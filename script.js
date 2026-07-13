@@ -830,9 +830,8 @@ function calculateTaxes() {
     const diff = state.lastSummaryData.diff;
     const feeAmount = state.lastSummaryData.fee;
     const k3FeeAmount = state.lastSummaryData.k3Fee;
-    const k3FareAmount = state.lastSummaryData.k3Fare;
     const passengerCount = state.lastSummaryData.pax;
-    const perPax = diff + feeAmount + k3FeeAmount + netTaxOnly + k3FareAmount + k3OnYQ;
+    const perPax = diff + feeAmount + k3FeeAmount + netTaxWithK3;
     const subTotal = perPax * passengerCount;
 
     els.perPax.value = `${result.currency}${formatAmount(perPax, result.currency)}`;
@@ -864,13 +863,13 @@ function buildCurrentSummaryData() {
   const netTaxOnly = state.lastTaxResult ? state.lastTaxResult.netTax : 0;
   const passengerCount = Math.max(1, parseInt(els.pax.value, 10) ?? 1);
   
-  // Recalculate perPax and subTotal to include tax adjustment
-  const perPax = diff + feeAmount + k3FeeAmount + netTaxOnly + k3FareAmount + k3OnYQ;
-  const subTotal = perPax * passengerCount;
   // Only add K3 to tax adjustment if currencies match
   const taxAdj = state.lastTaxResult 
     ? state.lastTaxResult.netTax + (state.lastFareCurrency === state.lastTaxResult.currency ? k3FareAmount + k3OnYQ : 0)
     : k3FareAmount + k3OnYQ;
+  // Recalculate perPax and subTotal to include tax adjustment
+  const perPax = diff + feeAmount + k3FeeAmount + taxAdj;
+  const subTotal = perPax * passengerCount;
 
   return {
     currency,
@@ -1074,7 +1073,7 @@ function calculateFare() {
   const k3OnYQ = state.lastTaxResult?.k3OnYQ ?? 0;
   // Include K3 on fare diff and K3 on YQ in net tax adjustment, not K3 on change fee
   const netTaxWithK3 = netTaxOnly + k3Fare + k3OnYQ;
-  const perPassenger = diff + fee.amount + k3Fee + netTaxOnly + k3Fare + k3OnYQ;
+  const perPassenger = diff + fee.amount + k3Fee + netTaxWithK3;
   const subTotal = perPassenger * passengerCount;
 
   els.taxAdj.value = `${currency}${formatAmount(netTaxWithK3, currency)}`;
