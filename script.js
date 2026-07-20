@@ -238,10 +238,20 @@ els.cabin.addEventListener('change', () => {
 els.applyK3OnFareDiff.addEventListener('change', () => {
   state.clearFareCache();
   debouncedCalculateFare();
+  // Also trigger tax calculation if tax values exist to update Add Taxes with combined K3
+  if (els.oldTax.value && els.newTax.value) {
+    state.clearTaxCache();
+    debouncedCalculateTaxes();
+  }
 });
 els.applyK3OnChangeFee.addEventListener('change', () => {
   state.clearFareCache();
   debouncedCalculateFare();
+  // Also trigger tax calculation if tax values exist to update Add Taxes with combined K3
+  if (els.oldTax.value && els.newTax.value) {
+    state.clearTaxCache();
+    debouncedCalculateTaxes();
+  }
 });
 els.applyK3OnYQ.addEventListener('change', () => {
   state.clearTaxCache();
