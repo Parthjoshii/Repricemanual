@@ -754,6 +754,45 @@ function parseTaxes(text, defaultCurrency, skipPaid = false) {
   return { taxes, paidTaxes };
 }
 
+function getCurrentFareK3State(currencyOverride = null) {
+  const oldFare = parseAmount(els.oldFare.value);
+  const newFare = parseAmount(els.newFare.value);
+  const explicitFareCurrency = oldFare?.currency ?? newFare?.currency;
+  const currency = explicitFareCurrency || currencyOverride || state.lastTaxResult?.currency || els.currency.value || 'INR';
+  const diff = oldFare && newFare ? newFare.amount - oldFare.amount : 0;
+  const feeAmount = parseAmount(els.changeFee.value)?.amount ?? 0;
+  const applyFareDiffK3 = els.applyK3OnFareDiff.checked;
+  const applyChangeFeeK3 = els.applyK3OnChangeFee.checked;
+  const cabin = els.cabin.value;
+  const k3Requested = (applyFareDiffK3 && diff > 0) || (applyChangeFeeK3 && feeAmount !== 0);
+
+  let k3Fare = 0;
+  let k3Fee = 0;
+
+  if (k3Requested && cabin) {
+    const rate = K3_RATES[cabin] ?? 0.05;
+    if (applyFareDiffK3 && diff > 0) {
+      k3Fare = diff * rate;
+    }
+    if (applyChangeFeeK3 && feeAmount !== 0) {
+      k3Fee = feeAmount * rate;
+    }
+  }
+
+  return {
+    currency,
+    diff,
+    feeAmount,
+    cabin,
+    k3Requested,
+    k3Fare,
+    k3Fee,
+    totalK3: k3Fare + k3Fee,
+    k3Label: (k3Fare + k3Fee) > 0 ? `${currency}${formatAmount(k3Fare + k3Fee, currency)}` : 'N/A',
+    k3FareStr: k3Fare > 0 ? `${currency}${formatAmount(k3Fare, currency)}K3` : '',
+  };
+}
+
 function calculateTaxes() {
   // Prevent recursive calls
   if (state.isCalculatingTax) return;
@@ -879,9 +918,8 @@ function calculateTaxes() {
 
   // Update fare calculator fields with recalculated values (without rendering summary)
   const netTaxOnly = result.netTax;
-  const k3FromFare = (result.currency === state.lastFareCurrency &&
-                       (els.applyK3OnFareDiff.checked || els.applyK3OnChangeFee.checked))
-                       ? state.lastFareK3Total : 0;
+  const fareK3State = getCurrentFareK3State(result.currency);
+  const k3FromFare = (result.currency === fareK3State.currency) ? fareK3State.totalK3 : 0;
   const totalK3 = k3FromFare + k3OnYQ;
   const netTaxWithK3 = netTaxOnly + totalK3;
 
@@ -891,7 +929,7 @@ function calculateTaxes() {
   if (state.lastSummaryData) {
     const diff = state.lastSummaryData.diff;
     const feeAmount = state.lastSummaryData.fee;
-    const k3FeeAmount = state.lastSummaryData.k3Fee;
+    const k3FeeAmount = fareK3State.k3Fee;
     const passengerCount = state.lastSummaryData.pax;
     const perPax = diff + feeAmount + k3FeeAmount + netTaxWithK3;
     const subTotal = perPax * passengerCount;
@@ -915,11 +953,10 @@ function buildCurrentSummaryData() {
   const fee = parseAmount(els.changeFee.value);
   const diff = oldFare && newFare ? newFare.amount - oldFare.amount : 0;
 
-  const k3FareAmount = extractK3FareFromAddTaxes();
+  const fareK3State = getCurrentFareK3State(state.lastTaxResult?.currency);
+  const k3FareAmount = fareK3State.k3Fare;
   // Only include K3 from fare if currencies match
-  const k3FeeAmount = (state.lastFareCurrency === state.lastTaxResult?.currency) 
-    ? Math.max(0, (state.lastFareK3Total ?? 0) - k3FareAmount) 
-    : 0;
+  const k3FeeAmount = (fareK3State.currency === state.lastTaxResult?.currency) ? fareK3State.k3Fee : 0;
   const k3OnYQ = state.lastTaxResult?.k3OnYQ ?? 0;
   const feeAmount = fee ? fee.amount : 0;
   const netTaxOnly = state.lastTaxResult ? state.lastTaxResult.netTax : 0;
@@ -927,7 +964,7 @@ function buildCurrentSummaryData() {
   
   // Only add K3 to tax adjustment if currencies match
   const taxAdj = state.lastTaxResult 
-    ? state.lastTaxResult.netTax + (state.lastFareCurrency === state.lastTaxResult.currency ? k3FareAmount + k3OnYQ : 0)
+    ? state.lastTaxResult.netTax + ((fareK3State.currency === state.lastTaxResult.currency) ? k3FareAmount + k3OnYQ : 0)
     : k3FareAmount + k3OnYQ;
   // Recalculate perPax and subTotal to include tax adjustment
   const perPax = diff + feeAmount + k3FeeAmount + taxAdj;
@@ -988,9 +1025,8 @@ function renderTaxResult(result) {
   els.taxResult.appendChild(fragment);
 
   // Calculate total K3 (fare diff K3 + YQ K3)
-  const k3FromFare = (result.currency === state.lastFareCurrency && 
-                       (els.applyK3OnFareDiff.checked || els.applyK3OnChangeFee.checked)) 
-                       ? state.lastFareK3Total : 0;
+  const fareK3State = getCurrentFareK3State();
+  const k3FromFare = (result.currency === fareK3State.currency) ? fareK3State.totalK3 : 0;
   const k3OnYQ = result.k3OnYQ || 0;
   const totalK3 = k3FromFare + k3OnYQ;
 
@@ -1003,8 +1039,8 @@ function renderTaxResult(result) {
   els.addTaxes.value = updateAddTaxesWithK3(positiveTaxStr, k3TaxStr);
   els.refundTaxes.value = result.negativeTaxes.join('/') || '';
 
-  if (state.lastFareK3Total > 0 && result.currency !== state.lastFareCurrency) {
-    showError(`K3 from last fare calculation (${state.lastFareCurrency}${formatAmount(state.lastFareK3Total, state.lastFareCurrency)}) is not added because tax currency is ${result.currency}.`);
+  if (fareK3State.totalK3 > 0 && result.currency !== fareK3State.currency) {
+    showError(`K3 from last fare calculation (${fareK3State.currency}${formatAmount(fareK3State.totalK3, fareK3State.currency)}) is not added because tax currency is ${result.currency}.`);
   }
   els.taxAdj.value = result.currency ? `${result.currency}${formatAmount(result.netTax + totalK3, result.currency)}` : '';
   state.lastTaxResult = result;
@@ -1052,7 +1088,7 @@ function calculateFare() {
     return;
   }
 
-  const currency = oldFare.currency ?? newFare.currency ?? els.currency.value;
+  const currency = oldFare.currency ?? newFare.currency ?? state.lastTaxResult?.currency ?? els.currency.value;
   if (oldFare.currency && newFare.currency && oldFare.currency !== newFare.currency) {
     showError('Old Fare and New Fare must use the same currency.');
     state.isCalculatingFare = false;
@@ -1066,11 +1102,13 @@ function calculateFare() {
   }
 
   const fee = parseAmount(els.changeFee.value) ?? { amount: 0, currency };
-  const applyFareDiffK3 = els.applyK3OnFareDiff.checked;
-  const applyChangeFeeK3 = els.applyK3OnChangeFee.checked;
   const passengerCount = Math.max(1, parseInt(els.pax.value, 10) ?? 1);
   const diff = newFare.amount - oldFare.amount;
   els.fareDiff.value = `${currency}${formatAmount(diff, currency)}`;
+
+  const fareK3State = getCurrentFareK3State(currency);
+  const applyFareDiffK3 = fareK3State.k3Requested && els.applyK3OnFareDiff.checked;
+  const applyChangeFeeK3 = fareK3State.k3Requested && els.applyK3OnChangeFee.checked;
 
   // Check cache
   const fareCacheKey = JSON.stringify({
@@ -1096,22 +1134,14 @@ function calculateFare() {
     return;
   }
 
-  let k3Fare = 0;
-  let k3Fee = 0;
-  let k3Label = 'N/A';
-  if ((applyFareDiffK3 && diff > 0) || (applyChangeFeeK3 && fee.amount !== 0)) {
-    if (!els.cabin.value) {
-      const cabinError = '⚠️ K3 requested. Select cabin to calculate K3.';
-      showError(cabinError);
-      state.isCalculatingFare = false;
-      return;
-    } else {
-      const rate = K3_RATES[els.cabin.value] ?? 0.05;
-      if (applyFareDiffK3 && diff > 0) k3Fare = diff * rate;
-      if (applyChangeFeeK3 && fee.amount !== 0) k3Fee = fee.amount * rate;
-      const k3Total = k3Fare + k3Fee;
-      k3Label = `${currency}${formatAmount(k3Total, currency)}`;
-    }
+  let k3Fare = fareK3State.k3Fare;
+  let k3Fee = fareK3State.k3Fee;
+  let k3Label = fareK3State.k3Label;
+  if (fareK3State.k3Requested && !fareK3State.cabin) {
+    const cabinError = '⚠️ K3 requested. Select cabin to calculate K3.';
+    showError(cabinError);
+    state.isCalculatingFare = false;
+    return;
   }
   els.k3Tax.value = k3Label;
 
