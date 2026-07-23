@@ -661,7 +661,9 @@ function parseAmount(text) {
 function parseTaxToken(token) {
   const trimmed = token.trim();
   if (!trimmed) return null;
-  const m = trimmed.match(/^([A-Z]{3})?\s*([+-]?\d+(?:\.\d+)?)\s*([A-Z0-9]{1,6})$/i);
+  const isPaid = trimmed.toUpperCase().startsWith('PD');
+  const content = isPaid ? trimmed.slice(2).trim() : trimmed;
+  const m = content.match(/^([A-Z]{3})?\s*([+-]?\d+(?:\.\d+)?)\s*([A-Z0-9]{1,6})$/i);
   if (!m) return null;
   const amount = parseFloat(m[2]);
   if (!Number.isFinite(amount)) return null;
@@ -669,6 +671,7 @@ function parseTaxToken(token) {
     currency: m[1] ? m[1].toUpperCase() : null,
     amount,
     code: m[3].toUpperCase(),
+    isPaid,
   };
 }
 
@@ -690,13 +693,18 @@ function formatTaxInput(text) {
   
   // Validate each entry: 3-letter currency + amount + 1-6 character tax code (letters or digits)
   const pattern = /^([A-Z]{3})(\d+(?:\.\d+)?)([A-Z0-9]{1,6})$/i;
+  const paidPattern = /^PD(?:([A-Z]{3}))?(\d+(?:\.\d+)?)([A-Z0-9]{1,6})$/i;
   
   entries.forEach(entry => {
-    // Skip PD (paid) entries - they are valid but should not be included in calculation
-    if (entry.trim().toUpperCase().startsWith('PD')) {
+    const normalized = entry.trim().toUpperCase();
+    const paidMatch = normalized.match(paidPattern);
+    if (paidMatch) {
+      const currency = paidMatch[1] ? paidMatch[1].toUpperCase() : '';
+      const formatted = currency ? `PD${currency}${paidMatch[2]}${paidMatch[3].toUpperCase()}` : `PD${paidMatch[2]}${paidMatch[3].toUpperCase()}`;
+      validEntries.push(formatted);
       return;
     }
-    const match = entry.match(pattern);
+    const match = normalized.match(pattern);
     if (match) {
       // Format as CurrencyAmountTaxCode (uppercase, no spaces)
       const formatted = `${match[1].toUpperCase()}${match[2]}${match[3].toUpperCase()}`;
@@ -727,22 +735,23 @@ function updateAddTaxesWithK3(baseAddTaxes, k3FareStr) {
 
 function parseTaxes(text, defaultCurrency, skipPaid = false) {
   const taxes = {};
-  if (!text) return taxes;
+  const paidTaxes = {};
+  if (!text) return { taxes, paidTaxes };
   const tokens = text.split(/[\/\n,]+/);
   tokens.forEach(token => {
-    // Skip entries with PD prefix (paid taxes) if skipPaid is true
-    if (skipPaid && token.trim().toUpperCase().startsWith('PD')) {
-      return;
-    }
     const parsed = parseTaxToken(token);
     if (parsed) {
       const code = parsed.code;
       const cur = parsed.currency || defaultCurrency;
       const key = `${cur}${code}`;
-      taxes[key] = (taxes[key] || 0) + parsed.amount;
+      if (parsed.isPaid) {
+        paidTaxes[key] = (paidTaxes[key] || 0) + parsed.amount;
+      } else {
+        taxes[key] = (taxes[key] || 0) + parsed.amount;
+      }
     }
   });
-  return taxes;
+  return { taxes, paidTaxes };
 }
 
 function calculateTaxes() {
@@ -767,11 +776,18 @@ function calculateTaxes() {
     return;
   }
 
-  const oldTaxes = parseTaxes(oldText, 'INR', true); // Skip PD (paid) entries in OLD TAX
-  const newTaxes = parseTaxes(newText, 'INR', false); // Include all entries in NEW TAX
+  const oldTaxData = parseTaxes(oldText, 'INR', true);
+  const newTaxData = parseTaxes(newText, 'INR', false);
+  const oldTaxes = oldTaxData.taxes;
+  const oldPaidTaxes = oldTaxData.paidTaxes;
+  const newTaxes = newTaxData.taxes;
 
   const allCurrencies = new Set();
   Object.keys(oldTaxes).forEach(k => {
+    const m = k.match(/^([A-Z]{3})/);
+    if (m) allCurrencies.add(m[1]);
+  });
+  Object.keys(oldPaidTaxes).forEach(k => {
     const m = k.match(/^([A-Z]{3})/);
     if (m) allCurrencies.add(m[1]);
   });
@@ -789,40 +805,45 @@ function calculateTaxes() {
     currency: null,
   };
 
-  allCurrencies.forEach(cur => {
-    if (!firstCurrency) firstCurrency = cur;
-    Object.keys(oldTaxes).forEach(k => {
-      if (k.startsWith(cur)) {
-        const code = k.substring(3);
-        const oldAmt = oldTaxes[k] || 0;
-        const newAmt = newTaxes[k] || 0;
-        const diff = newAmt - oldAmt;
-        if (diff > 0) {
-          const label = `${cur}${formatAmount(diff, cur)}${code}`;
-          result.positiveTaxes.push(label);
-          result.posTotal += diff;
-        } else if (diff < 0) {
-          const label = `-${cur}${formatAmount(Math.abs(diff), cur)}${code}`;
-          result.negativeTaxes.push(label);
-          result.negTotal += diff;
-        }
-      }
-    });
-    Object.keys(newTaxes).forEach(k => {
-      if (k.startsWith(cur) && !(k in oldTaxes)) {
-        const code = k.substring(3);
-        const newAmt = newTaxes[k];
-        if (newAmt > 0) {
-          const label = `${cur}${formatAmount(newAmt, cur)}${code}`;
-          result.positiveTaxes.push(label);
-          result.posTotal += newAmt;
-        } else if (newAmt < 0) {
-          const label = `-${cur}${formatAmount(Math.abs(newAmt), cur)}${code}`;
-          result.negativeTaxes.push(label);
-          result.negTotal += newAmt;
-        }
-      }
-    });
+  const allTaxCodes = new Set([
+    ...Object.keys(oldTaxes).map(k => k.substring(3)),
+    ...Object.keys(oldPaidTaxes).map(k => k.substring(3)),
+    ...Object.keys(newTaxes).map(k => k.substring(3)),
+  ]);
+
+  allTaxCodes.forEach(code => {
+    const matchingOldKeys = Object.keys(oldTaxes).filter(k => k.endsWith(code));
+    const matchingPaidKeys = Object.keys(oldPaidTaxes).filter(k => k.endsWith(code));
+    const matchingNewKeys = Object.keys(newTaxes).filter(k => k.endsWith(code));
+
+    const oldAmount = matchingOldKeys.reduce((sum, key) => sum + (oldTaxes[key] || 0), 0) +
+      matchingPaidKeys.reduce((sum, key) => sum + (oldPaidTaxes[key] || 0), 0);
+    const newAmount = matchingNewKeys.reduce((sum, key) => sum + (newTaxes[key] || 0), 0);
+    const diff = newAmount - oldAmount;
+
+    if (diff === 0) {
+      return;
+    }
+
+    const currency = matchingNewKeys.length > 0
+      ? matchingNewKeys[0].match(/^([A-Z]{3})/)[1]
+      : matchingOldKeys.length > 0
+        ? matchingOldKeys[0].match(/^([A-Z]{3})/)[1]
+        : matchingPaidKeys.length > 0
+          ? matchingPaidKeys[0].match(/^([A-Z]{3})/)[1]
+          : firstCurrency ?? 'INR';
+
+    if (!firstCurrency) firstCurrency = currency;
+
+    if (diff > 0) {
+      const label = `${currency}${formatAmount(diff, currency)}${code}`;
+      result.positiveTaxes.push(label);
+      result.posTotal += diff;
+    } else if (diff < 0) {
+      const label = `-${currency}${formatAmount(Math.abs(diff), currency)}${code}`;
+      result.negativeTaxes.push(label);
+      result.negTotal += diff;
+    }
   });
 
   result.currency = firstCurrency ?? 'INR';
