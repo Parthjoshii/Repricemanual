@@ -339,18 +339,18 @@ function parseFareCalcString() {
   const nucDiff = Math.abs(calculatedNuc - parsed.nuc);
   if (nucDiff < 0.01) {
     els.nucValidation.innerHTML = '<span class="success">✓ NUC Validation: PASS</span>';
+    // Validation passed: keep the fare calculation string exactly as entered
+    state.lastConvertedFareCalcString = input;
   } else {
     // Generate corrected fare string
     const correctedString = input.replace(/NUC\d+(?:\.\d+)?/, `NUC${calculatedNuc.toFixed(2)}`);
     els.nucValidation.innerHTML = `<span class="error">✗ NUC Validation: FAIL<br><br>Corrected Fare String:<br><span style="font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text-primary);">${correctedString}</span></span>`;
+    // Validation failed: use the corrected string for summaries
+    state.lastConvertedFareCalcString = correctedString;
   }
 
   // Display ROE
   els.roe.textContent = parsed.roe.toFixed(7);
-
-  // Keep the converted fare calculation string available for summaries
-  const convertedFareCalcString = input.replace(/NUC\d+(?:\.\d+)?/, `NUC${calculatedNuc.toFixed(2)}`);
-  state.lastConvertedFareCalcString = convertedFareCalcString;
 
   // Calculate and display base fare
   const baseFare = calculatedNuc * parsed.roe;
@@ -470,7 +470,7 @@ function handleSummarise() {
         k3Fee: 0,
         k3OnYQ: state.lastTaxResult.k3OnYQ || 0,
         fee: 0,
-        addTaxes: state.lastTaxResult.positiveTaxes.join('/') || '',
+        addTaxes: els.addTaxes.value || '',
         refundTaxes: state.lastTaxResult.negativeTaxes.join('/') || '',
         taxAdj: state.lastTaxResult.netTax + (state.lastTaxResult.k3OnYQ || 0),
         perPax: state.lastTaxResult.netTax + (state.lastTaxResult.k3OnYQ || 0),
@@ -919,7 +919,9 @@ function calculateTaxes() {
   // Update fare calculator fields with recalculated values (without rendering summary)
   const netTaxOnly = result.netTax;
   const fareK3State = getCurrentFareK3State(result.currency);
-  const k3FromFare = (result.currency === fareK3State.currency) ? fareK3State.totalK3 : 0;
+  // Change-fee K3 is excluded here; it is added separately via k3FeeAmount below and belongs
+  // to the Change Fee field, not the tax adjustment / Add Taxes total.
+  const k3FromFare = (result.currency === fareK3State.currency) ? fareK3State.k3Fare : 0;
   const totalK3 = k3FromFare + k3OnYQ;
   const netTaxWithK3 = netTaxOnly + totalK3;
 
@@ -937,10 +939,12 @@ function calculateTaxes() {
     els.perPax.value = `${result.currency}${formatAmount(perPax, result.currency)}`;
     els.subTotal.value = `${result.currency}${formatAmount(subTotal, result.currency)}`;
 
-    // Update stored summary data with new tax adjustment
+    // Update stored summary data with new tax adjustment and Add Taxes text (K3 on YQ may have changed)
     state.lastSummaryData.taxAdj = netTaxWithK3;
     state.lastSummaryData.perPax = perPax;
     state.lastSummaryData.subTotal = subTotal;
+    state.lastSummaryData.addTaxes = els.addTaxes.value;
+    state.lastSummaryData.k3OnYQ = k3OnYQ;
   }
 
   state.isCalculatingTax = false;
@@ -1024,9 +1028,10 @@ function renderTaxResult(result) {
   els.taxResult.innerHTML = '';
   els.taxResult.appendChild(fragment);
 
-  // Calculate total K3 (fare diff K3 + YQ K3)
+  // Calculate total K3 (fare diff K3 + YQ K3). Change-fee K3 is excluded here since it is
+  // already reflected in the Change Fee field, not the Add Taxes field.
   const fareK3State = getCurrentFareK3State();
-  const k3FromFare = (result.currency === fareK3State.currency) ? fareK3State.totalK3 : 0;
+  const k3FromFare = (result.currency === fareK3State.currency) ? fareK3State.k3Fare : 0;
   const k3OnYQ = result.k3OnYQ || 0;
   const totalK3 = k3FromFare + k3OnYQ;
 
@@ -1039,8 +1044,8 @@ function renderTaxResult(result) {
   els.addTaxes.value = updateAddTaxesWithK3(positiveTaxStr, k3TaxStr);
   els.refundTaxes.value = result.negativeTaxes.join('/') || '';
 
-  if (fareK3State.totalK3 > 0 && result.currency !== fareK3State.currency) {
-    showError(`K3 from last fare calculation (${fareK3State.currency}${formatAmount(fareK3State.totalK3, fareK3State.currency)}) is not added because tax currency is ${result.currency}.`);
+  if (fareK3State.k3Fare > 0 && result.currency !== fareK3State.currency) {
+    showError(`K3 from last fare calculation (${fareK3State.currency}${formatAmount(fareK3State.k3Fare, fareK3State.currency)}) is not added because tax currency is ${result.currency}.`);
   }
   els.taxAdj.value = result.currency ? `${result.currency}${formatAmount(result.netTax + totalK3, result.currency)}` : '';
   state.lastTaxResult = result;
@@ -1148,22 +1153,24 @@ function calculateFare() {
   // Track K3 fare state to preserve it if tax adjustment is recalculated later
   state.updateFareK3(currency, k3Fare + k3Fee, k3Fare > 0 ? `${currency}${formatAmount(k3Fare, currency)}K3` : '');
 
-  // Append K3 Fare Diff to Add Taxes (remove any existing K3 first to prevent duplication)
-  if (k3Fare > 0) {
+  const netTaxOnly = state.lastTaxResult ? state.lastTaxResult.netTax : 0;
+  const k3OnYQ = state.lastTaxResult?.k3OnYQ ?? 0;
+
+  // Append combined K3 (fare diff + YQ) to Add Taxes (remove any existing K3 first to prevent duplication)
+  const k3ForAddTaxes = k3Fare + k3OnYQ;
+  if (k3ForAddTaxes > 0) {
     // Remove existing K3 entries first to ensure clean state
     removeK3FFromAddTaxes();
     // Append new K3
-    const k3FareStr = `${currency}${formatAmount(k3Fare, currency)}K3`;
+    const k3FareStr = `${currency}${formatAmount(k3ForAddTaxes, currency)}K3`;
     els.addTaxes.value = updateAddTaxesWithK3(els.addTaxes.value, k3FareStr);
   } else {
-    // Remove K3 entries if K3 is not applied (checkbox deselected)
+    // Remove K3 entries if K3 is not applied (checkboxes deselected)
     removeK3FFromAddTaxes();
   }
 
   const feeWithK3 = fee.amount + k3Fee;
   const k3Total = k3Fare + k3Fee;
-  const netTaxOnly = state.lastTaxResult ? state.lastTaxResult.netTax : 0;
-  const k3OnYQ = state.lastTaxResult?.k3OnYQ ?? 0;
   // Include K3 on fare diff and K3 on YQ in net tax adjustment, not K3 on change fee
   const netTaxWithK3 = netTaxOnly + k3Fare + k3OnYQ;
   const perPassenger = diff + fee.amount + k3Fee + netTaxWithK3;
