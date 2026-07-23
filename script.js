@@ -393,14 +393,19 @@ function parseFareCalcStringInternal(input) {
   // Examples: Q5.00, QDXB5.00, Q DXBDXB4.00, Q DXBBOM4.00
   // Pattern 2: Number followed by Q, then optional airport codes (3 or 6 letters)
   // Examples: 58.47QDUB, 58.47Q DUB, 470.74QHAM
+  // Pattern 3: Q before airport code, number, then Q after (Q-number-Q pattern)
+  // Examples: Q DUBCOK58.47Q, QCOKDUB58.47Q
+  // Pattern 4: Airport code (6 letters) followed by number (no Q)
+  // Examples: DUBCOK18.82, COKDUB23.41
   // Q surcharge pattern — negative lookbehind ensures Q is NOT part of a fare basis code
   // (e.g. 256.70QWEEPIN1 — the Q here is preceded by "1" so lookbehind rejects it)
-  // Handles: Q5.00 / QBOM5.00 / Q BOM5.00 / Q BOMCCU5.00 / Q5 (integer) / 58.47QDUB / 470.74QHAM
-  const qPattern = /(?<![A-Z0-9])Q\s*(?:[A-Z]{3}){0,2}(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])/g;
+  // Handles: Q5.00 / QBOM5.00 / Q BOM5.00 / Q BOMCCU5.00 / Q5 (integer) / 58.47QDUB / 470.74QHAM / Q DUBCOK58.47Q / DUBCOK18.82
+  const qPattern = /(?<![A-Z0-9])Q\s*(?:[A-Z]{3}){0,2}(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(\d+(?:\.\d+)?)(?![A-Z0-9])/g;
   let qMatch;
   while ((qMatch = qPattern.exec(input)) !== null) {
-    // Match group 1 is for Q-first pattern, group 2 is for number-first pattern
-    const amount = qMatch[1] || qMatch[2];
+    // Match group 1 is for Q-first pattern, group 2 for number-first pattern
+    // Match group 3 is for Q-number-Q pattern, group 4 for airport-number pattern
+    const amount = qMatch[1] || qMatch[2] || qMatch[3] || qMatch[4];
     if (amount) {
       result.qSurcharges.push(parseFloat(amount));
     }
@@ -704,11 +709,15 @@ function updateAddTaxesWithK3(baseAddTaxes, k3FareStr) {
   return [cleaned, k3FareStr].filter(Boolean).join('/');
 }
 
-function parseTaxes(text, defaultCurrency) {
+function parseTaxes(text, defaultCurrency, skipPaid = false) {
   const taxes = {};
   if (!text) return taxes;
   const tokens = text.split(/[\/\n,]+/);
   tokens.forEach(token => {
+    // Skip entries with PD prefix (paid taxes) if skipPaid is true
+    if (skipPaid && token.trim().toUpperCase().startsWith('PD')) {
+      return;
+    }
     const parsed = parseTaxToken(token);
     if (parsed) {
       const code = parsed.code;
@@ -742,8 +751,8 @@ function calculateTaxes() {
     return;
   }
 
-  const oldTaxes = parseTaxes(oldText, 'INR');
-  const newTaxes = parseTaxes(newText, 'INR');
+  const oldTaxes = parseTaxes(oldText, 'INR', true); // Skip PD (paid) entries in OLD TAX
+  const newTaxes = parseTaxes(newText, 'INR', false); // Include all entries in NEW TAX
 
   const allCurrencies = new Set();
   Object.keys(oldTaxes).forEach(k => {
