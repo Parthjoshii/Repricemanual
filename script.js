@@ -1197,13 +1197,13 @@ function renderSummary(data) {
   }
 
   rows.push(
-    ['Converted Fare Calculation String', data.convertedFareCalcString || '-'],
     ['Add Taxes', data.addTaxes ?? '-'],
     ['Refund Taxes', data.refundTaxes ?? '-'],
     ['Tax Adjustment (Net)', `${data.currency}${formatAmount(data.taxAdj, data.currency)}`],
     ['Amount Payable per Pax', `${data.currency}${formatAmount(data.perPax, data.currency)}`],
     ['No. of Pax', data.pax],
     ['Sub Total', `${data.currency}${formatAmount(data.subTotal, data.currency)}`],
+    ['Fare Calculation String', data.convertedFareCalcString || '-'],
   );
 
   // Use DocumentFragment for batch DOM updates
