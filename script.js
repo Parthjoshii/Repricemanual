@@ -105,10 +105,13 @@ const state = {
   lastFareCurrency: null,
   lastK3AddTaxes: '',
   lastSummaryData: null,
+  lastConvertedFareCalcString: null,
   taxCalculationCache: new Map(),
   fareCalculationCache: new Map(),
   isCalculatingTax: false,
   isCalculatingFare: false,
+  // Fare calculation string state
+  lastFareCalcString: null,
   updateFareK3(currency, total, addTaxesStr) {
     this.lastFareCurrency = currency;
     this.lastFareK3Total = total;
@@ -290,6 +293,7 @@ function parseFareCalcString() {
   if (parsed.nuc === null) {
     showError('NUC not found in the string. Format: NUC followed by number (e.g., NUC506.77)');
     els.parserResults.style.display = 'none';
+    state.lastConvertedFareCalcString = null;
     return;
   }
 
@@ -343,6 +347,10 @@ function parseFareCalcString() {
 
   // Display ROE
   els.roe.textContent = parsed.roe.toFixed(7);
+
+  // Keep the converted fare calculation string available for summaries
+  const convertedFareCalcString = input.replace(/NUC\d+(?:\.\d+)?/, `NUC${calculatedNuc.toFixed(2)}`);
+  state.lastConvertedFareCalcString = convertedFareCalcString;
 
   // Calculate and display base fare
   const baseFare = calculatedNuc * parsed.roe;
@@ -431,6 +439,7 @@ function parseFareCalcStringInternal(input) {
 function clearParser() {
   els.fareCalcString.value = '';
   els.parserResults.style.display = 'none';
+  state.lastConvertedFareCalcString = null;
 }
 
 function toggleParserSection() {
@@ -467,6 +476,7 @@ function handleSummarise() {
         perPax: state.lastTaxResult.netTax + (state.lastTaxResult.k3OnYQ || 0),
         subTotal: state.lastTaxResult.netTax + (state.lastTaxResult.k3OnYQ || 0),
         pax: 1,
+        convertedFareCalcString: state.lastConvertedFareCalcString || '',
       };
     } else {
       // Fare data exists, tax data is already incorporated in the fare calculation
@@ -682,6 +692,10 @@ function formatTaxInput(text) {
   const pattern = /^([A-Z]{3})(\d+(?:\.\d+)?)([A-Z0-9]{1,6})$/i;
   
   entries.forEach(entry => {
+    // Skip PD (paid) entries - they are valid but should not be included in calculation
+    if (entry.trim().toUpperCase().startsWith('PD')) {
+      return;
+    }
     const match = entry.match(pattern);
     if (match) {
       // Format as CurrencyAmountTaxCode (uppercase, no spaces)
@@ -913,6 +927,7 @@ function buildCurrentSummaryData() {
     perPax,
     subTotal,
     pax: passengerCount,
+    convertedFareCalcString: state.lastConvertedFareCalcString || '',
   };
 }
 
@@ -1122,6 +1137,7 @@ function calculateFare() {
     perPax: perPassenger,
     subTotal,
     pax: passengerCount,
+    convertedFareCalcString: state.lastConvertedFareCalcString || '',
   };
 
   // Store in cache
@@ -1160,6 +1176,7 @@ function renderSummary(data) {
   }
 
   rows.push(
+    ['Converted Fare Calculation String', data.convertedFareCalcString || '-'],
     ['Add Taxes', data.addTaxes ?? '-'],
     ['Refund Taxes', data.refundTaxes ?? '-'],
     ['Tax Adjustment (Net)', `${data.currency}${formatAmount(data.taxAdj, data.currency)}`],
