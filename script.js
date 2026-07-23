@@ -389,15 +389,21 @@ function parseFareCalcStringInternal(input) {
   }
 
   // Extract Q surcharges
-  // Pattern: Q followed by optional space, then optional airport codes (3 or 6 letters), then a number
+  // Pattern 1: Q followed by optional space, then optional airport codes (3 or 6 letters), then a number
   // Examples: Q5.00, QDXB5.00, Q DXBDXB4.00, Q DXBBOM4.00
+  // Pattern 2: Number followed by Q, then optional airport codes (3 or 6 letters)
+  // Examples: 58.47QDUB, 58.47Q DUB, 470.74QHAM
   // Q surcharge pattern — negative lookbehind ensures Q is NOT part of a fare basis code
   // (e.g. 256.70QWEEPIN1 — the Q here is preceded by "1" so lookbehind rejects it)
-  // Handles: Q5.00 / QBOM5.00 / Q BOM5.00 / Q BOMCCU5.00 / Q5 (integer)
-  const qPattern = /(?<![A-Z0-9])Q\s*(?:[A-Z]{3}){0,2}(\d+(?:\.\d+)?)/g;
+  // Handles: Q5.00 / QBOM5.00 / Q BOM5.00 / Q BOMCCU5.00 / Q5 (integer) / 58.47QDUB / 470.74QHAM
+  const qPattern = /(?<![A-Z0-9])Q\s*(?:[A-Z]{3}){0,2}(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])/g;
   let qMatch;
   while ((qMatch = qPattern.exec(input)) !== null) {
-    result.qSurcharges.push(parseFloat(qMatch[1]));
+    // Match group 1 is for Q-first pattern, group 2 is for number-first pattern
+    const amount = qMatch[1] || qMatch[2];
+    if (amount) {
+      result.qSurcharges.push(parseFloat(amount));
+    }
   }
 
   // Extract NUC
