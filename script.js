@@ -97,12 +97,64 @@ const els = {
   baseFare: byId('baseFare'),
   parserToggleBtn: byId('parserToggleBtn'),
   parserCollapsible: byId('parserCollapsible'),
-  ptcTabADT: byId('ptcTabADT'),
-  ptcTabCNN: byId('ptcTabCNN'),
-  ptcTabINF: byId('ptcTabINF'),
+  ptcTabs: document.querySelector('.ptc-tabs'),
+  ptcAddTabButton: byId('ptcAddTabButton'),
+  ptcPromptModal: byId('ptcPromptModal'),
+  ptcPromptMessage: byId('ptcPromptMessage'),
+  ptcPromptInput: byId('ptcPromptInput'),
+  ptcPromptOkBtn: byId('ptcPromptOkBtn'),
+  ptcPromptCancelBtn: byId('ptcPromptCancelBtn'),
 };
 
+// In-app replacement for window.prompt()/confirm() — some embedded browser previews (e.g.
+// VS Code's Simple Browser) silently block native dialogs with no visible error, which made
+// the custom-tab "+" button appear completely broken. This modal has no such dependency.
+// requireInput: true shows a text field and resolves with the trimmed string (or null if
+// cancelled); false hides the field and resolves true/false (a plain OK/Cancel confirmation).
+function showPtcPrompt({ message, defaultValue = '', requireInput = true }) {
+  return new Promise((resolve) => {
+    els.ptcPromptMessage.textContent = message;
+    els.ptcPromptInput.style.display = requireInput ? 'block' : 'none';
+    els.ptcPromptInput.value = defaultValue;
+    els.ptcPromptModal.classList.add('show');
+    if (requireInput) {
+      els.ptcPromptInput.focus();
+      els.ptcPromptInput.select();
+    } else {
+      els.ptcPromptOkBtn.focus();
+    }
+
+    function cleanup(result) {
+      els.ptcPromptModal.classList.remove('show');
+      els.ptcPromptOkBtn.removeEventListener('click', onOk);
+      els.ptcPromptCancelBtn.removeEventListener('click', onCancel);
+      els.ptcPromptModal.removeEventListener('keydown', onKeydown);
+      resolve(result);
+    }
+    function onOk() {
+      cleanup(requireInput ? els.ptcPromptInput.value.trim() : true);
+    }
+    function onCancel() {
+      cleanup(requireInput ? null : false);
+    }
+    function onKeydown(e) {
+      // stopPropagation so this doesn't also reach the document-level keydown handler, which
+      // would otherwise treat a bare Enter as "calculate fare" (it doesn't know this modal exists).
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); onOk(); }
+      else if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); onCancel(); }
+    }
+    els.ptcPromptOkBtn.addEventListener('click', onOk);
+    els.ptcPromptCancelBtn.addEventListener('click', onCancel);
+    // Attached to the modal (not just the input) so Enter/Escape work regardless of which
+    // control currently has focus (input in name/rename mode, OK button in confirm-only mode).
+    els.ptcPromptModal.addEventListener('keydown', onKeydown);
+  });
+}
+
+// The first 3 codes are the fixed built-in tabs; anything beyond that is a user-added custom
+// tab (see addCustomTab/renameCustomTab/removeCustomTab), capped at MAX_CUSTOM_PTC_TABS.
 const PTC_CODES = ['ADT', 'CNN', 'INF'];
+const MAX_CUSTOM_PTC_TABS = 2;
 
 // Every field whose value should be saved/restored when switching passenger-type tabs.
 // 'value' fields are plain inputs/selects/textareas; 'checked' are checkboxes; 'html' fields
@@ -207,14 +259,20 @@ function getActivePtcCodes() {
   return PTC_CODES.filter(hasPtcData);
 }
 
+function ptcTabButton(code) {
+  return els.ptcTabs.querySelector(`.ptc-tab[data-ptc="${code}"]`);
+}
+
 function updatePtcTabUI() {
   PTC_CODES.forEach(ptc => {
-    const btn = els[`ptcTab${ptc}`];
+    const btn = ptcTabButton(ptc);
     if (!btn) return;
     const isActive = ptc === state.activePtc;
     btn.setAttribute('aria-selected', String(isActive));
     btn.classList.toggle('has-data', hasPtcData(ptc));
   });
+  const customCount = PTC_CODES.length - 3;
+  els.ptcAddTabButton.hidden = customCount >= MAX_CUSTOM_PTC_TABS;
 }
 
 function switchPtcTab(newPtc) {
@@ -222,6 +280,121 @@ function switchPtcTab(newPtc) {
   state.ptcData[state.activePtc].formSnapshot = snapshotPtc();
   state.activePtc = newPtc;
   restorePtc(state.ptcData[newPtc].formSnapshot || defaultPtcSnapshot());
+  updatePtcTabUI();
+}
+
+// Turns a user-typed tab name into a short, unique, alphanumeric internal key — used only as
+// the state.ptcData/PTC_CODES key and data-ptc attribute; the typed label is stored separately
+// in PTC_LABELS and is the only thing shown to the user (see renameCustomTab).
+function generatePtcCode(label) {
+  const base = (label.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10) || 'TAB');
+  let code = base;
+  let n = 2;
+  while (PTC_CODES.includes(code)) {
+    code = `${base}${n}`;
+    n += 1;
+  }
+  return code;
+}
+
+function isDuplicatePtcLabel(label, excludingCode = null) {
+  const normalized = label.trim().toLowerCase();
+  return PTC_CODES.some(code => {
+    if (code === excludingCode) return false;
+    const existingLabel = PTC_LABELS[code] || code;
+    return existingLabel.toLowerCase() === normalized;
+  });
+}
+
+function buildCustomTabButton(code, label) {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'ptc-tab custom';
+  btn.dataset.ptc = code;
+  btn.setAttribute('role', 'tab');
+  btn.setAttribute('aria-selected', 'false');
+
+  const labelSpan = document.createElement('span');
+  labelSpan.className = 'ptc-tab-label';
+  labelSpan.textContent = label;
+  btn.appendChild(labelSpan);
+
+  const renameIcon = document.createElement('span');
+  renameIcon.className = 'ptc-tab-action';
+  renameIcon.textContent = '✎';
+  renameIcon.title = 'Rename tab';
+  renameIcon.addEventListener('click', (e) => {
+    e.stopPropagation();
+    renameCustomTab(code);
+  });
+  btn.appendChild(renameIcon);
+
+  const removeIcon = document.createElement('span');
+  removeIcon.className = 'ptc-tab-action';
+  removeIcon.textContent = '×';
+  removeIcon.title = 'Remove tab';
+  removeIcon.addEventListener('click', (e) => {
+    e.stopPropagation();
+    removeCustomTab(code);
+  });
+  btn.appendChild(removeIcon);
+
+  const dot = document.createElement('span');
+  dot.className = 'ptc-tab-dot';
+  dot.setAttribute('aria-hidden', 'true');
+  btn.appendChild(dot);
+
+  return btn;
+}
+
+async function addCustomTab() {
+  if (PTC_CODES.length - 3 >= MAX_CUSTOM_PTC_TABS) return;
+  const label = await showPtcPrompt({ message: 'Name this tab:' });
+  if (!label) return;
+  if (isDuplicatePtcLabel(label)) {
+    showError(`A tab named "${label}" already exists.`);
+    return;
+  }
+
+  const code = generatePtcCode(label);
+  PTC_CODES.push(code);
+  state.ptcData[code] = { formSnapshot: null, summaryData: null };
+  PTC_LABELS[code] = label;
+
+  const btn = buildCustomTabButton(code, label);
+  els.ptcAddTabButton.insertAdjacentElement('beforebegin', btn);
+
+  switchPtcTab(code);
+}
+
+async function renameCustomTab(code) {
+  const currentLabel = PTC_LABELS[code] || code;
+  const label = await showPtcPrompt({ message: 'Rename tab:', defaultValue: currentLabel });
+  if (!label || label === currentLabel) return;
+  if (isDuplicatePtcLabel(label, code)) {
+    showError(`A tab named "${label}" already exists.`);
+    return;
+  }
+  PTC_LABELS[code] = label;
+  const btn = ptcTabButton(code);
+  if (btn) btn.querySelector('.ptc-tab-label').textContent = label;
+}
+
+async function removeCustomTab(code) {
+  const confirmed = await showPtcPrompt({
+    message: `Remove the "${PTC_LABELS[code] || code}" tab? Its data will be lost.`,
+    requireInput: false,
+  });
+  if (!confirmed) return;
+  if (state.activePtc === code) {
+    switchPtcTab('ADT');
+  }
+  const index = PTC_CODES.indexOf(code);
+  if (index !== -1) PTC_CODES.splice(index, 1);
+  delete state.ptcData[code];
+  delete PTC_LABELS[code];
+  const btn = ptcTabButton(code);
+  if (btn) btn.remove();
   updatePtcTabUI();
 }
 
@@ -327,8 +500,11 @@ els.copyGdsButton.addEventListener('click', copyGdsString);
 els.taxToggleBtn.addEventListener('click', toggleTaxSection);
 els.parserToggleBtn.addEventListener('click', toggleParserSection);
 els.summariseButton.addEventListener('click', handleSummarise);
-PTC_CODES.forEach(ptc => {
-  els[`ptcTab${ptc}`].addEventListener('click', () => switchPtcTab(ptc));
+els.ptcAddTabButton.addEventListener('click', addCustomTab);
+// Delegated so dynamically-added custom tab buttons work with no per-button wiring.
+els.ptcTabs.addEventListener('click', (e) => {
+  const btn = e.target.closest('.ptc-tab[data-ptc]');
+  if (btn) switchPtcTab(btn.dataset.ptc);
 });
 
 // Live calculation triggers (debounced for calculation, immediate for validation)
@@ -1447,7 +1623,7 @@ function buildSummaryTable(breakdown, amountPayable) {
   breakdown.forEach(({ ptc, data }) => {
     const tr = document.createElement('tr');
     const tdLabel = document.createElement('td');
-    tdLabel.innerHTML = `<b>Fare Calculation String ${ptc}</b>`;
+    tdLabel.innerHTML = `<b>Fare Calculation String ${PTC_LABELS[ptc] || ptc}</b>`;
     const tdVal = document.createElement('td');
     tdVal.colSpan = valueColSpan;
     tdVal.textContent = data.convertedFareCalcString || '-';
@@ -1562,7 +1738,7 @@ function generateGdsString(data, breakdown = null) {
   if (breakdown && breakdown.length > 1) {
     // els.gdsString is a single-line <input>, so PTC lines are pipe-separated rather than
     // newline-separated (a newline would be silently dropped/garbled in an <input> value).
-    const lines = breakdown.map(({ ptc, data: ptcData }) => `${ptc} ${buildGdsLine(ptcData)}`);
+    const lines = breakdown.map(({ ptc, data: ptcData }) => `${PTC_LABELS[ptc] || ptc} ${buildGdsLine(ptcData)}`);
     lines.push(`TOTAL = ${data.currency}${formatAmount(data.subTotal, data.currency)}`);
     return lines.join('  |  ');
   }

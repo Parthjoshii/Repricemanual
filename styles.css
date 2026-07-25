@@ -143,6 +143,15 @@ h1 {
   cursor: pointer;
   font-weight: 700;
 }
+.modal-input {
+  width: 100%;
+  margin: 0 0 20px;
+}
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
 .modal-close-btn:hover {
   background: var(--primary-hover);
   color: white;
@@ -444,6 +453,39 @@ th {
 }
 .ptc-tab.has-data .ptc-tab-dot {
   background: var(--primary-cyan);
+}
+.ptc-add-tab {
+  background: transparent;
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  font-weight: 700;
+  padding: 8px 14px;
+  margin: 4px 0;
+  cursor: pointer;
+  transform: none;
+  transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease;
+}
+.ptc-add-tab:hover {
+  background: var(--bg-card);
+  color: var(--primary-cyan);
+  border-color: var(--primary-cyan);
+  transform: none;
+}
+.ptc-add-tab[hidden] {
+  display: none;
+}
+.ptc-tab-action {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  padding: 2px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.ptc-tab-action:hover {
+  color: var(--text-primary);
+  background: rgba(148, 163, 184, 0.2);
 }
 @media (max-width: 1024px) {
   .calculator-container {
