@@ -663,7 +663,11 @@ function parseTaxToken(token) {
   if (!trimmed) return null;
   const isPaid = trimmed.toUpperCase().startsWith('PD');
   const content = isPaid ? trimmed.slice(2).trim() : trimmed;
-  const m = content.match(/^([A-Z]{3})?\s*([+-]?\d+(?:\.\d+)?)\s*([A-Z0-9]{1,6})$/i);
+  // Tax/fee codes are always exactly 2 characters (IATA convention, e.g. YQ, K3, 6A) — anchoring
+  // the code group to {2} instead of {1,6} stops a greedy amount match from swallowing the
+  // leading digit of a digit+letter code like "6A" (e.g. "10006A" is amount 1000, code 6A,
+  // not amount 10006, code A).
+  const m = content.match(/^([A-Z]{3})?\s*([+-]?\d+(?:\.\d+)?)\s*([A-Z0-9]{2})$/i);
   if (!m) return null;
   const amount = parseFloat(m[2]);
   if (!Number.isFinite(amount)) return null;
@@ -691,9 +695,10 @@ function formatTaxInput(text) {
   const validEntries = [];
   const invalidEntries = [];
   
-  // Validate each entry: 3-letter currency + amount + 1-6 character tax code (letters or digits)
-  const pattern = /^([A-Z]{3})(\d+(?:\.\d+)?)([A-Z0-9]{1,6})$/i;
-  const paidPattern = /^PD(?:([A-Z]{3}))?(\d+(?:\.\d+)?)([A-Z0-9]{1,6})$/i;
+  // Validate each entry: 3-letter currency + amount + exactly 2-character tax code (letters
+  // and/or digits, e.g. YQ, K3, 6A — see parseTaxToken for why this must be exactly 2, not 1-6).
+  const pattern = /^([A-Z]{3})(\d+(?:\.\d+)?)([A-Z0-9]{2})$/i;
+  const paidPattern = /^PD(?:([A-Z]{3}))?(\d+(?:\.\d+)?)([A-Z0-9]{2})$/i;
   
   entries.forEach(entry => {
     const normalized = entry.trim().toUpperCase();
@@ -733,24 +738,22 @@ function updateAddTaxesWithK3(baseAddTaxes, k3FareStr) {
   return [cleaned, k3FareStr].filter(Boolean).join('/');
 }
 
+// "PD" only marks an entry as already paid for the reader's benefit — it does not change how
+// the entry is totaled. Both PD and non-PD amounts for a code are summed into the same bucket
+// on each side, so: identical PD amounts restated on both sides net to a 0 diff (nothing owed),
+// while any extra amount on either side (PD or not) still shows up as the real difference.
 function parseTaxes(text) {
   const taxes = {};
-  const paidTaxes = {};
-  if (!text) return { taxes, paidTaxes, currency: null };
+  if (!text) return { taxes, currency: null };
   const tokens = text.split(/[\/\n,]+/);
   const parsedTokens = tokens.map(parseTaxToken).filter(Boolean);
   const inferredCurrency = parsedTokens.find(t => t.currency)?.currency || 'INR';
   parsedTokens.forEach(parsed => {
-    const code = parsed.code;
     const cur = parsed.currency || inferredCurrency;
-    const key = `${cur}${code}`;
-    if (parsed.isPaid) {
-      paidTaxes[key] = (paidTaxes[key] || 0) + parsed.amount;
-    } else {
-      taxes[key] = (taxes[key] || 0) + parsed.amount;
-    }
+    const key = `${cur}${parsed.code}`;
+    taxes[key] = (taxes[key] || 0) + parsed.amount;
   });
-  return { taxes, paidTaxes, currency: inferredCurrency };
+  return { taxes, currency: inferredCurrency };
 }
 
 function getCurrentFareK3State(currencyOverride = null) {
@@ -828,8 +831,9 @@ function calculateTaxes() {
     currency: null,
   };
 
-  // PD-marked entries are already settled and are excluded from oldTaxes/newTaxes,
-  // so any additional non-PD amount on either side still diffs correctly here.
+  // PD amounts are merged into oldTaxes/newTaxes just like regular entries (see parseTaxes),
+  // so a code that's fully restated (PD or not) on both sides nets to a 0 diff automatically,
+  // while any genuinely extra amount on either side still comes through as the real difference.
   const allTaxCodes = new Set([
     ...Object.keys(oldTaxes).map(k => k.substring(3)),
     ...Object.keys(newTaxes).map(k => k.substring(3)),
