@@ -97,7 +97,133 @@ const els = {
   baseFare: byId('baseFare'),
   parserToggleBtn: byId('parserToggleBtn'),
   parserCollapsible: byId('parserCollapsible'),
+  ptcTabADT: byId('ptcTabADT'),
+  ptcTabCNN: byId('ptcTabCNN'),
+  ptcTabINF: byId('ptcTabINF'),
 };
+
+const PTC_CODES = ['ADT', 'CNN', 'INF'];
+
+// Every field whose value should be saved/restored when switching passenger-type tabs.
+// 'value' fields are plain inputs/selects/textareas; 'checked' are checkboxes; 'html' fields
+// are readonly display elements whose content is only ever set by render functions (not typed
+// by the user) so they're restored via innerHTML rather than recomputed.
+const PTC_SNAPSHOT_FIELDS = [
+  { id: 'currency', kind: 'value' },
+  { id: 'cabin', kind: 'value' },
+  { id: 'oldFare', kind: 'value' },
+  { id: 'newFare', kind: 'value' },
+  { id: 'fareDiff', kind: 'value' },
+  { id: 'k3Tax', kind: 'value' },
+  { id: 'changeFee', kind: 'value' },
+  { id: 'applyK3OnFareDiff', kind: 'checked' },
+  { id: 'applyK3OnChangeFee', kind: 'checked' },
+  { id: 'applyK3OnYQ', kind: 'checked' },
+  { id: 'inrMessage', kind: 'html' },
+  { id: 'oldTax', kind: 'value' },
+  { id: 'newTax', kind: 'value' },
+  { id: 'taxResult', kind: 'html' },
+  { id: 'addTaxes', kind: 'value' },
+  { id: 'refundTaxes', kind: 'value' },
+  { id: 'taxAdj', kind: 'value' },
+  { id: 'perPax', kind: 'value' },
+  { id: 'pax', kind: 'value' },
+  { id: 'subTotal', kind: 'value' },
+  { id: 'fareCalcString', kind: 'value' },
+];
+
+// JS-level state.* fields that calculateFare()/calculateTaxes()/parseFareCalcString() read and
+// write as "the current working set" — swapped alongside the DOM fields above on tab switch.
+const PTC_STATE_KEYS = [
+  'lastTaxResult', 'lastFareK3Total', 'lastFareCurrency', 'lastK3AddTaxes',
+  'lastSummaryData', 'lastConvertedFareCalcString',
+];
+
+function defaultPtcSnapshot() {
+  const fields = {};
+  PTC_SNAPSHOT_FIELDS.forEach(({ id, kind }) => {
+    if (kind === 'checked') fields[id] = false;
+    else fields[id] = '';
+  });
+  fields.pax = '1';
+  const stateValues = {};
+  PTC_STATE_KEYS.forEach(key => { stateValues[key] = key === 'lastFareK3Total' ? 0 : (key === 'lastK3AddTaxes' ? '' : null); });
+  return { fields, stateValues, parserVisible: false, qSurchargesVisible: false };
+}
+
+function snapshotPtc() {
+  const fields = {};
+  PTC_SNAPSHOT_FIELDS.forEach(({ id, kind }) => {
+    const el = els[id];
+    if (!el) return;
+    if (kind === 'checked') fields[id] = el.checked;
+    else if (kind === 'html') fields[id] = el.innerHTML;
+    else fields[id] = el.value;
+  });
+  const stateValues = {};
+  PTC_STATE_KEYS.forEach(key => { stateValues[key] = state[key]; });
+  return {
+    fields,
+    stateValues,
+    parserVisible: els.parserResults.style.display === 'block',
+    qSurchargesVisible: els.qSurchargesSection.style.display === 'block',
+    fareComponentsHtml: els.fareComponents.innerHTML,
+    qSurchargesHtml: els.qSurcharges.innerHTML,
+    calculatedNucHtml: els.calculatedNuc.innerHTML,
+    statedNucText: els.statedNuc.textContent,
+    nucValidationHtml: els.nucValidation.innerHTML,
+    roeText: els.roe.textContent,
+    baseFareText: els.baseFare.textContent,
+  };
+}
+
+function restorePtc(snapshot) {
+  PTC_SNAPSHOT_FIELDS.forEach(({ id, kind }) => {
+    const el = els[id];
+    if (!el) return;
+    const value = snapshot.fields[id] ?? (kind === 'checked' ? false : '');
+    if (kind === 'checked') el.checked = value;
+    else if (kind === 'html') el.innerHTML = value;
+    else el.value = value;
+  });
+  PTC_STATE_KEYS.forEach(key => { state[key] = snapshot.stateValues[key] ?? null; });
+
+  els.parserResults.style.display = snapshot.parserVisible ? 'block' : 'none';
+  els.qSurchargesSection.style.display = snapshot.qSurchargesVisible ? 'block' : 'none';
+  els.fareComponents.innerHTML = snapshot.fareComponentsHtml || '';
+  els.qSurcharges.innerHTML = snapshot.qSurchargesHtml || '';
+  els.calculatedNuc.innerHTML = snapshot.calculatedNucHtml || '';
+  els.statedNuc.textContent = snapshot.statedNucText || '';
+  els.nucValidation.innerHTML = snapshot.nucValidationHtml || '';
+  els.roe.textContent = snapshot.roeText || '';
+  els.baseFare.textContent = snapshot.baseFareText || '';
+}
+
+function hasPtcData(ptc) {
+  return !!state.ptcData[ptc].summaryData;
+}
+
+function getActivePtcCodes() {
+  return PTC_CODES.filter(hasPtcData);
+}
+
+function updatePtcTabUI() {
+  PTC_CODES.forEach(ptc => {
+    const btn = els[`ptcTab${ptc}`];
+    if (!btn) return;
+    const isActive = ptc === state.activePtc;
+    btn.setAttribute('aria-selected', String(isActive));
+    btn.classList.toggle('has-data', hasPtcData(ptc));
+  });
+}
+
+function switchPtcTab(newPtc) {
+  if (!PTC_CODES.includes(newPtc) || newPtc === state.activePtc) return;
+  state.ptcData[state.activePtc].formSnapshot = snapshotPtc();
+  state.activePtc = newPtc;
+  restorePtc(state.ptcData[newPtc].formSnapshot || defaultPtcSnapshot());
+  updatePtcTabUI();
+}
 
 const state = {
   lastTaxResult: null,
@@ -112,6 +238,14 @@ const state = {
   isCalculatingFare: false,
   // Fare calculation string state
   lastFareCalcString: null,
+  // Passenger-type-code tabs: which tab is active, and the saved input/output snapshot +
+  // last computed summary for each PTC (used by switchPtcTab() and the Summary aggregation).
+  activePtc: 'ADT',
+  ptcData: {
+    ADT: { formSnapshot: null, summaryData: null },
+    CNN: { formSnapshot: null, summaryData: null },
+    INF: { formSnapshot: null, summaryData: null },
+  },
   updateFareK3(currency, total, addTaxesStr) {
     this.lastFareCurrency = currency;
     this.lastFareK3Total = total;
@@ -193,6 +327,9 @@ els.copyGdsButton.addEventListener('click', copyGdsString);
 els.taxToggleBtn.addEventListener('click', toggleTaxSection);
 els.parserToggleBtn.addEventListener('click', toggleParserSection);
 els.summariseButton.addEventListener('click', handleSummarise);
+PTC_CODES.forEach(ptc => {
+  els[`ptcTab${ptc}`].addEventListener('click', () => switchPtcTab(ptc));
+});
 
 // Live calculation triggers (debounced for calculation, immediate for validation)
 const debouncedCalculateTaxes = debounce(tryCalculateTaxes, 300);
@@ -450,41 +587,74 @@ function toggleParserSection() {
   els.parserToggleBtn.setAttribute('aria-expanded', !isCollapsed);
 }
 
+// Builds the minimal tax-only summary shape used when a PTC has tax data but no fare data yet.
+function buildTaxOnlySummaryData(taxResult, addTaxesValue, convertedFareCalcString) {
+  const netWithK3 = taxResult.netTax + (taxResult.k3OnYQ || 0);
+  return {
+    currency: taxResult.currency,
+    oldFare: 0,
+    newFare: 0,
+    diff: 0,
+    k3Fare: 0,
+    k3Fee: 0,
+    k3OnYQ: taxResult.k3OnYQ || 0,
+    fee: 0,
+    addTaxes: addTaxesValue || '',
+    refundTaxes: taxResult.negativeTaxes.join('/') || '',
+    taxAdj: netWithK3,
+    perPax: netWithK3,
+    subTotal: netWithK3,
+    pax: 1,
+    convertedFareCalcString: convertedFareCalcString || '',
+  };
+}
+
+// Sums the numeric fields of several PTC summaryData objects into one consolidated object.
+// Currency must match across all PTCs (mirrors the existing old/new-fare currency-mismatch check).
+function mergeSummaryData(dataList) {
+  const currency = dataList[0].currency;
+  const mismatch = dataList.find(d => d.currency && currency && d.currency !== currency);
+  if (mismatch) {
+    return { error: `All passenger types must use the same currency to summarise together (found ${currency} and ${mismatch.currency}).` };
+  }
+  const numericKeys = ['oldFare', 'newFare', 'diff', 'k3Fare', 'k3Fee', 'k3OnYQ', 'fee', 'taxAdj', 'subTotal', 'pax'];
+  const merged = { currency, addTaxes: '', refundTaxes: '', convertedFareCalcString: '' };
+  numericKeys.forEach(key => { merged[key] = dataList.reduce((sum, d) => sum + (d[key] || 0), 0); });
+  merged.perPax = merged.pax > 0 ? merged.subTotal / merged.pax : merged.subTotal;
+  merged.addTaxes = dataList.map(d => d.addTaxes).filter(Boolean).join('/');
+  merged.refundTaxes = dataList.map(d => d.refundTaxes).filter(Boolean).join('/');
+  merged.convertedFareCalcString = dataList.map(d => d.convertedFareCalcString).filter(Boolean).join(' // ');
+  return merged;
+}
+
 function handleSummarise() {
-  if (!state.lastSummaryData && !state.lastTaxResult) {
+  // Make sure the currently active tab's latest numbers are captured before aggregating,
+  // even if a tax-only calculation (no fare yet) hasn't been synced to ptcData.
+  if (!state.ptcData[state.activePtc].summaryData && state.lastTaxResult) {
+    state.ptcData[state.activePtc].summaryData = buildTaxOnlySummaryData(
+      state.lastTaxResult, els.addTaxes.value, state.lastConvertedFareCalcString
+    );
+  }
+
+  const activePtcs = getActivePtcCodes();
+  if (activePtcs.length === 0) {
     showError('No calculation data available. Please calculate fare or taxes first.');
     return;
   }
 
-  // Combine tax and fare data if both are available
-  let summaryData = state.lastSummaryData;
-  if (state.lastTaxResult) {
-    // If only tax data is available, create a minimal summary structure
-    if (!summaryData) {
-      summaryData = {
-        currency: state.lastTaxResult.currency,
-        oldFare: 0,
-        newFare: 0,
-        diff: 0,
-        k3Fare: 0,
-        k3Fee: 0,
-        k3OnYQ: state.lastTaxResult.k3OnYQ || 0,
-        fee: 0,
-        addTaxes: els.addTaxes.value || '',
-        refundTaxes: state.lastTaxResult.negativeTaxes.join('/') || '',
-        taxAdj: state.lastTaxResult.netTax + (state.lastTaxResult.k3OnYQ || 0),
-        perPax: state.lastTaxResult.netTax + (state.lastTaxResult.k3OnYQ || 0),
-        subTotal: state.lastTaxResult.netTax + (state.lastTaxResult.k3OnYQ || 0),
-        pax: 1,
-        convertedFareCalcString: state.lastConvertedFareCalcString || '',
-      };
-    } else {
-      // Fare data exists, tax data is already incorporated in the fare calculation
-      // The summaryData already includes taxAdj which has the tax calculation
-    }
+  const breakdown = activePtcs.map(ptc => ({ ptc, data: state.ptcData[ptc].summaryData }));
+
+  if (activePtcs.length === 1) {
+    renderSummary(breakdown[0].data, breakdown);
+    return;
   }
 
-  renderSummary(summaryData);
+  const consolidated = mergeSummaryData(breakdown.map(b => b.data));
+  if (consolidated.error) {
+    showError(consolidated.error);
+    return;
+  }
+  renderSummary(consolidated, breakdown);
 }
 
 // Help icon click to show keyboard shortcuts
@@ -508,6 +678,7 @@ function loadTheme() {
 
 // Initialize theme on load
 loadTheme();
+updatePtcTabUI();
 
 // Theme toggle click event
 els.themeToggle.addEventListener('click', toggleTheme);
@@ -1051,6 +1222,8 @@ function clearTaxes() {
   els.summary.innerHTML = '';
   els.gdsString.value = '';
   state.lastSummaryData = null;
+  state.ptcData[state.activePtc].summaryData = null;
+  updatePtcTabUI();
 }
 
 function showINRMessage(message) {
@@ -1120,6 +1293,8 @@ function calculateFare() {
     els.subTotal.value = `${currency}${formatAmount(cachedResult.subTotal, currency)}`;
     // Store summary data for manual summarise button
     state.lastSummaryData = cachedResult.summaryData;
+    state.ptcData[state.activePtc].summaryData = cachedResult.summaryData;
+    updatePtcTabUI();
     state.isCalculatingFare = false;
     return;
   }
@@ -1193,61 +1368,110 @@ function calculateFare() {
 
   // Store summary data for manual summarise button
   state.lastSummaryData = summaryData;
+  state.ptcData[state.activePtc].summaryData = summaryData;
+  updatePtcTabUI();
 
   state.isCalculatingFare = false;
 }
 
-function renderSummary(data) {
+const PTC_LABELS = { ADT: 'Adult', CNN: 'Child', INF: 'Infant' };
+
+// One row definition per summary metric: a label plus a getter that formats that metric
+// for a single PTC's summaryData object. Shared by both the single- and multi-PTC table.
+const SUMMARY_ROW_DEFS = [
+  { label: 'Old Fare', get: d => `${d.currency}${formatAmount(d.oldFare, d.currency)}` },
+  { label: 'New Fare', get: d => `${d.currency}${formatAmount(d.newFare, d.currency)}` },
+  { label: 'Fare Difference', get: d => `${d.currency}${formatAmount(d.diff, d.currency)}` },
+  {
+    label: 'Change Fee',
+    get: d => d.k3Fee > 0
+      ? `${d.currency}${formatAmount(d.fee + d.k3Fee, d.currency)} (incl. K3 ${d.currency}${formatAmount(d.k3Fee, d.currency)})`
+      : `${d.currency}${formatAmount(d.fee, d.currency)}`,
+  },
+  { label: 'Add Taxes', get: d => d.addTaxes || '-' },
+  { label: 'Refund Taxes', get: d => d.refundTaxes || '-' },
+  { label: 'Tax Adjustment (Net)', get: d => `${d.currency}${formatAmount(d.taxAdj, d.currency)}` },
+  { label: 'Amount Payable per Pax', get: d => `${d.currency}${formatAmount(d.perPax, d.currency)}` },
+  { label: 'No. of Pax', get: d => `${d.pax}` },
+  { label: 'Sub Total', get: d => `${d.currency}${formatAmount(d.subTotal, d.currency)}` },
+];
+
+// `breakdown`: [{ ptc, data }] for every PTC with data (1-3 entries). `amountPayable`
+// (optional): total Sub Total across all active PTCs, shown as a single full-width row
+// between Sub Total and the Fare Calculation String rows — only when more than one PTC is
+// active (a lone PTC's Amount Payable would just repeat its own Sub Total). Builds one table:
+// header row of PTC names, one row per metric (each PTC gets its own column, no Total column).
+function buildSummaryTable(breakdown, amountPayable) {
+  const table = document.createElement('table');
+
+  const thead = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  headRow.appendChild(document.createElement('th'));
+  breakdown.forEach(({ ptc }) => {
+    const th = document.createElement('th');
+    th.textContent = PTC_LABELS[ptc] || ptc;
+    headRow.appendChild(th);
+  });
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement('tbody');
+  const valueColSpan = breakdown.length;
+  SUMMARY_ROW_DEFS.forEach(rowDef => {
+    const tr = document.createElement('tr');
+    const tdLabel = document.createElement('td');
+    tdLabel.innerHTML = `<b>${rowDef.label}</b>`;
+    tr.appendChild(tdLabel);
+    breakdown.forEach(({ data }) => {
+      const td = document.createElement('td');
+      td.textContent = rowDef.get(data);
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  });
+
+  if (amountPayable) {
+    const tr = document.createElement('tr');
+    const tdLabel = document.createElement('td');
+    tdLabel.innerHTML = '<b>Amount Payable</b>';
+    const tdVal = document.createElement('td');
+    tdVal.colSpan = valueColSpan;
+    tdVal.textContent = `${amountPayable.currency}${formatAmount(amountPayable.subTotal, amountPayable.currency)}`;
+    tr.appendChild(tdLabel);
+    tr.appendChild(tdVal);
+    tbody.appendChild(tr);
+  }
+
+  // Fare Calculation String is shown as one full-width row per PTC (rather than a column-per-PTC
+  // metric row) since the strings are long free text and don't read well squeezed into a narrow column.
+  breakdown.forEach(({ ptc, data }) => {
+    const tr = document.createElement('tr');
+    const tdLabel = document.createElement('td');
+    tdLabel.innerHTML = `<b>Fare Calculation String ${ptc}</b>`;
+    const tdVal = document.createElement('td');
+    tdVal.colSpan = valueColSpan;
+    tdVal.textContent = data.convertedFareCalcString || '-';
+    tr.appendChild(tdLabel);
+    tr.appendChild(tdVal);
+    tbody.appendChild(tr);
+  });
+
+  table.appendChild(tbody);
+  return table;
+}
+
+// `breakdown`: [{ ptc, data }] for every PTC with data. `data`: the merged/consolidated
+// summaryData (same object as a single PTC's data when only one PTC is active).
+function renderSummary(data, breakdown) {
   // Show summary content
   els.summaryContent.style.display = 'block';
 
   // Generate and display GDS string
-  const gdsString = generateGdsString(data);
+  const gdsString = generateGdsString(data, breakdown);
   els.gdsString.value = gdsString;
 
-  const rows = [
-    ['Old Fare', `${data.currency}${formatAmount(data.oldFare, data.currency)}`],
-    ['New Fare', `${data.currency}${formatAmount(data.newFare, data.currency)}`],
-    ['Fare Difference', `${data.currency}${formatAmount(data.diff, data.currency)}`],
-  ];
-
-  // Display Change Fee with K3 breakdown if applicable
-  if (data.k3Fee > 0) {
-    rows.push(['Change Fee (incl. K3)', `${data.currency}${formatAmount(data.fee + data.k3Fee, data.currency)} (incl. K3 ${data.currency}${formatAmount(data.k3Fee, data.currency)})`]);
-  } else {
-    rows.push(['Change Fee', `${data.currency}${formatAmount(data.fee, data.currency)}`]);
-  }
-
-  rows.push(
-    ['Add Taxes', data.addTaxes ?? '-'],
-    ['Refund Taxes', data.refundTaxes ?? '-'],
-    ['Tax Adjustment (Net)', `${data.currency}${formatAmount(data.taxAdj, data.currency)}`],
-    ['Amount Payable per Pax', `${data.currency}${formatAmount(data.perPax, data.currency)}`],
-    ['No. of Pax', data.pax],
-    ['Sub Total', `${data.currency}${formatAmount(data.subTotal, data.currency)}`],
-    ['Fare Calculation String', data.convertedFareCalcString || '-'],
-  );
-
-  // Use DocumentFragment for batch DOM updates
-  const fragment = document.createDocumentFragment();
-  const table = document.createElement('table');
-  const tbody = document.createElement('tbody');
-  
-  rows.forEach(([key, val]) => {
-    const tr = document.createElement('tr');
-    const tdKey = document.createElement('td');
-    const tdVal = document.createElement('td');
-    tdKey.innerHTML = `<b>${key}</b>`;
-    tdVal.textContent = val;
-    tr.appendChild(tdKey);
-    tr.appendChild(tdVal);
-    tbody.appendChild(tr);
-  });
-  
-  table.appendChild(tbody);
-  fragment.appendChild(table);
   els.summary.innerHTML = '';
-  els.summary.appendChild(fragment);
+  els.summary.appendChild(buildSummaryTable(breakdown, breakdown.length > 1 ? data : null));
 }
 
 function removeK3FFromAddTaxes() {
@@ -1279,17 +1503,21 @@ function clearFare() {
   state.updateFareK3(null, 0, '');
   state.clearFareCache();
   state.lastSummaryData = null;
+  state.ptcData[state.activePtc].summaryData = null;
+  updatePtcTabUI();
 }
 
 function copySummaryTable() {
-  const table = els.summary.querySelector('table');
-  if (!table) {
+  const tables = els.summary.querySelectorAll('table');
+  if (tables.length === 0) {
     showError('No summary to copy.');
     return;
   }
-  const text = Array.from(table.rows).map(row => {
-    return Array.from(row.cells).map(cell => cell.textContent).join('\t');
-  }).join('\n');
+  const text = Array.from(tables).map(table =>
+    Array.from(table.rows).map(row =>
+      Array.from(row.cells).map(cell => cell.textContent).join('\t')
+    ).join('\n')
+  ).join('\n\n');
 
   navigator.clipboard.writeText(text).then(() => {
     showError('Summary copied to clipboard!', true);
@@ -1316,24 +1544,29 @@ function copySummaryTable() {
   });
 }
 
-function generateGdsString(data) {
+// Builds one "FARE DIFF ... + CHG FEE ... +/- TAX ... = ..." line for a single PTC's data
+// (per-pax amount — GDS commands are per-transaction, not per-group).
+function buildGdsLine(data) {
   const parts = [];
-  
-  // Add fare difference
   parts.push(`FARE DIFF ${data.currency}${formatAmount(data.diff, data.currency)}`);
-  
-  // Add change fee
   parts.push(`+ CHG FEE ${data.currency}${formatAmount(data.fee, data.currency)}`);
-  
-  // Add tax adjustment with +/- prefix
   const taxPrefix = data.taxAdj > 0 ? '+' : '-';
   parts.push(`${taxPrefix} TAX ${data.currency}${formatAmount(Math.abs(data.taxAdj), data.currency)}`);
-  
-  // Add total (per-pax amount — GDS commands are per-transaction, not per-group)
-  const total = data.perPax;
-  parts.push(`= ${data.currency}${formatAmount(total, data.currency)}`);
-  
+  parts.push(`= ${data.currency}${formatAmount(data.perPax, data.currency)}`);
   return parts.join(' ');
+}
+
+// `breakdown` (optional): [{ ptc, data }] — when more than one PTC has data, emit one line
+// per PTC followed by a final consolidated total line; otherwise unchanged single-line output.
+function generateGdsString(data, breakdown = null) {
+  if (breakdown && breakdown.length > 1) {
+    // els.gdsString is a single-line <input>, so PTC lines are pipe-separated rather than
+    // newline-separated (a newline would be silently dropped/garbled in an <input> value).
+    const lines = breakdown.map(({ ptc, data: ptcData }) => `${ptc} ${buildGdsLine(ptcData)}`);
+    lines.push(`TOTAL = ${data.currency}${formatAmount(data.subTotal, data.currency)}`);
+    return lines.join('  |  ');
+  }
+  return buildGdsLine(data);
 }
 
 function copyGdsString() {
