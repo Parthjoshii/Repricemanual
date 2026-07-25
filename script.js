@@ -733,25 +733,24 @@ function updateAddTaxesWithK3(baseAddTaxes, k3FareStr) {
   return [cleaned, k3FareStr].filter(Boolean).join('/');
 }
 
-function parseTaxes(text, defaultCurrency, skipPaid = false) {
+function parseTaxes(text) {
   const taxes = {};
   const paidTaxes = {};
-  if (!text) return { taxes, paidTaxes };
+  if (!text) return { taxes, paidTaxes, currency: null };
   const tokens = text.split(/[\/\n,]+/);
-  tokens.forEach(token => {
-    const parsed = parseTaxToken(token);
-    if (parsed) {
-      const code = parsed.code;
-      const cur = parsed.currency || defaultCurrency;
-      const key = `${cur}${code}`;
-      if (parsed.isPaid) {
-        paidTaxes[key] = (paidTaxes[key] || 0) + parsed.amount;
-      } else {
-        taxes[key] = (taxes[key] || 0) + parsed.amount;
-      }
+  const parsedTokens = tokens.map(parseTaxToken).filter(Boolean);
+  const inferredCurrency = parsedTokens.find(t => t.currency)?.currency || 'INR';
+  parsedTokens.forEach(parsed => {
+    const code = parsed.code;
+    const cur = parsed.currency || inferredCurrency;
+    const key = `${cur}${code}`;
+    if (parsed.isPaid) {
+      paidTaxes[key] = (paidTaxes[key] || 0) + parsed.amount;
+    } else {
+      taxes[key] = (taxes[key] || 0) + parsed.amount;
     }
   });
-  return { taxes, paidTaxes };
+  return { taxes, paidTaxes, currency: inferredCurrency };
 }
 
 function getCurrentFareK3State(currencyOverride = null) {
@@ -815,25 +814,10 @@ function calculateTaxes() {
     return;
   }
 
-  const oldTaxData = parseTaxes(oldText, 'INR', true);
-  const newTaxData = parseTaxes(newText, 'INR', false);
+  const oldTaxData = parseTaxes(oldText);
+  const newTaxData = parseTaxes(newText);
   const oldTaxes = oldTaxData.taxes;
-  const oldPaidTaxes = oldTaxData.paidTaxes;
   const newTaxes = newTaxData.taxes;
-
-  const allCurrencies = new Set();
-  Object.keys(oldTaxes).forEach(k => {
-    const m = k.match(/^([A-Z]{3})/);
-    if (m) allCurrencies.add(m[1]);
-  });
-  Object.keys(oldPaidTaxes).forEach(k => {
-    const m = k.match(/^([A-Z]{3})/);
-    if (m) allCurrencies.add(m[1]);
-  });
-  Object.keys(newTaxes).forEach(k => {
-    const m = k.match(/^([A-Z]{3})/);
-    if (m) allCurrencies.add(m[1]);
-  });
 
   let firstCurrency = null;
   const result = {
@@ -844,19 +828,18 @@ function calculateTaxes() {
     currency: null,
   };
 
+  // PD-marked entries are already settled and are excluded from oldTaxes/newTaxes,
+  // so any additional non-PD amount on either side still diffs correctly here.
   const allTaxCodes = new Set([
     ...Object.keys(oldTaxes).map(k => k.substring(3)),
-    ...Object.keys(oldPaidTaxes).map(k => k.substring(3)),
     ...Object.keys(newTaxes).map(k => k.substring(3)),
   ]);
 
   allTaxCodes.forEach(code => {
     const matchingOldKeys = Object.keys(oldTaxes).filter(k => k.endsWith(code));
-    const matchingPaidKeys = Object.keys(oldPaidTaxes).filter(k => k.endsWith(code));
     const matchingNewKeys = Object.keys(newTaxes).filter(k => k.endsWith(code));
 
-    const oldAmount = matchingOldKeys.reduce((sum, key) => sum + (oldTaxes[key] || 0), 0) +
-      matchingPaidKeys.reduce((sum, key) => sum + (oldPaidTaxes[key] || 0), 0);
+    const oldAmount = matchingOldKeys.reduce((sum, key) => sum + (oldTaxes[key] || 0), 0);
     const newAmount = matchingNewKeys.reduce((sum, key) => sum + (newTaxes[key] || 0), 0);
     const diff = newAmount - oldAmount;
 
@@ -868,9 +851,7 @@ function calculateTaxes() {
       ? matchingNewKeys[0].match(/^([A-Z]{3})/)[1]
       : matchingOldKeys.length > 0
         ? matchingOldKeys[0].match(/^([A-Z]{3})/)[1]
-        : matchingPaidKeys.length > 0
-          ? matchingPaidKeys[0].match(/^([A-Z]{3})/)[1]
-          : firstCurrency ?? 'INR';
+        : firstCurrency ?? 'INR';
 
     if (!firstCurrency) firstCurrency = currency;
 
@@ -885,7 +866,7 @@ function calculateTaxes() {
     }
   });
 
-  result.currency = firstCurrency ?? 'INR';
+  result.currency = firstCurrency ?? newTaxData.currency ?? oldTaxData.currency ?? 'INR';
   result.netTax = result.posTotal + result.negTotal;
 
   // Calculate K3 on positive YQ if checkbox is checked
