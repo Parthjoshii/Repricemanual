@@ -341,9 +341,12 @@ td:first-child {
   width: auto;
   white-space: nowrap;
 }
-td:last-child {
-  width: 500px;
-  min-width: 200px;
+#summary table {
+  width: 100%;
+}
+#summary td:not(:first-child) {
+  max-width: 260px;
+  word-break: break-word;
 }
 th {
   background: #f8fafc;
@@ -402,9 +405,58 @@ th {
 .collapsible-content.collapsed {
   max-height: 0;
 }
+.ptc-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--border-color);
+}
+.ptc-tab {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  border-radius: 8px 8px 0 0;
+  padding: 8px 18px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transform: none;
+  transition: color 0.2s ease, background 0.2s ease;
+}
+.ptc-tab:hover {
+  background: var(--bg-card);
+  color: var(--text-primary);
+  transform: none;
+}
+.ptc-tab[aria-selected="true"] {
+  background: var(--bg-card);
+  color: var(--primary-cyan);
+  box-shadow: inset 0 -2px 0 var(--primary-cyan);
+}
+.ptc-tab-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: transparent;
+}
+.ptc-tab.has-data .ptc-tab-dot {
+  background: var(--primary-cyan);
+}
 @media (max-width: 1024px) {
   .calculator-container {
     grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 760px) {
+  .ptc-tabs {
+    flex-wrap: wrap;
+  }
+  .ptc-tab {
+    flex: 1 1 auto;
+    justify-content: center;
   }
 }
 @media (max-width: 760px) {
