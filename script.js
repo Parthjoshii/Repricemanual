@@ -1683,6 +1683,29 @@ function clearFare() {
   updatePtcTabUI();
 }
 
+// Rebuilds the summary table(s) as self-contained HTML with inline styles (borders, padding,
+// bold labels) so the table format survives paste into apps that support rich text (Word,
+// Outlook/Gmail, Docs, Slack, Notion, etc.) instead of arriving as bare tab-separated text.
+// Inline styles are required here — a pasted-in app has no access to this page's styles.css.
+function buildSummaryHtmlForClipboard(tables) {
+  const border = '3px solid #334155';
+  const cellStyle = `border:${border}; padding:8px 12px; text-align:center; font-family:sans-serif; font-size:14px;`;
+  const tableStyle = `border:${border}; border-collapse:collapse;`;
+  return Array.from(tables).map(table => {
+    const rows = Array.from(table.rows).map(row => {
+      const cells = Array.from(row.cells).map(cell => {
+        const tag = cell.tagName.toLowerCase();
+        const isBoldLabel = !!cell.querySelector('b');
+        const weight = tag === 'th' || isBoldLabel ? 'font-weight:700;' : '';
+        const colspanAttr = cell.colSpan > 1 ? ` colspan="${cell.colSpan}"` : '';
+        return `<${tag} style="${cellStyle}${weight}"${colspanAttr}>${cell.textContent}</${tag}>`;
+      }).join('');
+      return `<tr>${cells}</tr>`;
+    }).join('');
+    return `<table style="${tableStyle}">${rows}</table>`;
+  }).join('<br>');
+}
+
 function copySummaryTable() {
   const tables = els.summary.querySelectorAll('table');
   if (tables.length === 0) {
@@ -1695,29 +1718,44 @@ function copySummaryTable() {
     ).join('\n')
   ).join('\n\n');
 
-  navigator.clipboard.writeText(text).then(() => {
-    showError('Summary copied to clipboard!', true);
-  }).catch(() => {
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.style.position = 'fixed';
-    textarea.style.left = '-9999px';
-    document.body.appendChild(textarea);
-    textarea.select();
+  function fallbackCopyPlainText() {
+    navigator.clipboard.writeText(text).then(() => {
+      showError('Summary copied to clipboard!', true);
+    }).catch(() => {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.style.position = 'fixed';
+      textarea.style.left = '-9999px';
+      document.body.appendChild(textarea);
+      textarea.select();
 
-    try {
-      const successful = document.execCommand('copy');
-      document.body.removeChild(textarea);
-      if (successful) {
-        showError('Summary copied to clipboard!', true);
-      } else {
+      try {
+        const successful = document.execCommand('copy');
+        document.body.removeChild(textarea);
+        if (successful) {
+          showError('Summary copied to clipboard!', true);
+        } else {
+          showError('Unable to copy automatically. Please paste manually.', false);
+        }
+      } catch (error) {
+        document.body.removeChild(textarea);
         showError('Unable to copy automatically. Please paste manually.', false);
       }
-    } catch (error) {
-      document.body.removeChild(textarea);
-      showError('Unable to copy automatically. Please paste manually.', false);
-    }
-  });
+    });
+  }
+
+  if (navigator.clipboard?.write && typeof ClipboardItem !== 'undefined') {
+    const html = buildSummaryHtmlForClipboard(tables);
+    const item = new ClipboardItem({
+      'text/plain': new Blob([text], { type: 'text/plain' }),
+      'text/html': new Blob([html], { type: 'text/html' }),
+    });
+    navigator.clipboard.write([item]).then(() => {
+      showError('Summary copied to clipboard!', true);
+    }).catch(fallbackCopyPlainText);
+  } else {
+    fallbackCopyPlainText();
+  }
 }
 
 // Builds one "FARE DIFF ... + CHG FEE ... +/- TAX ... = ..." line for a single PTC's data

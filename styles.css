@@ -335,13 +335,13 @@ table {
   max-width: 100%;
   border-collapse: collapse;
   margin-top: 12px;
-  border: 2px solid var(--border-color);
+  border: 3px solid var(--border-color);
   table-layout: auto;
   font-size: 0.92rem;
 }
 th,
 td {
-  border: 2px solid var(--border-color);
+  border: 3px solid var(--border-color);
   padding: 12px 14px;
   text-align: center;
   vertical-align: middle;
