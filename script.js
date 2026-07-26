@@ -586,12 +586,22 @@ els.fareCalcString.addEventListener('keydown', (e) => {
 
 // Parser functions
 function parseFareCalcString() {
-  const input = els.fareCalcString.value.trim();
+  const rawInput = els.fareCalcString.value.trim();
 
-  if (!input) {
+  if (!rawInput) {
     showError('Please enter a fare calculation string.');
     els.parserResults.style.display = 'none';
     return;
+  }
+
+  // Fare calculation strings are conventionally all-uppercase (GDS/ticketing systems always
+  // print them that way), so a lowercase-typed string isn't really "malformed" input — it's just
+  // not yet in the form every regex below expects. Normalizing once here (mirrors the existing
+  // uppercase-on-blur behavior for tax entries in formatTaxInput()) means the parser itself never
+  // needs to special-case letter case, and what's displayed always matches what was parsed.
+  const input = rawInput.toUpperCase();
+  if (input !== els.fareCalcString.value) {
+    els.fareCalcString.value = input;
   }
 
   const parsed = parseFareCalcStringInternal(input);
@@ -671,6 +681,14 @@ function parseFareCalcString() {
 
   // Show results
   els.parserResults.style.display = 'block';
+
+  // Some malformed shapes (a stray second decimal point, a minus sign glued to a fare basis
+  // code) can't be corrected automatically — the intended value is ambiguous — but they can be
+  // silently mis-parsed into a wrong-but-plausible-looking number with no other sign anything is
+  // off. Surface a heads-up rather than let that pass silently; the results above are still shown.
+  if (parsed.warnings.length > 0) {
+    showError(parsed.warnings.join(' '));
+  }
 }
 
 function getPaxType(suffix) {
@@ -695,13 +713,67 @@ function parseFareCalcStringInternal(input) {
     qSurcharges: [],
     nuc: null,
     roe: null,
+    warnings: [],
   };
+
+  // Fare components and Q surcharges only ever appear before the NUC keyword — NUC/ROE always
+  // mark the totals section that follows. Bounding both scans to that region stops any stray or
+  // malformed text between the fare string and NUC/ROE (a missing space, a copy-paste artifact)
+  // from being misread as an extra fare component — e.g. without this bound, "NUC651.59ENDROE95"
+  // (no space before ROE) has "651.59" immediately followed by exactly 8 alphanumeric characters
+  // ("ENDROE95"), which the fare-component pattern below would otherwise happily match as a bogus
+  // fare component, double-counting the NUC total itself into the calculated NUC.
+  //
+  // The NUC/ROE keyword is preferentially matched with a lookbehind requiring it be preceded by
+  // whitespace or the start of the string — a bare `input.search(/NUC/)` would also match "NUC"
+  // accidentally embedded inside an earlier token, e.g. a fare basis code like "TLNUC123", which
+  // would truncate the scan window before the real fare components (dropping them) and also read
+  // the embedded "123" as the stated NUC total instead of the real one later in the string. The
+  // same risk applies to ROE, which gets the identical treatment. `\s*` between the keyword and
+  // its digits (matching qPattern's existing tolerance) means a stray space — "NUC 511.77" —
+  // still parses instead of being misreported as "not found".
+  //
+  // But that lookbehind can't be the *only* attempt: a malformed string can glue the real keyword
+  // directly onto preceding stray text with no space at all — e.g. "NUC651.59ENDROE95.593911" —
+  // where "ROE" is genuinely the total's keyword but isn't preceded by whitespace either. So each
+  // keyword is looked up in two passes: first the strict (whitespace-anchored) pattern, which
+  // correctly skips a false match embedded earlier in the string as long as a real, cleanly-
+  // separated occurrence exists later to fall through to; only when NO whitespace-anchored
+  // occurrence exists at all do we fall back to a bare, unanchored match (the previous behavior),
+  // so a keyword that's merely glued to adjacent garbage — not embedded inside another token —
+  // still parses.
+  function findKeywordMatch(keyword) {
+    const strict = input.match(new RegExp(`(?<=^|\\s)${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+    return strict || input.match(new RegExp(`${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+  }
+
+  const nucKeywordMatch = findKeywordMatch('NUC');
+  const nucIndex = nucKeywordMatch ? nucKeywordMatch.index : -1;
+  const farePart = nucIndex === -1 ? input : input.slice(0, nucIndex);
+  if (nucKeywordMatch) {
+    result.nuc = parseFloat(nucKeywordMatch[1]);
+  }
+
+  const roeKeywordMatch = findKeywordMatch('ROE');
+  if (roeKeywordMatch) {
+    result.roe = parseFloat(roeKeywordMatch[1]);
+  }
+
+  // Known, intentionally-unfixed limitations (would need a real IATA airport-code list or a full
+  // fare-basis grammar to resolve, which is out of scope for free-text regex parsing):
+  // - A short/malformed fare-basis code (not exactly 8 chars) sitting directly against a Q
+  //   surcharge with no separator can have farePattern's [A-Z0-9]{8} swallow into the Q token's
+  //   characters, corrupting the *displayed* fare-basis text (numeric totals are usually still
+  //   right, since qPattern independently re-finds the same digits elsewhere).
+  // - A coincidental bare 6-letter uppercase word directly touching digits (e.g. "REBOOK50.00",
+  //   not an actual airport-pair) is indistinguishable from a real bare-airport-code Q surcharge
+  //   and will be read as one.
 
   // Extract fare amounts (numbers before fare basis codes)
   // Pattern: number (with or without decimal) followed by 8-character fare basis (alphanumeric), optional CH|IN suffix, and /4-character designator (alphanumeric)
   const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(?:\/[A-Z0-9]{1,4})?/g;
   let fareMatch;
-  while ((fareMatch = farePattern.exec(input)) !== null && result.fareComponents.length < 6) {
+  while ((fareMatch = farePattern.exec(farePart)) !== null && result.fareComponents.length < 6) {
     result.fareComponents.push({
       amount: parseFloat(fareMatch[1]),
       fareBasis: fareMatch[2],
@@ -709,41 +781,41 @@ function parseFareCalcStringInternal(input) {
     });
   }
 
-  // Extract Q surcharges
-  // Pattern 1: Q followed by optional space, then optional airport codes (3 or 6 letters), then a number
-  // Examples: Q5.00, QDXB5.00, Q DXBDXB4.00, Q DXBBOM4.00
-  // Pattern 2: Number followed by Q, then optional airport codes (3 or 6 letters)
-  // Examples: 58.47QDUB, 58.47Q DUB, 470.74QHAM
-  // Pattern 3: Q before airport code, number, then Q after (Q-number-Q pattern)
-  // Examples: Q DUBCOK58.47Q, QCOKDUB58.47Q
-  // Pattern 4: Airport code (6 letters) followed by number (no Q)
-  // Examples: DUBCOK18.82, COKDUB23.41
-  // Q surcharge pattern — negative lookbehind ensures Q is NOT part of a fare basis code
-  // (e.g. 256.70QWEEPIN1 — the Q here is preceded by "1" so lookbehind rejects it)
-  // Handles: Q5.00 / QBOM5.00 / Q BOM5.00 / Q BOMCCU5.00 / Q5 (integer) / 58.47QDUB / 470.74QHAM / Q DUBCOK58.47Q / DUBCOK18.82
-  // Also handles Q without left space: DUBCOK58.47Q, COKDUB23.41Q
-  const qPattern = /(?<![A-Z0-9])Q\s*(?:[A-Z]{3}){0,2}(\d+(?:\.\d+)?)|(\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(\d+(?:\.\d+)?)(?![A-Z0-9])|([A-Z]{6})(\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
+  // Extract Q surcharges. Named capture groups are used deliberately (not positional
+  // qMatch[1]/[2]/... ) so adding/reordering alternatives below can never silently shift an
+  // index and start reading the wrong group — that class of bug is exactly what motivated
+  // rewriting this from positional groups in the first place.
+  //
+  // qDirect: Q immediately followed by a number, e.g. Q5.00, Q24.94 — no lookbehind restriction,
+  //   because this shape can never match inside an 8-char fare basis code (see qCoded below), so
+  //   it's always safe even when directly preceded by another surcharge's digits with no
+  //   separator, e.g. "Q3.13Q24.94" (two consecutive surcharges, a common real fare string shape
+  //   that a blanket "Q must not follow a digit" lookbehind used to incorrectly swallow).
+  // qCoded: Q + one or two 3-letter airport codes + a number, e.g. QBOM5.00, Q BOMCCU5.00 — keeps
+  //   the negative lookbehind, because THIS shape is the one that can false-positive-match inside
+  //   a fare basis code (e.g. "256.70QWEEPIN1": Q + "WEE" + "PIN" + "1" looks identical in form).
+  // qNumFirst: number then Q then optional airport code(s), e.g. 58.47QDUB, 470.74QHAM.
+  // qNumQ: Q + 6-letter airport pair + number + Q, e.g. Q DUBCOK58.47Q.
+  // qAirport / qAirportQ: bare 6-letter airport pair + number, with or without a trailing Q,
+  //   e.g. DUBCOK18.82, DUBCOK58.47Q.
+  const qPattern = /Q\s*(?<qDirect>\d+(?:\.\d+)?)|(?<![A-Z0-9])Q\s*[A-Z]{3}(?:[A-Z]{3})?(?<qCoded>\d+(?:\.\d+)?)|(?<qNumFirst>\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(?<qNumQ>\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(?<qAirport>\d+(?:\.\d+)?)(?![A-Z0-9])|[A-Z]{6}(?<qAirportQ>\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
   let qMatch;
-  while ((qMatch = qPattern.exec(input)) !== null) {
-    // Match group 1 is for Q-first pattern, group 2 for number-first pattern
-    // Match group 3 is for Q-number-Q pattern, group 4 for airport-number pattern
-    // Match group 5-6 is for airport-number-Q pattern (no left space)
-    const amount = qMatch[1] || qMatch[2] || qMatch[3] || qMatch[4] || qMatch[6];
+  while ((qMatch = qPattern.exec(farePart)) !== null) {
+    const g = qMatch.groups;
+    const amount = g.qDirect || g.qCoded || g.qNumFirst || g.qNumQ || g.qAirport || g.qAirportQ;
     if (amount) {
       result.qSurcharges.push(parseFloat(amount));
     }
   }
 
-  // Extract NUC
-  const nucMatch = input.match(/NUC(\d+(?:\.\d+)?)/);
-  if (nucMatch) {
-    result.nuc = parseFloat(nucMatch[1]);
+  // Flag (don't silently act on) shapes that would otherwise mis-parse into a wrong-but-plausible
+  // number with no other indication anything is off — the intended value is ambiguous, so the
+  // best we can do is calculate a best-effort result and tell the user to double-check it.
+  if (/\d+\.\d+\.\d+/.test(farePart)) {
+    result.warnings.push('A number with more than one decimal point was found — the parsed amount(s) may be incorrect.');
   }
-
-  // Extract ROE
-  const roeMatch = input.match(/ROE(\d+(?:\.\d+)?)/);
-  if (roeMatch) {
-    result.roe = parseFloat(roeMatch[1]);
+  if (/-\d+(?:\.\d+)?[A-Z0-9]{8}/.test(farePart)) {
+    result.warnings.push('A negative amount was found before a fare basis code — the minus sign is ignored, so the parsed amount may be incorrect.');
   }
 
   return result;
