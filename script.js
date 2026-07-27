@@ -878,7 +878,14 @@ function mergeSummaryData(dataList) {
 function handleSummarise() {
   // Make sure the currently active tab's latest numbers are captured before aggregating,
   // even if a tax-only calculation (no fare yet) hasn't been synced to ptcData.
-  if (!state.ptcData[state.activePtc].summaryData && state.lastTaxResult) {
+  if (state.ptcData[state.activePtc].summaryData) {
+    // summaryData already exists (calculateFare() ran at some point) — but
+    // convertedFareCalcString is only baked in at calculateFare()-time, so if the user
+    // re-converts the Fare Calculation String afterward without recalculating the fare, the
+    // stored copy goes stale. Refresh it from the current per-tab state every time Summarise is
+    // clicked, regardless of whether fare-calc or fare-diff was done first.
+    state.ptcData[state.activePtc].summaryData.convertedFareCalcString = state.lastConvertedFareCalcString || '';
+  } else if (state.lastTaxResult) {
     state.ptcData[state.activePtc].summaryData = buildTaxOnlySummaryData(
       state.lastTaxResult, els.addTaxes.value, state.lastConvertedFareCalcString
     );
@@ -1835,7 +1842,11 @@ function copySummaryTable() {
 function buildGdsLine(data) {
   const parts = [];
   parts.push(`FARE DIFF ${data.currency}${formatAmount(data.diff, data.currency)}`);
-  parts.push(`+ CHG FEE ${data.currency}${formatAmount(data.fee, data.currency)}`);
+  // Include K3 in the displayed change fee, matching the summary table's Change Fee row
+  // (SUMMARY_ROW_DEFS: d.fee + d.k3Fee) — data.perPax already folds k3Fee into the trailing
+  // total below, so leaving it out here made the line items silently not add up to that total.
+  const feeWithK3 = data.fee + (data.k3Fee || 0);
+  parts.push(`+ CHG FEE ${data.currency}${formatAmount(feeWithK3, data.currency)}`);
   const taxPrefix = data.taxAdj > 0 ? '+' : '-';
   parts.push(`${taxPrefix} TAX ${data.currency}${formatAmount(Math.abs(data.taxAdj), data.currency)}`);
   parts.push(`= ${data.currency}${formatAmount(data.perPax, data.currency)}`);
