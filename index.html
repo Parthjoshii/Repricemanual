@@ -121,6 +121,11 @@ Changes in V4.6 (Bug Fix Release):
         <label for="fareCalcString">Fare Calculation String</label>
         <textarea id="fareCalcString" placeholder="Example: BOM EK X/DXB EK NYC 102.21TLEEPIN1/NDC2 EK X/DXB BOM 404.56XWEEFIN1/NDC2 Q5.00 NUC511.77 ROE90.3344456"></textarea>
       </div>
+      <div class="section-grid-full checkbox-cell checkbox-inline" id="autoCalcFromAdultRow" style="display: none;">
+        <input id="autoCalcFromAdult" type="checkbox" aria-describedby="autoCalcDescription">
+        <label for="autoCalcFromAdult">Auto-calculate from Adult</label>
+      </div>
+      <span id="autoCalcDescription" class="sr-only">Scales the validated Adult fare calculation string by the passenger type percentage and fills this field automatically.</span>
       <div class="section-grid-full button-row">
         <button id="parseButton" type="button" aria-label="Parse fare calculation string">Convert</button>
         <button id="parserClearButton" type="button" class="secondary" aria-label="Clear parser fields">Clear</button>

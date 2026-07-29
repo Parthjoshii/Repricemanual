@@ -104,6 +104,8 @@ const els = {
   ptcPromptInput: byId('ptcPromptInput'),
   ptcPromptOkBtn: byId('ptcPromptOkBtn'),
   ptcPromptCancelBtn: byId('ptcPromptCancelBtn'),
+  autoCalcFromAdult: byId('autoCalcFromAdult'),
+  autoCalcFromAdultRow: byId('autoCalcFromAdultRow'),
 };
 
 // In-app replacement for window.prompt()/confirm() — some embedded browser previews (e.g.
@@ -156,6 +158,11 @@ function showPtcPrompt({ message, defaultValue = '', requireInput = true }) {
 const PTC_CODES = ['ADT', 'CNN', 'INF'];
 const MAX_CUSTOM_PTC_TABS = 2;
 
+// CNN/INF Fare Calculation Strings can be auto-derived from the validated ADT string by scaling
+// fare/surcharge amounts by these percentages and forcing this pax-type suffix onto fare basis codes.
+const PTC_AUTO_CALC_PERCENT = { CNN: 0.75, INF: 0.10 };
+const PTC_FARE_BASIS_SUFFIX = { CNN: 'CH', INF: 'IN' };
+
 // Every field whose value should be saved/restored when switching passenger-type tabs.
 // 'value' fields are plain inputs/selects/textareas; 'checked' are checkboxes; 'html' fields
 // are readonly display elements whose content is only ever set by render functions (not typed
@@ -182,6 +189,7 @@ const PTC_SNAPSHOT_FIELDS = [
   { id: 'pax', kind: 'value' },
   { id: 'subTotal', kind: 'value' },
   { id: 'fareCalcString', kind: 'value' },
+  { id: 'autoCalcFromAdult', kind: 'checked' },
 ];
 
 // JS-level state.* fields that calculateFare()/calculateTaxes()/parseFareCalcString() read and
@@ -273,6 +281,17 @@ function updatePtcTabUI() {
   });
   const customCount = PTC_CODES.length - 3;
   els.ptcAddTabButton.hidden = customCount >= MAX_CUSTOM_PTC_TABS;
+  syncAutoCalcUI();
+}
+
+// The "Auto-calculate from Adult" toggle only applies to CNN/INF: shows/hides its row and
+// keeps the Fare Calculation String field/Convert button locked while auto-calc is active.
+function syncAutoCalcUI() {
+  const eligible = state.activePtc in PTC_AUTO_CALC_PERCENT;
+  els.autoCalcFromAdultRow.style.display = eligible ? '' : 'none';
+  const locked = eligible && els.autoCalcFromAdult.checked;
+  els.fareCalcString.readOnly = locked;
+  els.parseButton.disabled = locked;
 }
 
 function switchPtcTab(newPtc) {
@@ -281,6 +300,9 @@ function switchPtcTab(newPtc) {
   state.activePtc = newPtc;
   restorePtc(state.ptcData[newPtc].formSnapshot || defaultPtcSnapshot());
   updatePtcTabUI();
+  if (newPtc in PTC_AUTO_CALC_PERCENT && els.autoCalcFromAdult.checked) {
+    applyAutoCalc(newPtc, { silent: true });
+  }
 }
 
 // Turns a user-typed tab name into a short, unique, alphanumeric internal key — used only as
@@ -405,6 +427,9 @@ const state = {
   lastK3AddTaxes: '',
   lastSummaryData: null,
   lastConvertedFareCalcString: null,
+  // Last NUC-validated ADT Fare Calculation String, used as the source for CNN/INF auto-calculation.
+  // Not part of PTC_STATE_KEYS: it's ADT-specific data that CNN/INF tabs read, not their own per-tab state.
+  adtParsedFareCalc: null,
   taxCalculationCache: new Map(),
   fareCalculationCache: new Map(),
   isCalculatingTax: false,
@@ -583,6 +608,20 @@ els.fareCalcString.addEventListener('keydown', (e) => {
     parseFareCalcString();
   }
 });
+els.fareCalcString.addEventListener('input', () => {
+  // Editing the Adult string without reconverting invalidates it as an auto-calc source.
+  if (state.activePtc === 'ADT') {
+    state.adtParsedFareCalc = null;
+  }
+});
+els.autoCalcFromAdult.addEventListener('change', () => {
+  if (!(state.activePtc in PTC_AUTO_CALC_PERCENT)) return;
+  if (els.autoCalcFromAdult.checked) {
+    applyAutoCalc(state.activePtc);
+  } else {
+    syncAutoCalcUI();
+  }
+});
 
 // Parser functions
 function parseFareCalcString() {
@@ -670,6 +709,13 @@ function parseFareCalcString() {
     els.nucValidation.innerHTML = `<span class="error">✗ NUC Validation: FAIL<br><br>Corrected Fare String:<br><span style="font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text-primary);">${correctedString}</span></span>`;
     // Validation failed: use the corrected string for summaries
     state.lastConvertedFareCalcString = correctedString;
+  }
+
+  // ADT is the only source for CNN/INF auto-calculation; capture its validated string whenever
+  // it's (re)converted so switching to CNN/INF or toggling auto-calc there always derives from
+  // the latest Adult data.
+  if (state.activePtc === 'ADT') {
+    state.adtParsedFareCalc = state.lastConvertedFareCalcString;
   }
 
   // Display ROE
@@ -825,6 +871,74 @@ function clearParser() {
   els.fareCalcString.value = '';
   els.parserResults.style.display = 'none';
   state.lastConvertedFareCalcString = null;
+  if (state.activePtc === 'ADT') {
+    state.adtParsedFareCalc = null;
+  }
+}
+
+function round2(n) {
+  return Math.round((n + Number.EPSILON) * 100) / 100;
+}
+
+// Scales fare components and Q-surcharges in a validated ADT fare calculation string by `percent`,
+// forces `paxSuffix` (CH/IN) onto each fare basis code, and recomputes NUC from the scaled totals.
+// Mirrors parseFareCalcStringInternal()'s own farePattern/qPattern and its farePart-bounding /
+// keyword-lookup logic exactly, so this always scales precisely what the parser itself would read
+// out of the same string — kept as literal copies (not a shared reference) because the parser's
+// regexes live inside that function's closure; if those patterns change, update both together.
+function deriveFareCalcString(adtString, percent, paxSuffix) {
+  function findKeywordMatch(keyword) {
+    const strict = adtString.match(new RegExp(`(?<=^|\\s)${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+    return strict || adtString.match(new RegExp(`${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+  }
+
+  const nucKeywordMatch = findKeywordMatch('NUC');
+  const nucIndex = nucKeywordMatch ? nucKeywordMatch.index : -1;
+  const farePart = nucIndex === -1 ? adtString : adtString.slice(0, nucIndex);
+  const rest = nucIndex === -1 ? '' : adtString.slice(nucIndex);
+
+  let scaledTotal = 0;
+
+  const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(?:\/[A-Z0-9]{1,4})?/g;
+  const scaledFarePart = farePart.replace(farePattern, (match, amountStr, fareBasis) => {
+    const scaled = round2(parseFloat(amountStr) * percent);
+    scaledTotal += scaled;
+    const trailing = match.slice(amountStr.length + fareBasis.length).replace(/^(CH|IN)/, '');
+    return `${scaled.toFixed(2)}${fareBasis}${paxSuffix}${trailing}`;
+  });
+
+  const qPattern = /Q\s*(?<qDirect>\d+(?:\.\d+)?)|(?<![A-Z0-9])Q\s*[A-Z]{3}(?:[A-Z]{3})?(?<qCoded>\d+(?:\.\d+)?)|(?<qNumFirst>\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(?<qNumQ>\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(?<qAirport>\d+(?:\.\d+)?)(?![A-Z0-9])|[A-Z]{6}(?<qAirportQ>\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
+  const scaledFarePartWithQ = scaledFarePart.replace(qPattern, (match, ...args) => {
+    const g = args[args.length - 1];
+    const amountStr = g.qDirect || g.qCoded || g.qNumFirst || g.qNumQ || g.qAirport || g.qAirportQ;
+    if (!amountStr) return match;
+    const scaled = round2(parseFloat(amountStr) * percent);
+    scaledTotal += scaled;
+    return match.replace(amountStr, scaled.toFixed(2));
+  });
+
+  const recomputedNuc = round2(scaledTotal);
+  const scaledRest = rest.replace(/NUC(\d+(?:\.\d+)?)/, `NUC${recomputedNuc.toFixed(2)}`);
+  return scaledFarePartWithQ + scaledRest;
+}
+
+// Derives and applies the CNN/INF Fare Calculation String from the last validated ADT string,
+// then runs it through the normal parseFareCalcString() pipeline so validation/rendering stay
+// authoritative. `silent` suppresses the "validate Adult first" error (used on tab-switch
+// re-derivation, where a missing ADT source just means "nothing to refresh yet").
+function applyAutoCalc(ptc, { silent = false } = {}) {
+  if (!state.adtParsedFareCalc) {
+    if (!silent) {
+      showError('Please calculate and validate the Adult Fare Calculation String first.');
+      els.autoCalcFromAdult.checked = false;
+    }
+    syncAutoCalcUI();
+    return;
+  }
+  const derived = deriveFareCalcString(state.adtParsedFareCalc, PTC_AUTO_CALC_PERCENT[ptc], PTC_FARE_BASIS_SUFFIX[ptc]);
+  els.fareCalcString.value = derived;
+  parseFareCalcString();
+  syncAutoCalcUI();
 }
 
 function toggleParserSection() {
@@ -857,10 +971,38 @@ function buildTaxOnlySummaryData(taxResult, addTaxesValue, convertedFareCalcStri
   };
 }
 
+// Minimal all-zero summary shape for a PTC that only has a converted Fare Calculation String —
+// no fare or tax was ever calculated for it. Mirrors buildTaxOnlySummaryData()'s shape so it
+// flows through mergeSummaryData()/renderSummary() identically, just contributing zero to every
+// numeric total while still surfacing its Fare Calculation String row.
+function buildFareCalcOnlySummaryData(convertedFareCalcString) {
+  return {
+    currency: '',
+    oldFare: 0,
+    newFare: 0,
+    diff: 0,
+    k3Fare: 0,
+    k3Fee: 0,
+    k3OnYQ: 0,
+    fee: 0,
+    addTaxes: '',
+    refundTaxes: '',
+    taxAdj: 0,
+    perPax: 0,
+    subTotal: 0,
+    pax: 1,
+    convertedFareCalcString: convertedFareCalcString || '',
+  };
+}
+
 // Sums the numeric fields of several PTC summaryData objects into one consolidated object.
 // Currency must match across all PTCs (mirrors the existing old/new-fare currency-mismatch check).
 function mergeSummaryData(dataList) {
-  const currency = dataList[0].currency;
+  // A fare-calc-string-only PTC has no currency of its own (buildFareCalcOnlySummaryData uses
+  // ''), so pick the first PTC that actually has one rather than assuming dataList[0] does —
+  // otherwise a currency-less PTC sorting first (e.g. ADT with only a converted string) would
+  // blank out the whole merged row's currency even though CNN/INF have real amounts.
+  const currency = dataList.map(d => d.currency).find(Boolean) || '';
   const mismatch = dataList.find(d => d.currency && currency && d.currency !== currency);
   if (mismatch) {
     return { error: `All passenger types must use the same currency to summarise together (found ${currency} and ${mismatch.currency}).` };
@@ -877,7 +1019,7 @@ function mergeSummaryData(dataList) {
 
 function handleSummarise() {
   // Make sure the currently active tab's latest numbers are captured before aggregating,
-  // even if a tax-only calculation (no fare yet) hasn't been synced to ptcData.
+  // even if a tax-only (or fare-calc-string-only) calculation hasn't been synced to ptcData yet.
   if (state.ptcData[state.activePtc].summaryData) {
     // summaryData already exists (calculateFare() ran at some point) — but
     // convertedFareCalcString is only baked in at calculateFare()-time, so if the user
@@ -889,7 +1031,24 @@ function handleSummarise() {
     state.ptcData[state.activePtc].summaryData = buildTaxOnlySummaryData(
       state.lastTaxResult, els.addTaxes.value, state.lastConvertedFareCalcString
     );
+  } else if (state.lastConvertedFareCalcString) {
+    state.ptcData[state.activePtc].summaryData = buildFareCalcOnlySummaryData(state.lastConvertedFareCalcString);
   }
+
+  // Inactive PTC tabs only have their last-saved snapshot (no live DOM state to read here). A
+  // tab that has a converted Fare Calc String but never had a fare/tax calculated still needs a
+  // zero-valued summary entry so its string shows up — otherwise it's silently excluded from
+  // both the single-PTC and consolidated summary just because it has no fare/tax numbers.
+  PTC_CODES.forEach(ptc => {
+    if (ptc === state.activePtc) return;
+    const entry = state.ptcData[ptc];
+    const savedFcs = entry.formSnapshot?.stateValues?.lastConvertedFareCalcString || '';
+    if (entry.summaryData) {
+      entry.summaryData.convertedFareCalcString = savedFcs;
+    } else if (savedFcs) {
+      entry.summaryData = buildFareCalcOnlySummaryData(savedFcs);
+    }
+  });
 
   const activePtcs = getActivePtcCodes();
   if (activePtcs.length === 0) {
