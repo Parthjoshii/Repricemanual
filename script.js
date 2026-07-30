@@ -1,17 +1,31 @@
 const byId = (id) => document.getElementById(id);
 
-// Rounding rules by currency
+// Rounding rules by currency. Decimal places follow ISO 4217 minor units, except INR/IDR/TWD
+// which keep this app's existing fare-rounding convention (whole-unit fares are how these are
+// conventionally issued in air ticketing, even though ISO 4217 itself specifies 2 decimals).
 const roundingRules = {
-  'INR': { type: 'ceiling', decimals: 0 },      // Round up, no decimals
-  'JPY': { type: 'nearest', decimals: 0 },      // Round to nearest, no decimals
+  // 0 decimals (ISO 4217 zero-decimal currencies, plus INR/IDR/TWD's fare-issuance convention)
+  'INR': { type: 'ceiling', decimals: 0 },      // Round up, no decimals (fare-issuance convention)
+  'JPY': { type: 'nearest', decimals: 0 },      // Japanese Yen - no decimals
   'KRW': { type: 'nearest', decimals: 0 },      // Korean Won - no decimals
-  'TWD': { type: 'nearest', decimals: 0 },      // Taiwan Dollar - no decimals
-  'XAF': { type: 'nearest', decimals: 0 },      // Central African Franc - no decimals
-  'XOF': { type: 'nearest', decimals: 0 },      // West African Franc - no decimals
+  'TWD': { type: 'nearest', decimals: 0 },      // Taiwan Dollar - no decimals (fare-issuance convention)
+  'XAF': { type: 'nearest', decimals: 0 },      // Central African CFA Franc - no decimals
+  'XOF': { type: 'nearest', decimals: 0 },      // West African CFA Franc - no decimals
+  'XPF': { type: 'nearest', decimals: 0 },      // CFP Franc - no decimals
   'CLP': { type: 'nearest', decimals: 0 },      // Chilean Peso - no decimals
   'ISK': { type: 'nearest', decimals: 0 },      // Icelandic Króna - no decimals
   'VND': { type: 'nearest', decimals: 0 },      // Vietnamese Dong - no decimals
-  'IDR': { type: 'standard', decimals: 0 },     // Indonesian Rupiah - no decimals
+  'IDR': { type: 'standard', decimals: 0 },     // Indonesian Rupiah - no decimals (fare-issuance convention)
+  'IRR': { type: 'standard', decimals: 0 },     // Iranian Rial - no decimals (fares run into the hundreds of thousands/millions, so whole-unit issuance is standard)
+
+  // 3 decimals (ISO 4217 three-decimal currencies — mostly Gulf/North African dinars & rials)
+  'BHD': { type: 'standard', decimals: 3 },     // Bahraini Dinar - 3 decimals
+  'JOD': { type: 'standard', decimals: 3 },     // Jordanian Dinar - 3 decimals
+  'KWD': { type: 'standard', decimals: 3 },     // Kuwaiti Dinar - 3 decimals
+  'OMR': { type: 'standard', decimals: 3 },     // Omani Rial - 3 decimals
+  'TND': { type: 'standard', decimals: 3 },     // Tunisian Dinar - 3 decimals
+
+  // 2 decimals (ISO 4217 standard — the default for everything else in the currency dropdown)
   'USD': { type: 'standard', decimals: 2 },     // US Dollar - 2 decimals
   'EUR': { type: 'standard', decimals: 2 },     // Euro - 2 decimals
   'GBP': { type: 'standard', decimals: 2 },     // British Pound - 2 decimals
@@ -37,6 +51,31 @@ const roundingRules = {
   'PKR': { type: 'standard', decimals: 2 },     // Pakistani Rupee - 2 decimals
   'BDT': { type: 'standard', decimals: 2 },     // Bangladeshi Taka - 2 decimals
   'LKR': { type: 'standard', decimals: 2 },     // Sri Lankan Rupee - 2 decimals
+  'AOA': { type: 'standard', decimals: 2 },     // Angolan Kwanza - 2 decimals
+  'ARS': { type: 'standard', decimals: 2 },     // Argentine Peso - 2 decimals
+  'BND': { type: 'standard', decimals: 2 },     // Brunei Dollar - 2 decimals
+  'COP': { type: 'standard', decimals: 2 },     // Colombian Peso - 2 decimals
+  'CZK': { type: 'standard', decimals: 2 },     // Czech Koruna - 2 decimals
+  'DKK': { type: 'standard', decimals: 2 },     // Danish Krone - 2 decimals
+  'DZD': { type: 'standard', decimals: 2 },     // Algerian Dinar - 2 decimals
+  'EGP': { type: 'standard', decimals: 2 },     // Egyptian Pound - 2 decimals
+  'ETB': { type: 'standard', decimals: 2 },     // Ethiopian Birr - 2 decimals
+  'FJD': { type: 'standard', decimals: 2 },     // Fiji Dollar - 2 decimals
+  'GHS': { type: 'standard', decimals: 2 },     // Ghana Cedi - 2 decimals
+  'HUF': { type: 'standard', decimals: 2 },     // Hungarian Forint - 2 decimals
+  'HRK': { type: 'standard', decimals: 2 },     // Croatian Kuna - 2 decimals
+  'ILS': { type: 'standard', decimals: 2 },     // Israeli Shekel - 2 decimals
+  'KES': { type: 'standard', decimals: 2 },     // Kenyan Shilling - 2 decimals
+  'KZT': { type: 'standard', decimals: 2 },     // Kazakhstani Tenge - 2 decimals
+  'MAD': { type: 'standard', decimals: 2 },     // Moroccan Dirham - 2 decimals
+  'MUR': { type: 'standard', decimals: 2 },     // Mauritius Rupee - 2 decimals
+  'NGN': { type: 'standard', decimals: 2 },     // Nigerian Naira - 2 decimals
+  'NPR': { type: 'standard', decimals: 2 },     // Nepalese Rupee - 2 decimals
+  'PLN': { type: 'standard', decimals: 2 },     // Polish Zloty - 2 decimals
+  'QAR': { type: 'standard', decimals: 2 },     // Qatari Rial - 2 decimals
+  'SCR': { type: 'standard', decimals: 2 },     // Seychelles Rupee - 2 decimals
+  'UAH': { type: 'standard', decimals: 2 },     // Ukrainian Hryvnia - 2 decimals
+  'ZMW': { type: 'standard', decimals: 2 },     // Zambian Kwacha - 2 decimals
 };
 
 const K3_RATES = {
