@@ -75,6 +75,8 @@ Changes in V4.6 (Bug Fix Release):
   <button type="button" class="ptc-tab" id="ptcTabADT" data-ptc="ADT" role="tab" aria-selected="true">ADT<span class="ptc-tab-dot" aria-hidden="true"></span></button>
   <button type="button" class="ptc-tab" id="ptcTabCNN" data-ptc="CNN" role="tab" aria-selected="false">CNN<span class="ptc-tab-dot" aria-hidden="true"></span></button>
   <button type="button" class="ptc-tab" id="ptcTabINF" data-ptc="INF" role="tab" aria-selected="false">INF<span class="ptc-tab-dot" aria-hidden="true"></span></button>
+  <button type="button" class="ptc-tab" id="ptcTabINF_CNN" data-ptc="INF_CNN" role="tab" aria-selected="false">INF/CNN<span class="ptc-tab-dot" aria-hidden="true"></span></button>
+  <button type="button" class="ptc-tab" id="ptcTabCNN_ADT" data-ptc="CNN_ADT" role="tab" aria-selected="false">CNN/ADT<span class="ptc-tab-dot" aria-hidden="true"></span></button>
   <button type="button" class="ptc-add-tab" id="ptcAddTabButton" aria-label="Add custom passenger type tab">+</button>
 </div>
 <div class="calculator-container">
@@ -124,8 +126,9 @@ Changes in V4.6 (Bug Fix Release):
       <div class="section-grid-full checkbox-cell checkbox-inline" id="autoCalcFromAdultRow" style="display: none;">
         <input id="autoCalcFromAdult" type="checkbox" aria-describedby="autoCalcDescription">
         <label for="autoCalcFromAdult">Auto-calculate from Adult</label>
+        <span id="autoCalcHint" class="auto-calc-hint" style="display: none;"></span>
       </div>
-      <span id="autoCalcDescription" class="sr-only">Scales the validated Adult fare calculation string by the passenger type percentage and fills this field automatically.</span>
+      <span id="autoCalcDescription" class="sr-only">Scales the validated Adult fare calculation string by the passenger type percentage (or, on the hybrid tabs, by outbound/inbound leg) and fills this field automatically.</span>
       <div class="section-grid-full button-row">
         <button id="parseButton" type="button" aria-label="Parse fare calculation string">Convert</button>
         <button id="parserClearButton" type="button" class="secondary" aria-label="Clear parser fields">Clear</button>

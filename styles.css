@@ -294,6 +294,11 @@ textarea {
   display: inline;
   font-size: 0.91rem;
 }
+.auto-calc-hint {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin-left: 4px;
+}
 input[type="checkbox"]:checked {
   accent-color: var(--primary-cyan);
 }
@@ -416,6 +421,7 @@ th {
 }
 .ptc-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
   margin-bottom: 16px;
   border-bottom: 1px solid var(--border-color);
@@ -493,9 +499,6 @@ th {
   }
 }
 @media (max-width: 760px) {
-  .ptc-tabs {
-    flex-wrap: wrap;
-  }
   .ptc-tab {
     flex: 1 1 auto;
     justify-content: center;

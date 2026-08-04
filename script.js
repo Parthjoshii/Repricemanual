@@ -145,6 +145,7 @@ const els = {
   ptcPromptCancelBtn: byId('ptcPromptCancelBtn'),
   autoCalcFromAdult: byId('autoCalcFromAdult'),
   autoCalcFromAdultRow: byId('autoCalcFromAdultRow'),
+  autoCalcHint: byId('autoCalcHint'),
 };
 
 // In-app replacement for window.prompt()/confirm() — some embedded browser previews (e.g.
@@ -192,15 +193,34 @@ function showPtcPrompt({ message, defaultValue = '', requireInput = true }) {
   });
 }
 
-// The first 3 codes are the fixed built-in tabs; anything beyond that is a user-added custom
-// tab (see addCustomTab/renameCustomTab/removeCustomTab), capped at MAX_CUSTOM_PTC_TABS.
-const PTC_CODES = ['ADT', 'CNN', 'INF'];
+// The first BUILT_IN_PTC_COUNT codes are the fixed built-in tabs; anything beyond that is a
+// user-added custom tab (see addCustomTab/renameCustomTab/removeCustomTab), capped at
+// MAX_CUSTOM_PTC_TABS.
+const PTC_CODES = ['ADT', 'CNN', 'INF', 'INF_CNN', 'CNN_ADT'];
+const BUILT_IN_PTC_COUNT = 5;
 const MAX_CUSTOM_PTC_TABS = 2;
 
 // CNN/INF Fare Calculation Strings can be auto-derived from the validated ADT string by scaling
 // fare/surcharge amounts by these percentages and forcing this pax-type suffix onto fare basis codes.
 const PTC_AUTO_CALC_PERCENT = { CNN: 0.75, INF: 0.10 };
 const PTC_FARE_BASIS_SUFFIX = { CNN: 'CH', INF: 'IN' };
+
+// Hybrid age-transition tabs: a passenger who ages up mid-journey (e.g. an infant turning 2
+// between outbound and return) prices the outbound leg at one PTC's rate and the inbound leg at
+// another's. Ratios/suffixes are keyed by leg rather than a single flat value like the map above.
+const PTC_HYBRID_RATIOS = {
+  INF_CNN: { outbound: 0.10, inbound: 0.75 },
+  CNN_ADT: { outbound: 0.75, inbound: 1.00 },
+};
+// '' suffix = strip any existing CH/IN suffix (Adult fare basis codes carry none).
+const PTC_HYBRID_SUFFIX = {
+  INF_CNN: { outbound: 'IN', inbound: 'CH' },
+  CNN_ADT: { outbound: 'CH', inbound: '' },
+};
+
+function isAutoCalcEligible(ptc) {
+  return ptc in PTC_AUTO_CALC_PERCENT || ptc in PTC_HYBRID_RATIOS;
+}
 
 // Every field whose value should be saved/restored when switching passenger-type tabs.
 // 'value' fields are plain inputs/selects/textareas; 'checked' are checkboxes; 'html' fields
@@ -318,19 +338,29 @@ function updatePtcTabUI() {
     btn.setAttribute('aria-selected', String(isActive));
     btn.classList.toggle('has-data', hasPtcData(ptc));
   });
-  const customCount = PTC_CODES.length - 3;
+  const customCount = PTC_CODES.length - BUILT_IN_PTC_COUNT;
   els.ptcAddTabButton.hidden = customCount >= MAX_CUSTOM_PTC_TABS;
   syncAutoCalcUI();
 }
 
-// The "Auto-calculate from Adult" toggle only applies to CNN/INF: shows/hides its row and
-// keeps the Fare Calculation String field/Convert button locked while auto-calc is active.
+// The "Auto-calculate from Adult" toggle applies to CNN/INF (single ratio) and INF_CNN/CNN_ADT
+// (hybrid, two ratios): shows/hides its row, keeps the Fare Calculation String field/Convert
+// button locked while active, and shows a small split-percentage hint for the hybrid tabs only.
 function syncAutoCalcUI() {
-  const eligible = state.activePtc in PTC_AUTO_CALC_PERCENT;
+  const eligible = isAutoCalcEligible(state.activePtc);
   els.autoCalcFromAdultRow.style.display = eligible ? '' : 'none';
   const locked = eligible && els.autoCalcFromAdult.checked;
   els.fareCalcString.readOnly = locked;
   els.parseButton.disabled = locked;
+
+  const hybrid = PTC_HYBRID_RATIOS[state.activePtc];
+  if (hybrid) {
+    const [outCode, inCode] = state.activePtc.split('_');
+    els.autoCalcHint.textContent = `Outbound ${(hybrid.outbound * 100).toFixed(0)}% (${PTC_LABELS[outCode] || outCode}) · Inbound ${(hybrid.inbound * 100).toFixed(0)}% (${PTC_LABELS[inCode] || inCode})`;
+    els.autoCalcHint.style.display = '';
+  } else {
+    els.autoCalcHint.style.display = 'none';
+  }
 }
 
 function switchPtcTab(newPtc) {
@@ -339,7 +369,7 @@ function switchPtcTab(newPtc) {
   state.activePtc = newPtc;
   restorePtc(state.ptcData[newPtc].formSnapshot || defaultPtcSnapshot());
   updatePtcTabUI();
-  if (newPtc in PTC_AUTO_CALC_PERCENT && els.autoCalcFromAdult.checked) {
+  if (isAutoCalcEligible(newPtc) && els.autoCalcFromAdult.checked) {
     applyAutoCalc(newPtc, { silent: true });
   }
 }
@@ -409,7 +439,7 @@ function buildCustomTabButton(code, label) {
 }
 
 async function addCustomTab() {
-  if (PTC_CODES.length - 3 >= MAX_CUSTOM_PTC_TABS) return;
+  if (PTC_CODES.length - BUILT_IN_PTC_COUNT >= MAX_CUSTOM_PTC_TABS) return;
   const label = await showPtcPrompt({ message: 'Name this tab:' });
   if (!label) return;
   if (isDuplicatePtcLabel(label)) {
@@ -482,6 +512,8 @@ const state = {
     ADT: { formSnapshot: null, summaryData: null },
     CNN: { formSnapshot: null, summaryData: null },
     INF: { formSnapshot: null, summaryData: null },
+    INF_CNN: { formSnapshot: null, summaryData: null },
+    CNN_ADT: { formSnapshot: null, summaryData: null },
   },
   updateFareK3(currency, total, addTaxesStr) {
     this.lastFareCurrency = currency;
@@ -654,7 +686,7 @@ els.fareCalcString.addEventListener('input', () => {
   }
 });
 els.autoCalcFromAdult.addEventListener('change', () => {
-  if (!(state.activePtc in PTC_AUTO_CALC_PERCENT)) return;
+  if (!isAutoCalcEligible(state.activePtc)) return;
   if (els.autoCalcFromAdult.checked) {
     applyAutoCalc(state.activePtc);
   } else {
@@ -709,10 +741,24 @@ function parseFareCalcString() {
   const qSum = parsed.qSurcharges.reduce((sum, amount) => sum + amount, 0);
   const calculatedNuc = fareSum + qSum;
 
-  // Display fare components
-  els.fareComponents.innerHTML = parsed.fareComponents
-    .map(comp => `<li>${comp.amount.toFixed(2)}</li>`)
-    .join('');
+  // Display fare components. On the hybrid tabs, label each with the outbound/inbound leg it
+  // was matched to (same boundary rule applyAutoCalc()/deriveHybridFareCalcString() use) so the
+  // split the tool chose is visible and checkable at a glance, not hidden.
+  const hybridRatios = PTC_HYBRID_RATIOS[state.activePtc];
+  if (hybridRatios) {
+    const { boundaryIndex } = findHybridBoundary(input);
+    els.fareComponents.innerHTML = parsed.fareComponents
+      .map(comp => {
+        const phase = boundaryIndex === null || comp.index < boundaryIndex ? 'Outbound' : 'Inbound';
+        const basis = comp.fareBasis + (comp.suffix || '') + (comp.designator || '');
+        return `<li><b>${phase}:</b> ${comp.amount.toFixed(2)} <span style="color: var(--text-secondary);">(${basis})</span></li>`;
+      })
+      .join('');
+  } else {
+    els.fareComponents.innerHTML = parsed.fareComponents
+      .map(comp => `<li>${comp.amount.toFixed(2)}</li>`)
+      .join('');
+  }
 
   // Display Q surcharges
   if (parsed.qSurcharges.length > 0) {
@@ -855,14 +901,17 @@ function parseFareCalcStringInternal(input) {
   //   and will be read as one.
 
   // Extract fare amounts (numbers before fare basis codes)
-  // Pattern: number (with or without decimal) followed by 8-character fare basis (alphanumeric), optional CH|IN suffix, and /4-character designator (alphanumeric)
-  const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(?:\/[A-Z0-9]{1,4})?/g;
+  // Pattern: number (with or without decimal) followed by 8-character fare basis (alphanumeric), optional CH|IN suffix, and /4-character designator (alphanumeric, captured for display)
+  const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(\/[A-Z0-9]{1,4})?/g;
   let fareMatch;
   while ((fareMatch = farePattern.exec(farePart)) !== null && result.fareComponents.length < 6) {
     result.fareComponents.push({
       amount: parseFloat(fareMatch[1]),
       fareBasis: fareMatch[2],
-      paxType: getPaxType(fareMatch[3] || '')
+      suffix: fareMatch[3] || '',
+      paxType: getPaxType(fareMatch[3] || ''),
+      designator: fareMatch[4] || '',
+      index: fareMatch.index,
     });
   }
 
@@ -961,10 +1010,162 @@ function deriveFareCalcString(adtString, percent, paxSuffix) {
   return scaledFarePartWithQ + scaledRest;
 }
 
-// Derives and applies the CNN/INF Fare Calculation String from the last validated ADT string,
-// then runs it through the normal parseFareCalcString() pipeline so validation/rendering stay
-// authoritative. `silent` suppresses the "validate Adult first" error (used on tab-switch
-// re-derivation, where a missing ADT source just means "nothing to refresh yet").
+// Finds top-level (...) side-trip groups. One level of bracket matching is sufficient — IATA
+// side trips aren't nested in practice — so any '(' seen while already inside a group is just
+// absorbed into that same outer span rather than starting a new one.
+function findSideTripSpans(input) {
+  const spans = [];
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (ch === '(') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (ch === ')') {
+      if (depth > 0) {
+        depth--;
+        if (depth === 0 && start !== -1) {
+          spans.push({ start, end: i + 1 });
+          start = -1;
+        }
+      }
+    }
+  }
+  return spans;
+}
+
+// Replaces each side-trip span with equal-length whitespace so every other character's index is
+// unchanged — used only to find the outbound/inbound boundary without a side trip's own fare
+// component being miscounted as a 3rd/4th "primary" leg.
+function buildFareSpine(input, spans) {
+  let spine = input;
+  spans.forEach(({ start, end }) => {
+    spine = spine.slice(0, start) + ' '.repeat(end - start) + spine.slice(end);
+  });
+  return spine;
+}
+
+// Determines the outbound/inbound split point for the hybrid (INF/CNN, CNN/ADT) tabs. Per the
+// agreed rule, the first Fare Basis Code in the string is Outbound and the second is Inbound —
+// there's no attempt to re-derive this from routing/city codes (this parser has no airport
+// database or mileage logic to do that reliably). Side trips are excluded from the "primary"
+// component count via the spine (see buildFareSpine) so they can't be mistaken for a 3rd leg;
+// `-/` open-jaw markers need no special handling since they never match farePattern and simply
+// pass through as routing text on whichever side of the boundary they land on.
+// Returns { boundaryIndex, warning }: boundaryIndex is an index into `input` (null if the string
+// doesn't have exactly 2 primary fare components, i.e. the split can't be confidently determined —
+// e.g. a one-way fare, or a multi-stop fare with more than 2 priced legs).
+function findHybridBoundary(input) {
+  const spans = findSideTripSpans(input);
+  const spine = buildFareSpine(input, spans);
+
+  function findKeywordMatch(keyword, haystack) {
+    const strict = haystack.match(new RegExp(`(?<=^|\\s)${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+    return strict || haystack.match(new RegExp(`${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+  }
+  const nucMatch = findKeywordMatch('NUC', spine);
+  const spineFarePart = nucMatch ? spine.slice(0, nucMatch.index) : spine;
+
+  const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(?:\/[A-Z0-9]{1,4})?/g;
+  const primaryIndices = [];
+  let m;
+  while ((m = farePattern.exec(spineFarePart)) !== null) {
+    primaryIndices.push(m.index);
+  }
+
+  if (primaryIndices.length === 2) {
+    return { boundaryIndex: primaryIndices[1], warning: null };
+  }
+  return {
+    boundaryIndex: null,
+    warning: `Could not confidently split this fare string into outbound/inbound legs (found ${primaryIndices.length} primary fare component${primaryIndices.length === 1 ? '' : 's'}, expected 2) — the whole string was scaled at the outbound rate. Review before using it.`,
+  };
+}
+
+// Hybrid version of deriveFareCalcString(): applies a different ratio/suffix to the outbound vs.
+// inbound fare components and surcharges of the same ADT string, using findHybridBoundary() to
+// decide which leg each match belongs to. Unlike deriveFareCalcString(), the fare-component and
+// Q-surcharge passes can't simply be chained (one regex-replace after another) — scaling a fare
+// amount can change its digit count and shift every later character's position, which would
+// silently corrupt the position-based outbound/inbound comparison for the second pass. Instead,
+// every edit is computed against the *original* (unmodified) string's positions first and the
+// result is assembled in one final pass — see the `edits` array below.
+function deriveHybridFareCalcString(adtString, ratios, suffixes) {
+  const { boundaryIndex, warning } = findHybridBoundary(adtString);
+
+  function findKeywordMatch(keyword) {
+    const strict = adtString.match(new RegExp(`(?<=^|\\s)${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+    return strict || adtString.match(new RegExp(`${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+  }
+  const nucKeywordMatch = findKeywordMatch('NUC');
+  const nucIndex = nucKeywordMatch ? nucKeywordMatch.index : -1;
+  const farePart = nucIndex === -1 ? adtString : adtString.slice(0, nucIndex);
+  const rest = nucIndex === -1 ? '' : adtString.slice(nucIndex);
+
+  function phaseFor(index) {
+    if (boundaryIndex === null) return 'outbound';
+    return index < boundaryIndex ? 'outbound' : 'inbound';
+  }
+
+  let scaledTotal = 0;
+  const edits = []; // { start, end, text }, positions relative to farePart
+
+  const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(?:\/[A-Z0-9]{1,4})?/g;
+  let fareMatch;
+  while ((fareMatch = farePattern.exec(farePart)) !== null) {
+    const full = fareMatch[0];
+    const amountStr = fareMatch[1];
+    const fareBasis = fareMatch[2];
+    const phase = phaseFor(fareMatch.index);
+    const scaled = round2(parseFloat(amountStr) * ratios[phase]);
+    scaledTotal += scaled;
+    const trailing = full.slice(amountStr.length + fareBasis.length).replace(/^(CH|IN)/, '');
+    edits.push({
+      start: fareMatch.index,
+      end: fareMatch.index + full.length,
+      text: `${scaled.toFixed(2)}${fareBasis}${suffixes[phase]}${trailing}`,
+    });
+  }
+
+  const qPattern = /Q\s*(?<qDirect>\d+(?:\.\d+)?)|(?<![A-Z0-9])Q\s*[A-Z]{3}(?:[A-Z]{3})?(?<qCoded>\d+(?:\.\d+)?)|(?<qNumFirst>\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(?<qNumQ>\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(?<qAirport>\d+(?:\.\d+)?)(?![A-Z0-9])|[A-Z]{6}(?<qAirportQ>\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
+  let qMatch;
+  while ((qMatch = qPattern.exec(farePart)) !== null) {
+    const g = qMatch.groups;
+    const amountStr = g.qDirect || g.qCoded || g.qNumFirst || g.qNumQ || g.qAirport || g.qAirportQ;
+    if (!amountStr) continue;
+    const full = qMatch[0];
+    const start = qMatch.index;
+    const end = start + full.length;
+    // Defensive: the fare and Q patterns target disjoint text shapes, but skip anything that
+    // would overlap an already-recorded fare-component edit rather than double-editing it.
+    if (edits.some(e => start < e.end && end > e.start)) continue;
+    const phase = phaseFor(start);
+    const scaled = round2(parseFloat(amountStr) * ratios[phase]);
+    scaledTotal += scaled;
+    edits.push({ start, end, text: full.replace(amountStr, scaled.toFixed(2)) });
+  }
+
+  edits.sort((a, b) => a.start - b.start);
+  let rebuilt = '';
+  let cursor = 0;
+  edits.forEach(({ start, end, text }) => {
+    if (start < cursor) return;
+    rebuilt += farePart.slice(cursor, start) + text;
+    cursor = end;
+  });
+  rebuilt += farePart.slice(cursor);
+
+  const recomputedNuc = round2(scaledTotal);
+  const scaledRest = rest.replace(/NUC(\d+(?:\.\d+)?)/, `NUC${recomputedNuc.toFixed(2)}`);
+  return { string: rebuilt + scaledRest, warning };
+}
+
+// Derives and applies the CNN/INF (single-ratio) or INF/CNN, CNN/ADT (hybrid, two-ratio) Fare
+// Calculation String from the last validated ADT string, then runs it through the normal
+// parseFareCalcString() pipeline so validation/rendering stay authoritative. `silent` suppresses
+// the "validate Adult first" error (used on tab-switch re-derivation, where a missing ADT source
+// just means "nothing to refresh yet").
 function applyAutoCalc(ptc, { silent = false } = {}) {
   if (!state.adtParsedFareCalc) {
     if (!silent) {
@@ -974,10 +1175,21 @@ function applyAutoCalc(ptc, { silent = false } = {}) {
     syncAutoCalcUI();
     return;
   }
-  const derived = deriveFareCalcString(state.adtParsedFareCalc, PTC_AUTO_CALC_PERCENT[ptc], PTC_FARE_BASIS_SUFFIX[ptc]);
+  let derived;
+  let warning = null;
+  if (ptc in PTC_HYBRID_RATIOS) {
+    const result = deriveHybridFareCalcString(state.adtParsedFareCalc, PTC_HYBRID_RATIOS[ptc], PTC_HYBRID_SUFFIX[ptc]);
+    derived = result.string;
+    warning = result.warning;
+  } else {
+    derived = deriveFareCalcString(state.adtParsedFareCalc, PTC_AUTO_CALC_PERCENT[ptc], PTC_FARE_BASIS_SUFFIX[ptc]);
+  }
   els.fareCalcString.value = derived;
   parseFareCalcString();
   syncAutoCalcUI();
+  if (warning) {
+    showError(warning);
+  }
 }
 
 function toggleParserSection() {
@@ -1827,7 +2039,7 @@ function calculateFare() {
   state.isCalculatingFare = false;
 }
 
-const PTC_LABELS = { ADT: 'Adult', CNN: 'Child', INF: 'Infant' };
+const PTC_LABELS = { ADT: 'Adult', CNN: 'Child', INF: 'Infant', INF_CNN: 'Infant/Child', CNN_ADT: 'Child/Adult' };
 
 // One row definition per summary metric: a label plus a getter that formats that metric
 // for a single PTC's summaryData object. Shared by both the single- and multi-PTC table.
