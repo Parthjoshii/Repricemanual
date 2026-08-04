@@ -1748,12 +1748,20 @@ function calculateTaxes() {
 
   els.taxAdj.value = result.currency ? `${result.currency}${formatAmount(netTaxWithK3, result.currency)}` : '';
 
-  // If fare data exists, update perPax and subTotal
-  if (state.lastSummaryData) {
-    const diff = state.lastSummaryData.diff;
-    const feeAmount = state.lastSummaryData.fee;
+  // Keep the active tab's stored summary data live-updated with the new tax numbers, whatever
+  // kind of summary it currently is — fare-based (built by calculateFare()) or a tax-only /
+  // fare-calc-only one built by handleSummarise() when Summarise was clicked before any fare was
+  // entered. Targeting state.ptcData directly (rather than state.lastSummaryData, which a
+  // tax-only/fare-calc-only summary is never assigned to) is what makes a recalculation always
+  // reach whichever object is actually canonical for this tab, regardless of how it was created
+  // or in what order fare/tax/Summarise happened — otherwise a Summary built before any fare
+  // existed would silently stop picking up further tax edits.
+  const activeSummary = state.ptcData[state.activePtc].summaryData;
+  if (activeSummary) {
+    const diff = activeSummary.diff;
+    const feeAmount = activeSummary.fee;
     const k3FeeAmount = fareK3State.k3Fee;
-    const passengerCount = state.lastSummaryData.pax;
+    const passengerCount = activeSummary.pax;
     const perPax = diff + feeAmount + k3FeeAmount + netTaxWithK3;
     const subTotal = perPax * passengerCount;
 
@@ -1761,11 +1769,11 @@ function calculateTaxes() {
     els.subTotal.value = `${result.currency}${formatAmount(subTotal, result.currency)}`;
 
     // Update stored summary data with new tax adjustment and Add Taxes text (K3 on YQ may have changed)
-    state.lastSummaryData.taxAdj = netTaxWithK3;
-    state.lastSummaryData.perPax = perPax;
-    state.lastSummaryData.subTotal = subTotal;
-    state.lastSummaryData.addTaxes = els.addTaxes.value;
-    state.lastSummaryData.k3OnYQ = k3OnYQ;
+    activeSummary.taxAdj = netTaxWithK3;
+    activeSummary.perPax = perPax;
+    activeSummary.subTotal = subTotal;
+    activeSummary.addTaxes = els.addTaxes.value;
+    activeSummary.k3OnYQ = k3OnYQ;
   }
 
   state.isCalculatingTax = false;
