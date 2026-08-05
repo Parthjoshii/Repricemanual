@@ -1,5 +1,18 @@
 const byId = (id) => document.getElementById(id);
 
+// Escapes text before it's interpolated into an innerHTML template string. Needed anywhere raw
+// user input (or a DOM node's .textContent read back out) flows into HTML built via string
+// concatenation — .textContent itself is safe to *set*, but re-reading it and splicing the
+// result into a new HTML string loses that protection, so it has to be escaped again here.
+function escapeHtml(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 // Rounding rules by currency. Decimal places follow ISO 4217 minor units, except INR/IDR/TWD
 // which keep this app's existing fare-rounding convention (whole-unit fares are how these are
 // conventionally issued in air ticketing, even though ISO 4217 itself specifies 2 decimals).
@@ -199,6 +212,11 @@ function showPtcPrompt({ message, defaultValue = '', requireInput = true }) {
 const PTC_CODES = ['ADT', 'CNN', 'INF', 'INF_CNN', 'CNN_ADT'];
 const BUILT_IN_PTC_COUNT = 5;
 const MAX_CUSTOM_PTC_TABS = 2;
+// Declared here (not near the summary-table code that mainly reads it) so it's available to
+// loadStateFromStorage()/syncAutoCalcUI(), both of which can run before the script has finished
+// its top-to-bottom pass — a `const` further down the file would still be in its temporal dead
+// zone at that point and throw a ReferenceError.
+const PTC_LABELS = { ADT: 'Adult', CNN: 'Child', INF: 'Infant', INF_CNN: 'Infant/Child', CNN_ADT: 'Child/Adult' };
 
 // CNN/INF Fare Calculation Strings can be auto-derived from the validated ADT string by scaling
 // fare/surcharge amounts by these percentages and forcing this pax-type suffix onto fare basis codes.
@@ -341,6 +359,67 @@ function updatePtcTabUI() {
   const customCount = PTC_CODES.length - BUILT_IN_PTC_COUNT;
   els.ptcAddTabButton.hidden = customCount >= MAX_CUSTOM_PTC_TABS;
   syncAutoCalcUI();
+  saveStateToStorage();
+}
+
+const PERSIST_KEY = 'fareTaxCalc.state.v1';
+
+// Auto-saves the whole session (every PTC tab's inputs/results, custom tabs, which tab is
+// active) so an accidental refresh or closed tab doesn't silently discard mid-task work — the
+// only thing persisted before this was the light/dark theme. Called from updatePtcTabUI() (which
+// already runs after every state-changing action — tab switch, calculate, clear, add/remove
+// custom tab) plus a few spots that change data without going through it (tax-only recalculation,
+// converting a Fare Calculation String, renaming a custom tab).
+function saveStateToStorage() {
+  try {
+    // Capture the active tab's live DOM values too — formSnapshot for the active tab is normally
+    // only refreshed when switching *away* from it, so without this its most recent edits
+    // wouldn't be in state.ptcData yet at save time.
+    state.ptcData[state.activePtc].formSnapshot = snapshotPtc();
+    const payload = {
+      activePtc: state.activePtc,
+      ptcCodes: PTC_CODES,
+      ptcLabels: PTC_LABELS,
+      ptcData: state.ptcData,
+    };
+    localStorage.setItem(PERSIST_KEY, JSON.stringify(payload));
+  } catch (e) {
+    // Best-effort: storage disabled (private browsing), quota exceeded, etc. — the app still
+    // works without persistence, it just won't survive a refresh.
+  }
+}
+
+// Restores a previously auto-saved session on page load, including re-creating any custom tabs'
+// DOM buttons (built-in ADT/CNN/INF/INF_CNN/CNN_ADT already exist in the HTML). Safe to call with
+// nothing saved yet (first-ever visit) — leaves everything at its default state in that case.
+function loadStateFromStorage() {
+  let saved;
+  try {
+    const raw = localStorage.getItem(PERSIST_KEY);
+    if (!raw) return;
+    saved = JSON.parse(raw);
+  } catch (e) {
+    return;
+  }
+  if (!saved || !Array.isArray(saved.ptcCodes) || !saved.ptcData) return;
+
+  // PTC_CODES/PTC_LABELS are declared const — mutate in place rather than reassigning, since
+  // other modules already hold a reference to these exact objects.
+  PTC_CODES.length = 0;
+  saved.ptcCodes.forEach(code => PTC_CODES.push(code));
+  Object.keys(PTC_LABELS).forEach(key => delete PTC_LABELS[key]);
+  Object.assign(PTC_LABELS, saved.ptcLabels || {});
+  state.ptcData = saved.ptcData;
+
+  // Re-create DOM buttons for any saved custom tabs (built-ins are already in index.html).
+  PTC_CODES.slice(BUILT_IN_PTC_COUNT).forEach(code => {
+    if (ptcTabButton(code)) return;
+    const btn = buildCustomTabButton(code, PTC_LABELS[code] || code);
+    els.ptcAddTabButton.insertAdjacentElement('beforebegin', btn);
+  });
+
+  state.activePtc = PTC_CODES.includes(saved.activePtc) ? saved.activePtc : 'ADT';
+  restorePtc(state.ptcData[state.activePtc]?.formSnapshot || defaultPtcSnapshot());
 }
 
 // The "Auto-calculate from Adult" toggle applies to CNN/INF (single ratio) and INF_CNN/CNN_ADT
@@ -469,6 +548,7 @@ async function renameCustomTab(code) {
   PTC_LABELS[code] = label;
   const btn = ptcTabButton(code);
   if (btn) btn.querySelector('.ptc-tab-label').textContent = label;
+  saveStateToStorage();
 }
 
 async function removeCustomTab(code) {
@@ -791,7 +871,7 @@ function parseFareCalcString() {
   } else {
     // Generate corrected fare string
     const correctedString = input.replace(/NUC\d+(?:\.\d+)?/, `NUC${calculatedNuc.toFixed(2)}`);
-    els.nucValidation.innerHTML = `<span class="error">✗ NUC Validation: FAIL<br><br>Corrected Fare String:<br><span style="font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text-primary);">${correctedString}</span></span>`;
+    els.nucValidation.innerHTML = `<span class="error">✗ NUC Validation: FAIL<br><br>Corrected Fare String:<br><span style="font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text-primary);">${escapeHtml(correctedString)}</span></span>`;
     // Validation failed: use the corrected string for summaries
     state.lastConvertedFareCalcString = correctedString;
   }
@@ -820,6 +900,7 @@ function parseFareCalcString() {
   if (parsed.warnings.length > 0) {
     showError(parsed.warnings.join(' '));
   }
+  saveStateToStorage();
 }
 
 function getPaxType(suffix) {
@@ -901,8 +982,8 @@ function parseFareCalcStringInternal(input) {
   //   and will be read as one.
 
   // Extract fare amounts (numbers before fare basis codes)
-  // Pattern: number (with or without decimal) followed by 8-character fare basis (alphanumeric), optional CH|IN suffix, and /4-character designator (alphanumeric, captured for display)
-  const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(\/[A-Z0-9]{1,4})?/g;
+  // Pattern: number (with or without decimal) followed by 8-character fare basis (alphanumeric), optional CH|IN suffix, and a /1-8 character ticket designator (alphanumeric, captured for display) — 8 is IATA's actual max designator length, not an arbitrary cap
+  const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(\/[A-Z0-9]{1,8})?/g;
   let fareMatch;
   while ((fareMatch = farePattern.exec(farePart)) !== null && result.fareComponents.length < 6) {
     result.fareComponents.push({
@@ -987,7 +1068,7 @@ function deriveFareCalcString(adtString, percent, paxSuffix) {
 
   let scaledTotal = 0;
 
-  const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(?:\/[A-Z0-9]{1,4})?/g;
+  const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(?:\/[A-Z0-9]{1,8})?/g;
   const scaledFarePart = farePart.replace(farePattern, (match, amountStr, fareBasis) => {
     const scaled = round2(parseFloat(amountStr) * percent);
     scaledTotal += scaled;
@@ -1067,7 +1148,7 @@ function findHybridBoundary(input) {
   const nucMatch = findKeywordMatch('NUC', spine);
   const spineFarePart = nucMatch ? spine.slice(0, nucMatch.index) : spine;
 
-  const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(?:\/[A-Z0-9]{1,4})?/g;
+  const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(?:\/[A-Z0-9]{1,8})?/g;
   const primaryIndices = [];
   let m;
   while ((m = farePattern.exec(spineFarePart)) !== null) {
@@ -1111,7 +1192,7 @@ function deriveHybridFareCalcString(adtString, ratios, suffixes) {
   let scaledTotal = 0;
   const edits = []; // { start, end, text }, positions relative to farePart
 
-  const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(?:\/[A-Z0-9]{1,4})?/g;
+  const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(?:\/[A-Z0-9]{1,8})?/g;
   let fareMatch;
   while ((fareMatch = farePattern.exec(farePart)) !== null) {
     const full = fareMatch[0];
@@ -1341,8 +1422,9 @@ function loadTheme() {
   els.themeToggle.textContent = savedTheme === 'light' ? '🌙' : '☀️';
 }
 
-// Initialize theme on load
+// Initialize theme and any auto-saved session on load
 loadTheme();
+loadStateFromStorage();
 updatePtcTabUI();
 
 // Theme toggle click event
@@ -1777,6 +1859,7 @@ function calculateTaxes() {
   }
 
   state.isCalculatingTax = false;
+  saveStateToStorage();
 }
 
 function buildCurrentSummaryData() {
@@ -2047,8 +2130,6 @@ function calculateFare() {
   state.isCalculatingFare = false;
 }
 
-const PTC_LABELS = { ADT: 'Adult', CNN: 'Child', INF: 'Infant', INF_CNN: 'Infant/Child', CNN_ADT: 'Child/Adult' };
-
 // One row definition per summary metric: a label plus a getter that formats that metric
 // for a single PTC's summaryData object. Shared by both the single- and multi-PTC table.
 const SUMMARY_ROW_DEFS = [
@@ -2195,7 +2276,7 @@ function buildSummaryHtmlForClipboard(tables) {
         const isBoldLabel = !!cell.querySelector('b');
         const weight = tag === 'th' || isBoldLabel ? 'font-weight:700;' : '';
         const colspanAttr = cell.colSpan > 1 ? ` colspan="${cell.colSpan}"` : '';
-        return `<${tag} style="${cellStyle}${weight}"${colspanAttr}>${cell.textContent}</${tag}>`;
+        return `<${tag} style="${cellStyle}${weight}"${colspanAttr}>${escapeHtml(cell.textContent)}</${tag}>`;
       }).join('');
       return `<tr>${cells}</tr>`;
     }).join('');
