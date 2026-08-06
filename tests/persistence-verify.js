@@ -43,11 +43,16 @@ let browser;
   await page.click('#parseButton');
   await page.waitForTimeout(150);
 
-  // Stay on CNN as the active tab, then reload the page (new page, same storage/context)
+  // Stay on CNN as the active tab, then reload the page (new page, same storage/context).
+  // Restoration is trigger-based, not automatic (see restore-trigger-verify.js for that
+  // behavior in detail) — click "Restore Previous Session" before asserting anything restored.
   await page.waitForTimeout(150);
   await page.reload();
   await page.waitForSelector('h1');
   await page.waitForTimeout(200);
+  assert.ok(await page.isVisible('#restoreBanner'), 'Restore banner should appear after reload');
+  await page.click('#restoreSessionButton');
+  await page.waitForTimeout(150);
 
   const errorsAfterReload = [...errors];
 

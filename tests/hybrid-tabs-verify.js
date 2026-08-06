@@ -77,7 +77,11 @@ let browser;
   console.log('CHECK4 OK: CNN_ADT plain round trip scales 75%/100%, no suffix on inbound');
 
   // --- Side trip inside outbound leg ---
-  const sideTripOutbound = 'DUB EK X/DXB EK COK 400.00QHAMPIE1/VFN2 (EK COK BEY COK 100.00XXXXXXX1) EK X/DXB DUB 400.00UHEESIE1/VFN2 NUC900.00 ROE1.0';
+  // Positioned BEFORE the outbound fare component, not after it: the boundary sits right after
+  // the *end* of the outbound component (see findHybridBoundary), since a return leg's own
+  // Q-surcharges/routing are written before its fare amount, in the gap between the two primary
+  // components — so anything in that gap is correctly inbound, not outbound.
+  const sideTripOutbound = 'DUB EK X/DXB (EK X/DXB EK COK 100.00XXXXXXX1) EK COK 400.00QHAMPIE1/VFN2 EK X/DXB DUB 400.00UHEESIE1/VFN2 NUC900.00 ROE1.0';
   await setAdt(sideTripOutbound);
   await enableAutoCalc('INF_CNN');
   const sideOutDerived = await page.inputValue('#fareCalcString');

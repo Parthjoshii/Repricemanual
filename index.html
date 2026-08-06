@@ -71,6 +71,13 @@ Changes in V4.6 (Bug Fix Release):
   </div>
 </div>
 <div id="errorDisplay" class="error-display" role="alert" aria-live="assertive" aria-atomic="true"></div>
+<div id="restoreBanner" class="restore-banner" role="status" aria-live="polite" style="display: none;">
+  <span class="restore-banner-text">A previous session was found.</span>
+  <div class="restore-banner-actions">
+    <button type="button" id="restoreSessionButton">Restore Previous Session</button>
+    <button type="button" id="dismissRestoreButton" class="secondary">Dismiss</button>
+  </div>
+</div>
 <div class="ptc-tabs" role="tablist" aria-label="Passenger Type">
   <button type="button" class="ptc-tab" id="ptcTabADT" data-ptc="ADT" role="tab" aria-selected="true">ADT<span class="ptc-tab-dot" aria-hidden="true"></span></button>
   <button type="button" class="ptc-tab" id="ptcTabCNN" data-ptc="CNN" role="tab" aria-selected="false">CNN<span class="ptc-tab-dot" aria-hidden="true"></span></button>

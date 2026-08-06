@@ -43,11 +43,14 @@ done
 | `summary-sequence-verify.js` | A tax-only (or fare-calc-only) summary keeps picking up further tax recalculations, in any order |
 | `parser-hardening-verify.js` | Fare Calculation String Parser: embedded-keyword false positives, whitespace tolerance, case normalization, malformed-input warnings |
 | `q-surcharge-verify.js` | All documented Q-surcharge string shapes parse correctly |
+| `q-decimal-split-verify.js` | A `Q`-surcharge glued directly onto the previous surcharge's amount (`...50.00Q DXBYFC29.81`) keeps its decimal intact instead of splitting into two bogus integers |
 | `clipboard-border-verify.js` | Summary table copies with rich HTML formatting (not just plain text) and bold borders |
 | `custom-tabs-verify.js` | Add/rename/remove custom PTC tabs via the in-app modal, 2-tab cap |
 | `hybrid-tabs-verify.js` | INF/CNN and CNN/ADT hybrid tabs: outbound/inbound split, side trips, open jaw, fallback warnings |
+| `hybrid-q-directional-verify.js` | The return leg's own Q-surcharges (written before its fare amount, between the two primary components) scale at the *inbound* PTC rate, not the outbound one |
 | `ptc-single-table.js` | Consolidated Summary table layout: one column per PTC, no Total column, Amount Payable row |
-| `persistence-verify.js` | Session state (all tabs, custom tabs, active tab) survives a page reload |
+| `persistence-verify.js` | Session state (all tabs, custom tabs, active tab) survives a page reload once restored |
+| `restore-trigger-verify.js` | Restoration is trigger-based, not automatic: reload leaves fields empty and shows a banner; Restore populates everything; Dismiss clears the saved session for good; starting to type without restoring auto-dismisses the banner |
 | `xss-fix-verify.js` | NUC-validation-FAIL display and the clipboard HTML builder escape user input |
 
 `ptc-verify.js` from earlier in this project's history is intentionally **not** included here —

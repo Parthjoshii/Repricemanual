@@ -159,6 +159,9 @@ const els = {
   autoCalcFromAdult: byId('autoCalcFromAdult'),
   autoCalcFromAdultRow: byId('autoCalcFromAdultRow'),
   autoCalcHint: byId('autoCalcHint'),
+  restoreBanner: byId('restoreBanner'),
+  restoreSessionButton: byId('restoreSessionButton'),
+  dismissRestoreButton: byId('dismissRestoreButton'),
 };
 
 // In-app replacement for window.prompt()/confirm() — some embedded browser previews (e.g.
@@ -364,13 +367,24 @@ function updatePtcTabUI() {
 
 const PERSIST_KEY = 'fareTaxCalc.state.v1';
 
-// Auto-saves the whole session (every PTC tab's inputs/results, custom tabs, which tab is
-// active) so an accidental refresh or closed tab doesn't silently discard mid-task work — the
-// only thing persisted before this was the light/dark theme. Called from updatePtcTabUI() (which
-// already runs after every state-changing action — tab switch, calculate, clear, add/remove
-// custom tab) plus a few spots that change data without going through it (tax-only recalculation,
-// converting a Fare Calculation String, renaming a custom tab).
+// While true, saveStateToStorage() is a no-op. Set on page load whenever a previous session is
+// found (see initSessionRestore()), so nothing overwrites that saved snapshot in localStorage
+// before the user has decided whether to restore it — updatePtcTabUI() alone already fires a
+// save during the init sequence, which would otherwise clobber it with the fresh/empty default
+// state a few lines later. Cleared the moment the user restores, dismisses, or starts typing.
+let suppressAutoSave = false;
+// True only while the restore banner is showing and undecided — lets the "start typing dismisses
+// the prompt" listener (see initSessionRestore()) tell a real new-session keystroke apart from
+// its own restore/dismiss button clicks or unrelated activity after the prompt is already gone.
+let sessionCanRestore = false;
+
+// Saves the whole session (every PTC tab's inputs/results, custom tabs, which tab is active) so
+// an accidental refresh or closed tab doesn't silently discard mid-task work. Called from
+// updatePtcTabUI() (which already runs after every state-changing action — tab switch, calculate,
+// clear, add/remove custom tab), a few spots that change data without going through it (tax-only
+// recalculation, converting a Fare Calculation String, renaming a custom tab), and beforeunload.
 function saveStateToStorage() {
+  if (suppressAutoSave) return;
   try {
     // Capture the active tab's live DOM values too — formSnapshot for the active tab is normally
     // only refreshed when switching *away* from it, so without this its most recent edits
@@ -389,19 +403,54 @@ function saveStateToStorage() {
   }
 }
 
-// Restores a previously auto-saved session on page load, including re-creating any custom tabs'
-// DOM buttons (built-in ADT/CNN/INF/INF_CNN/CNN_ADT already exist in the HTML). Safe to call with
-// nothing saved yet (first-ever visit) — leaves everything at its default state in that case.
-function loadStateFromStorage() {
-  let saved;
+// Reads and validates the saved snapshot without applying it anywhere — pure/side-effect-free, so
+// it's safe to call from hasSavedSession() just to check, separately from actually restoring it.
+function readSavedSnapshot() {
   try {
     const raw = localStorage.getItem(PERSIST_KEY);
-    if (!raw) return;
-    saved = JSON.parse(raw);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (!parsed || !Array.isArray(parsed.ptcCodes) || !parsed.ptcData) return null;
+    return parsed;
   } catch (e) {
-    return;
+    return null;
   }
-  if (!saved || !Array.isArray(saved.ptcCodes) || !saved.ptcData) return;
+}
+
+// A structurally-valid snapshot isn't necessarily worth offering to restore — saveStateToStorage()
+// writes on every state-changing action regardless of whether anything meaningful was ever
+// entered, so a snapshot of an untouched default session is common (e.g. right after Dismiss:
+// suppressAutoSave lifts, then the reload's own beforeunload immediately writes a fresh empty
+// snapshot). Only count it as "has a session" if some real data is actually in it.
+function snapshotHasMeaningfulData(saved) {
+  if (saved.ptcCodes.length > BUILT_IN_PTC_COUNT) return true;
+  return Object.values(saved.ptcData).some(entry => {
+    if (entry.summaryData) return true;
+    const f = entry.formSnapshot?.fields;
+    return !!(f && (f.oldFare || f.newFare || f.oldTax || f.newTax || f.fareCalcString));
+  });
+}
+
+function hasSavedSession() {
+  const saved = readSavedSnapshot();
+  return saved !== null && snapshotHasMeaningfulData(saved);
+}
+
+function clearSavedSession() {
+  try {
+    localStorage.removeItem(PERSIST_KEY);
+  } catch (e) {
+    // Best-effort, same as saveStateToStorage().
+  }
+}
+
+// Applies a previously-saved snapshot into state/PTC_CODES/PTC_LABELS/DOM, including re-creating
+// any custom tabs' DOM buttons (built-in ADT/CNN/INF/INF_CNN/CNN_ADT already exist in the HTML).
+// Only ever called in response to the user clicking "Restore Previous Session" — page load itself
+// never auto-hydrates the form; see initSessionRestore().
+function restoreSession() {
+  const saved = readSavedSnapshot();
+  if (!saved) return;
 
   // PTC_CODES/PTC_LABELS are declared const — mutate in place rather than reassigning, since
   // other modules already hold a reference to these exact objects.
@@ -411,7 +460,6 @@ function loadStateFromStorage() {
   Object.assign(PTC_LABELS, saved.ptcLabels || {});
   state.ptcData = saved.ptcData;
 
-  // Re-create DOM buttons for any saved custom tabs (built-ins are already in index.html).
   PTC_CODES.slice(BUILT_IN_PTC_COUNT).forEach(code => {
     if (ptcTabButton(code)) return;
     const btn = buildCustomTabButton(code, PTC_LABELS[code] || code);
@@ -420,7 +468,60 @@ function loadStateFromStorage() {
 
   state.activePtc = PTC_CODES.includes(saved.activePtc) ? saved.activePtc : 'ADT';
   restorePtc(state.ptcData[state.activePtc]?.formSnapshot || defaultPtcSnapshot());
+
+  hideRestoreBanner();
+  sessionCanRestore = false;
+  suppressAutoSave = false;
+  updatePtcTabUI();
 }
+
+function showRestoreBanner() {
+  els.restoreBanner.style.display = 'flex';
+}
+
+function hideRestoreBanner() {
+  els.restoreBanner.style.display = 'none';
+}
+
+// Runs once at page load. Never auto-fills the form — only decides whether a restore prompt is
+// worth showing, and if so, holds off on saving (see suppressAutoSave) until the user acts.
+function initSessionRestore() {
+  if (!hasSavedSession()) return;
+  sessionCanRestore = true;
+  suppressAutoSave = true;
+  showRestoreBanner();
+
+  els.restoreSessionButton.addEventListener('click', restoreSession);
+  els.dismissRestoreButton.addEventListener('click', () => {
+    hideRestoreBanner();
+    sessionCanRestore = false;
+    suppressAutoSave = false;
+    clearSavedSession();
+  });
+
+  // "If the user modifies input without restoring, dismiss the restore option once new data
+  // entry begins" — 'input'/'change' cover every form control (text fields, selects, checkboxes).
+  // Clicks on the banner's own buttons are excluded since those already have their own handlers
+  // above; without the exclusion this listener would fire for those clicks too (event bubbling)
+  // and immediately re-clear suppressAutoSave right as restoreSession() is trying to use it.
+  const dismissOnDataEntry = (e) => {
+    if (!sessionCanRestore) return;
+    if (e.target.closest && e.target.closest('#restoreBanner')) return;
+    hideRestoreBanner();
+    sessionCanRestore = false;
+    suppressAutoSave = false;
+    // Deliberately not clearing storage here (unlike the explicit Dismiss button) — the old
+    // snapshot is simply superseded by normal saveStateToStorage() calls as the new session
+    // progresses, with no need to force it out immediately.
+  };
+  document.addEventListener('input', dismissOnDataEntry);
+  document.addEventListener('change', dismissOnDataEntry);
+}
+
+// Best-effort final save on tab close/refresh, in addition to the many explicit save points
+// already wired elsewhere — respects suppressAutoSave the same as every other call site, so this
+// can't clobber an undecided restore prompt either.
+window.addEventListener('beforeunload', saveStateToStorage);
 
 // The "Auto-calculate from Adult" toggle applies to CNN/INF (single ratio) and INF_CNN/CNN_ADT
 // (hybrid, two ratios): shows/hides its row, keeps the Fare Calculation String field/Convert
@@ -1009,15 +1110,24 @@ function parseFareCalcStringInternal(input) {
   // qCoded: Q + one or two 3-letter airport codes + a number, e.g. QBOM5.00, Q BOMCCU5.00 — keeps
   //   the negative lookbehind, because THIS shape is the one that can false-positive-match inside
   //   a fare basis code (e.g. "256.70QWEEPIN1": Q + "WEE" + "PIN" + "1" looks identical in form).
+  // qCodedSpaced: same shape as qCoded, but for when Q is glued directly onto the *previous*
+  //   surcharge's amount with no separator, e.g. "...50.00Q DXBYFC29.81" — qCoded's lookbehind
+  //   rejects this (Q is preceded by a digit), and without this alternative the match falls
+  //   through to qAirport/qNumFirst, whose trailing negative lookaheads force the regex engine to
+  //   backtrack off the tail of the decimal to satisfy them, splitting e.g. 29.81 into 29 + 81 as
+  //   two bogus surcharges. No lookbehind is needed here: unlike qCoded, this alternative requires
+  //   *mandatory* whitespace after Q (`\s+`, not `\s*`), and that space is itself proof this isn't
+  //   glued fare-basis text like "QWEEPIN1" (which never contains a space) — so it can't produce
+  //   the same false positive qCoded's lookbehind exists to prevent, even applied unconditionally.
   // qNumFirst: number then Q then optional airport code(s), e.g. 58.47QDUB, 470.74QHAM.
   // qNumQ: Q + 6-letter airport pair + number + Q, e.g. Q DUBCOK58.47Q.
   // qAirport / qAirportQ: bare 6-letter airport pair + number, with or without a trailing Q,
   //   e.g. DUBCOK18.82, DUBCOK58.47Q.
-  const qPattern = /Q\s*(?<qDirect>\d+(?:\.\d+)?)|(?<![A-Z0-9])Q\s*[A-Z]{3}(?:[A-Z]{3})?(?<qCoded>\d+(?:\.\d+)?)|(?<qNumFirst>\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(?<qNumQ>\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(?<qAirport>\d+(?:\.\d+)?)(?![A-Z0-9])|[A-Z]{6}(?<qAirportQ>\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
+  const qPattern = /Q\s*(?<qDirect>\d+(?:\.\d+)?)|(?<![A-Z0-9])Q\s*[A-Z]{3}(?:[A-Z]{3})?(?<qCoded>\d+(?:\.\d+)?)|Q\s+[A-Z]{3}(?:[A-Z]{3})?(?<qCodedSpaced>\d+(?:\.\d+)?)|(?<qNumFirst>\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(?<qNumQ>\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(?<qAirport>\d+(?:\.\d+)?)(?![A-Z0-9])|[A-Z]{6}(?<qAirportQ>\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
   let qMatch;
   while ((qMatch = qPattern.exec(farePart)) !== null) {
     const g = qMatch.groups;
-    const amount = g.qDirect || g.qCoded || g.qNumFirst || g.qNumQ || g.qAirport || g.qAirportQ;
+    const amount = g.qDirect || g.qCoded || g.qCodedSpaced || g.qNumFirst || g.qNumQ || g.qAirport || g.qAirportQ;
     if (amount) {
       result.qSurcharges.push(parseFloat(amount));
     }
@@ -1076,10 +1186,10 @@ function deriveFareCalcString(adtString, percent, paxSuffix) {
     return `${scaled.toFixed(2)}${fareBasis}${paxSuffix}${trailing}`;
   });
 
-  const qPattern = /Q\s*(?<qDirect>\d+(?:\.\d+)?)|(?<![A-Z0-9])Q\s*[A-Z]{3}(?:[A-Z]{3})?(?<qCoded>\d+(?:\.\d+)?)|(?<qNumFirst>\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(?<qNumQ>\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(?<qAirport>\d+(?:\.\d+)?)(?![A-Z0-9])|[A-Z]{6}(?<qAirportQ>\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
+  const qPattern = /Q\s*(?<qDirect>\d+(?:\.\d+)?)|(?<![A-Z0-9])Q\s*[A-Z]{3}(?:[A-Z]{3})?(?<qCoded>\d+(?:\.\d+)?)|Q\s+[A-Z]{3}(?:[A-Z]{3})?(?<qCodedSpaced>\d+(?:\.\d+)?)|(?<qNumFirst>\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(?<qNumQ>\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(?<qAirport>\d+(?:\.\d+)?)(?![A-Z0-9])|[A-Z]{6}(?<qAirportQ>\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
   const scaledFarePartWithQ = scaledFarePart.replace(qPattern, (match, ...args) => {
     const g = args[args.length - 1];
-    const amountStr = g.qDirect || g.qCoded || g.qNumFirst || g.qNumQ || g.qAirport || g.qAirportQ;
+    const amountStr = g.qDirect || g.qCoded || g.qCodedSpaced || g.qNumFirst || g.qNumQ || g.qAirport || g.qAirportQ;
     if (!amountStr) return match;
     const scaled = round2(parseFloat(amountStr) * percent);
     scaledTotal += scaled;
@@ -1134,6 +1244,14 @@ function buildFareSpine(input, spans) {
 // component count via the spine (see buildFareSpine) so they can't be mistaken for a 3rd leg;
 // `-/` open-jaw markers need no special handling since they never match farePattern and simply
 // pass through as routing text on whichever side of the boundary they land on.
+//
+// The boundary itself sits right after the END of the first primary fare component — not at the
+// start of the second one. Q-surcharges (and any routing text) for the return leg are written
+// *before* that leg's own fare amount, in the gap between the two primary components — e.g.
+// "...37.13LLEIPCA1/NDC2 EK X/YMQ EK YFC Q DXBYFC5.00 559.11ULEESCA1/NDC2..." has the return
+// leg's own "Q DXBYFC5.00" sitting textually before "559.11", not after it. A boundary at the
+// 2nd component's *start* would misclassify that gap as still outbound, applying the outbound
+// PTC's rate to a surcharge that's actually part of the return leg.
 // Returns { boundaryIndex, warning }: boundaryIndex is an index into `input` (null if the string
 // doesn't have exactly 2 primary fare components, i.e. the split can't be confidently determined —
 // e.g. a one-way fare, or a multi-stop fare with more than 2 priced legs).
@@ -1149,18 +1267,18 @@ function findHybridBoundary(input) {
   const spineFarePart = nucMatch ? spine.slice(0, nucMatch.index) : spine;
 
   const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(?:\/[A-Z0-9]{1,8})?/g;
-  const primaryIndices = [];
+  const primaryMatches = [];
   let m;
   while ((m = farePattern.exec(spineFarePart)) !== null) {
-    primaryIndices.push(m.index);
+    primaryMatches.push({ start: m.index, end: m.index + m[0].length });
   }
 
-  if (primaryIndices.length === 2) {
-    return { boundaryIndex: primaryIndices[1], warning: null };
+  if (primaryMatches.length === 2) {
+    return { boundaryIndex: primaryMatches[0].end, warning: null };
   }
   return {
     boundaryIndex: null,
-    warning: `Could not confidently split this fare string into outbound/inbound legs (found ${primaryIndices.length} primary fare component${primaryIndices.length === 1 ? '' : 's'}, expected 2) — the whole string was scaled at the outbound rate. Review before using it.`,
+    warning: `Could not confidently split this fare string into outbound/inbound legs (found ${primaryMatches.length} primary fare component${primaryMatches.length === 1 ? '' : 's'}, expected 2) — the whole string was scaled at the outbound rate. Review before using it.`,
   };
 }
 
@@ -1209,11 +1327,11 @@ function deriveHybridFareCalcString(adtString, ratios, suffixes) {
     });
   }
 
-  const qPattern = /Q\s*(?<qDirect>\d+(?:\.\d+)?)|(?<![A-Z0-9])Q\s*[A-Z]{3}(?:[A-Z]{3})?(?<qCoded>\d+(?:\.\d+)?)|(?<qNumFirst>\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(?<qNumQ>\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(?<qAirport>\d+(?:\.\d+)?)(?![A-Z0-9])|[A-Z]{6}(?<qAirportQ>\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
+  const qPattern = /Q\s*(?<qDirect>\d+(?:\.\d+)?)|(?<![A-Z0-9])Q\s*[A-Z]{3}(?:[A-Z]{3})?(?<qCoded>\d+(?:\.\d+)?)|Q\s+[A-Z]{3}(?:[A-Z]{3})?(?<qCodedSpaced>\d+(?:\.\d+)?)|(?<qNumFirst>\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(?<qNumQ>\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(?<qAirport>\d+(?:\.\d+)?)(?![A-Z0-9])|[A-Z]{6}(?<qAirportQ>\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
   let qMatch;
   while ((qMatch = qPattern.exec(farePart)) !== null) {
     const g = qMatch.groups;
-    const amountStr = g.qDirect || g.qCoded || g.qNumFirst || g.qNumQ || g.qAirport || g.qAirportQ;
+    const amountStr = g.qDirect || g.qCoded || g.qCodedSpaced || g.qNumFirst || g.qNumQ || g.qAirport || g.qAirportQ;
     if (!amountStr) continue;
     const full = qMatch[0];
     const start = qMatch.index;
@@ -1422,9 +1540,9 @@ function loadTheme() {
   els.themeToggle.textContent = savedTheme === 'light' ? '🌙' : '☀️';
 }
 
-// Initialize theme and any auto-saved session on load
+// Initialize theme, then check for (but never auto-apply) a previous session
 loadTheme();
-loadStateFromStorage();
+initSessionRestore();
 updatePtcTabUI();
 
 // Theme toggle click event
