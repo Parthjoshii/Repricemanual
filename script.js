@@ -358,6 +358,7 @@ function updatePtcTabUI() {
     const isActive = ptc === state.activePtc;
     btn.setAttribute('aria-selected', String(isActive));
     btn.classList.toggle('has-data', hasPtcData(ptc));
+    btn.classList.toggle('dirty', !!state.ptcData[ptc].dirty);
   });
   const customCount = PTC_CODES.length - BUILT_IN_PTC_COUNT;
   els.ptcAddTabButton.hidden = customCount >= MAX_CUSTOM_PTC_TABS;
@@ -520,8 +521,12 @@ function initSessionRestore() {
 
 // Best-effort final save on tab close/refresh, in addition to the many explicit save points
 // already wired elsewhere — respects suppressAutoSave the same as every other call site, so this
-// can't clobber an undecided restore prompt either.
-window.addEventListener('beforeunload', saveStateToStorage);
+// can't clobber an undecided restore prompt either. Flushes first so a field edited within the
+// last 300ms isn't lost from the saved snapshot.
+window.addEventListener('beforeunload', () => {
+  flushPendingCalculations();
+  saveStateToStorage();
+});
 
 // The "Auto-calculate from Adult" toggle applies to CNN/INF (single ratio) and INF_CNN/CNN_ADT
 // (hybrid, two ratios): shows/hides its row, keeps the Fare Calculation String field/Convert
@@ -545,6 +550,9 @@ function syncAutoCalcUI() {
 
 function switchPtcTab(newPtc) {
   if (!PTC_CODES.includes(newPtc) || newPtc === state.activePtc) return;
+  // Same staleness risk as Summarise: an edit still inside the debounce window would otherwise be
+  // captured into formSnapshot's raw field value but never folded into summaryData for this tab.
+  flushPendingCalculations();
   state.ptcData[state.activePtc].formSnapshot = snapshotPtc();
   state.activePtc = newPtc;
   restorePtc(state.ptcData[newPtc].formSnapshot || defaultPtcSnapshot());
@@ -629,7 +637,7 @@ async function addCustomTab() {
 
   const code = generatePtcCode(label);
   PTC_CODES.push(code);
-  state.ptcData[code] = { formSnapshot: null, summaryData: null };
+  state.ptcData[code] = { formSnapshot: null, summaryData: null, dirty: false };
   PTC_LABELS[code] = label;
 
   const btn = buildCustomTabButton(code, label);
@@ -690,11 +698,11 @@ const state = {
   // last computed summary for each PTC (used by switchPtcTab() and the Summary aggregation).
   activePtc: 'ADT',
   ptcData: {
-    ADT: { formSnapshot: null, summaryData: null },
-    CNN: { formSnapshot: null, summaryData: null },
-    INF: { formSnapshot: null, summaryData: null },
-    INF_CNN: { formSnapshot: null, summaryData: null },
-    CNN_ADT: { formSnapshot: null, summaryData: null },
+    ADT: { formSnapshot: null, summaryData: null, dirty: false },
+    CNN: { formSnapshot: null, summaryData: null, dirty: false },
+    INF: { formSnapshot: null, summaryData: null, dirty: false },
+    INF_CNN: { formSnapshot: null, summaryData: null, dirty: false },
+    CNN_ADT: { formSnapshot: null, summaryData: null, dirty: false },
   },
   updateFareK3(currency, total, addTaxesStr) {
     this.lastFareCurrency = currency;
@@ -873,6 +881,40 @@ els.autoCalcFromAdult.addEventListener('change', () => {
   } else {
     syncAutoCalcUI();
   }
+});
+
+// Marks the active tab as having data entered that isn't reflected in its summary yet — cleared
+// again wherever a fresh summaryData actually gets committed (see calculateFare()/calculateTaxes()).
+// Cheap by design (only touches the one affected tab button) since it runs on every keystroke.
+function markActiveTabDirty() {
+  const entry = state.ptcData[state.activePtc];
+  if (!entry || entry.dirty) return;
+  entry.dirty = true;
+  const btn = ptcTabButton(state.activePtc);
+  if (btn) btn.classList.add('dirty');
+}
+
+// Clears the dirty flag for the active tab — called wherever a fresh summaryData actually gets
+// committed for it (calculateFare()/calculateTaxes(), including their cache-hit branches) or where
+// the tab reverts to genuinely empty (clearFare()/clearTaxes()).
+function clearActiveTabDirty() {
+  const entry = state.ptcData[state.activePtc];
+  if (!entry || !entry.dirty) return;
+  entry.dirty = false;
+  const btn = ptcTabButton(state.activePtc);
+  if (btn) btn.classList.remove('dirty');
+}
+
+// Every field that feeds a fare/tax/summary calculation for the active tab — same set the live
+// recalculation listeners above already watch, plus the Fare Calc String (which has no live-calc
+// listener of its own; it only recalculates on explicit Convert).
+[
+  'currency', 'cabin', 'oldFare', 'newFare', 'changeFee',
+  'applyK3OnFareDiff', 'applyK3OnChangeFee', 'applyK3OnYQ',
+  'oldTax', 'newTax', 'pax', 'fareCalcString',
+].forEach(id => {
+  els[id].addEventListener('input', markActiveTabDirty);
+  els[id].addEventListener('change', markActiveTabDirty);
 });
 
 // Parser functions
@@ -1468,6 +1510,10 @@ function mergeSummaryData(dataList) {
 }
 
 function handleSummarise() {
+  // Flush any edit still sitting inside the 300ms auto-recalc debounce window — otherwise a field
+  // edited immediately before clicking Summarise wouldn't be reflected in summaryData yet.
+  flushPendingCalculations();
+
   // Make sure the currently active tab's latest numbers are captured before aggregating,
   // even if a tax-only (or fare-calc-string-only) calculation hasn't been synced to ptcData yet.
   if (state.ptcData[state.activePtc].summaryData) {
@@ -1484,6 +1530,9 @@ function handleSummarise() {
   } else if (state.lastConvertedFareCalcString) {
     state.ptcData[state.activePtc].summaryData = buildFareCalcOnlySummaryData(state.lastConvertedFareCalcString);
   }
+  // By this point the active tab's summaryData reflects every field currently on screen (fare,
+  // tax, and Fare Calc String alike), so any pending "unsummarised data" indicator can clear.
+  clearActiveTabDirty();
 
   // Inactive PTC tabs only have their last-saved snapshot (no live DOM state to read here). A
   // tab that has a converted Fare Calc String but never had a fare/tax calculated still needs a
@@ -1645,6 +1694,20 @@ function tryCalculateFare() {
   }
 
   calculateFare();
+}
+
+// Forces any pending debounced recalculation to happen NOW instead of up to 300ms from now.
+// tryCalculateFare()/tryCalculateTaxes() are idempotent and self-guarding (no-op on incomplete
+// input; calculateFare() itself is cache-keyed with a re-entrancy guard), so calling them directly
+// here is safe even if the debounce timer is also still pending — it'll just redundantly recompute
+// the same now-current cache key when it eventually fires.
+//
+// Needed anywhere that reads state.ptcData[activePtc].summaryData/formSnapshot off the live DOM:
+// without this, a field edited within the last 300ms (debounce window) hasn't been folded into
+// summaryData yet, so Summarise/tab-switch/autosave would act on stale numbers.
+function flushPendingCalculations() {
+  tryCalculateFare();
+  tryCalculateTaxes();
 }
 
 function toggleTaxSection() {
@@ -1974,6 +2037,7 @@ function calculateTaxes() {
     activeSummary.subTotal = subTotal;
     activeSummary.addTaxes = els.addTaxes.value;
     activeSummary.k3OnYQ = k3OnYQ;
+    clearActiveTabDirty();
   }
 
   state.isCalculatingTax = false;
@@ -2097,6 +2161,7 @@ function clearTaxes() {
   els.gdsString.value = '';
   state.lastSummaryData = null;
   state.ptcData[state.activePtc].summaryData = null;
+  clearActiveTabDirty();
   updatePtcTabUI();
 }
 
@@ -2168,6 +2233,7 @@ function calculateFare() {
     // Store summary data for manual summarise button
     state.lastSummaryData = cachedResult.summaryData;
     state.ptcData[state.activePtc].summaryData = cachedResult.summaryData;
+    clearActiveTabDirty();
     updatePtcTabUI();
     state.isCalculatingFare = false;
     return;
@@ -2243,6 +2309,7 @@ function calculateFare() {
   // Store summary data for manual summarise button
   state.lastSummaryData = summaryData;
   state.ptcData[state.activePtc].summaryData = summaryData;
+  clearActiveTabDirty();
   updatePtcTabUI();
 
   state.isCalculatingFare = false;
@@ -2376,6 +2443,7 @@ function clearFare() {
   state.clearFareCache();
   state.lastSummaryData = null;
   state.ptcData[state.activePtc].summaryData = null;
+  clearActiveTabDirty();
   updatePtcTabUI();
 }
 

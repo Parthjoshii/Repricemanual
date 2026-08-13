@@ -483,6 +483,12 @@ th {
 .ptc-tab.has-data .ptc-tab-dot {
   background: var(--primary-cyan);
 }
+/* Data typed into this tab since its last summarised calculation — takes visual priority over the
+   plain has-data dot above (declared after it) since it's the more actionable of the two states. */
+.ptc-tab.dirty .ptc-tab-dot {
+  background: #f59e0b;
+  box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.25);
+}
 .ptc-add-tab {
   background: transparent;
   border: 1px dashed var(--border-color);
