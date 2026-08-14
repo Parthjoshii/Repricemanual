@@ -457,6 +457,13 @@ th {
 .collapsible-content.collapsed {
   max-height: 0;
 }
+.converter-panel {
+  background: var(--readonly-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 4px 0 6px;
+}
 .ptc-tabs {
   display: flex;
   flex-wrap: wrap;
