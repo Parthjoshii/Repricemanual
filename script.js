@@ -2452,17 +2452,23 @@ function clearFare() {
 // Outlook/Gmail, Docs, Slack, Notion, etc.) instead of arriving as bare tab-separated text.
 // Inline styles are required here — a pasted-in app has no access to this page's styles.css.
 function buildSummaryHtmlForClipboard(tables) {
-  const border = '3px solid #334155';
-  const cellStyle = `border:${border}; padding:8px 12px; text-align:center; font-family:sans-serif; font-size:14px;`;
-  const tableStyle = `border:${border}; border-collapse:collapse;`;
+  const border = '3px solid #000000';
+  const tableStyle = `border:${border}; border-collapse:collapse; width:100%; font-family:system-ui, -apple-system, Arial, sans-serif; font-size:14px; color:#0f172a; background-color:#ffffff;`;
   return Array.from(tables).map(table => {
-    const rows = Array.from(table.rows).map(row => {
-      const cells = Array.from(row.cells).map(cell => {
+    const rows = Array.from(table.rows).map((row, rowIndex) => {
+      const cells = Array.from(row.cells).map((cell, colIndex) => {
         const tag = cell.tagName.toLowerCase();
+        const isHeader = tag === 'th';
         const isBoldLabel = !!cell.querySelector('b');
-        const weight = tag === 'th' || isBoldLabel ? 'font-weight:700;' : '';
+        const isFirstCol = colIndex === 0;
+
+        const bgStyle = isHeader ? 'background-color:#f8fafc;' : 'background-color:#ffffff;';
+        const weightStyle = (isHeader || isBoldLabel) ? 'font-weight:700;' : 'font-weight:400;';
+        const alignStyle = (isFirstCol && !isHeader) ? 'text-align:left; white-space:nowrap;' : 'text-align:center;';
+        const cellStyle = `border:${border}; padding:12px 14px; color:#0f172a; ${bgStyle} ${weightStyle} ${alignStyle} font-family:system-ui, -apple-system, Arial, sans-serif; font-size:14px; vertical-align:middle;`;
         const colspanAttr = cell.colSpan > 1 ? ` colspan="${cell.colSpan}"` : '';
-        return `<${tag} style="${cellStyle}${weight}"${colspanAttr}>${escapeHtml(cell.textContent)}</${tag}>`;
+
+        return `<${tag} style="${cellStyle}"${colspanAttr}>${escapeHtml(cell.textContent)}</${tag}>`;
       }).join('');
       return `<tr>${cells}</tr>`;
     }).join('');
