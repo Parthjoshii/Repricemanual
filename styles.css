@@ -385,6 +385,21 @@ td:first-child {
   max-width: 260px;
   word-break: break-word;
 }
+#summary th {
+  background: #ffff00;
+  color: #000000;
+  font-weight: 700;
+}
+.summary-disclaimer {
+  text-align: center;
+  font-weight: 700;
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  margin-top: 12px;
+}
+[data-theme="light"] .summary-disclaimer {
+  color: #000000;
+}
 th {
   background: #f8fafc;
   color: #0f172a;

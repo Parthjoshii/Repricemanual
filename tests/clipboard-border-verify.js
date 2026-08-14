@@ -39,10 +39,14 @@ let browser;
 
   const thBorder = await page.$eval('#summary th', el => getComputedStyle(el).borderTopWidth);
   const tdBorder = await page.$eval('#summary td', el => getComputedStyle(el).borderTopWidth);
-  console.log('th border:', thBorder, '| td border:', tdBorder);
+  const thBg = await page.$eval('#summary th', el => getComputedStyle(el).backgroundColor);
+  console.log('th border:', thBorder, '| td border:', tdBorder, '| th bg:', thBg);
   assert.strictEqual(thBorder, '3px');
   assert.strictEqual(tdBorder, '3px');
-  console.log('CHECK1 OK: summary table borders are 3px (bold)');
+  assert.strictEqual(thBg, 'rgb(255, 255, 0)', 'Summary header should have yellow background');
+  const disclaimerTextDom = await page.$eval('#summary .summary-disclaimer', el => el.textContent.trim());
+  assert.strictEqual(disclaimerTextDom, 'Please note that the fares are not guaranteed until ticketed and are subject to change as per availability');
+  console.log('CHECK1 OK: summary table borders are 3px (bold), yellow header, and disclaimer rendered');
 
   // --- Copy Summary and inspect clipboard for both text/plain and text/html ---
   await page.click('#copySummaryButton');
@@ -66,9 +70,12 @@ let browser;
   assert.ok(clipboardHtml, 'Expected text/html to be present on the clipboard');
   assert.ok(clipboardHtml.includes('<table'), 'Clipboard HTML should contain a <table> element');
   assert.ok(clipboardHtml.includes('border:3px solid'), 'Clipboard HTML table should have inline 3px border styling');
+  assert.ok(clipboardHtml.includes('#ffff00') || clipboardHtml.includes('#FFFF00'), 'Clipboard HTML table should have yellow header');
+  assert.ok(clipboardHtml.includes('Please note that the fares are not guaranteed until ticketed and are subject to change as per availability'), 'Clipboard HTML should include disclaimer note');
   assert.ok(clipboardHtml.includes('Old Fare'), 'Clipboard HTML should contain the row labels');
   assert.ok(clipboardText.includes('Old Fare\tAED1000.00'), 'Clipboard plain-text fallback should still be tab-separated');
-  console.log('CHECK2 OK: clipboard has both rich HTML (table survives paste) and plain-text fallback');
+  assert.ok(clipboardText.includes('Please note that the fares are not guaranteed until ticketed and are subject to change as per availability'), 'Clipboard plain-text should include disclaimer note');
+  console.log('CHECK2 OK: clipboard has rich HTML (yellow header, centered cells, bold borders, disclaimer) and plain-text fallback');
 
   console.log('CONSOLE_ERRORS:', JSON.stringify(errors));
   assert.strictEqual(errors.length, 0, 'Expected zero console errors');

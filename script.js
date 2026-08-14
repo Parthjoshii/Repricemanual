@@ -2411,6 +2411,11 @@ function renderSummary(data, breakdown) {
 
   els.summary.innerHTML = '';
   els.summary.appendChild(buildSummaryTable(breakdown, breakdown.length > 1 ? data : null));
+
+  const disclaimer = document.createElement('div');
+  disclaimer.className = 'summary-disclaimer';
+  disclaimer.innerHTML = '<b>Please note that the fares are not guaranteed until ticketed and are subject to change as per availability</b>';
+  els.summary.appendChild(disclaimer);
 }
 
 function removeK3FFromAddTaxes() {
@@ -2448,32 +2453,36 @@ function clearFare() {
 }
 
 // Rebuilds the summary table(s) as self-contained HTML with inline styles (borders, padding,
-// bold labels) so the table format survives paste into apps that support rich text (Word,
-// Outlook/Gmail, Docs, Slack, Notion, etc.) instead of arriving as bare tab-separated text.
+// bold labels, yellow header, centered text) so the table format survives paste into apps that support
+// rich text (Word, Outlook/Gmail, Docs, Slack, Notion, Excel, etc.) instead of arriving as bare tab-separated text.
 // Inline styles are required here — a pasted-in app has no access to this page's styles.css.
 function buildSummaryHtmlForClipboard(tables) {
   const border = '3px solid #000000';
-  const tableStyle = `border:${border}; border-collapse:collapse; width:100%; font-family:system-ui, -apple-system, Arial, sans-serif; font-size:14px; color:#0f172a; background-color:#ffffff;`;
-  return Array.from(tables).map(table => {
+  const tableStyle = `border:${border}; border-collapse:collapse; width:100%; font-family:Arial, sans-serif; font-size:14px; color:#000000; background-color:#ffffff;`;
+  const tableHtml = Array.from(tables).map(table => {
     const rows = Array.from(table.rows).map((row, rowIndex) => {
       const cells = Array.from(row.cells).map((cell, colIndex) => {
         const tag = cell.tagName.toLowerCase();
         const isHeader = tag === 'th';
         const isBoldLabel = !!cell.querySelector('b');
-        const isFirstCol = colIndex === 0;
 
-        const bgStyle = isHeader ? 'background-color:#f8fafc;' : 'background-color:#ffffff;';
+        const bgStyle = isHeader ? 'background-color:#ffff00;' : 'background-color:#ffffff;';
         const weightStyle = (isHeader || isBoldLabel) ? 'font-weight:700;' : 'font-weight:400;';
-        const alignStyle = (isFirstCol && !isHeader) ? 'text-align:left; white-space:nowrap;' : 'text-align:center;';
-        const cellStyle = `border:${border}; padding:12px 14px; color:#0f172a; ${bgStyle} ${weightStyle} ${alignStyle} font-family:system-ui, -apple-system, Arial, sans-serif; font-size:14px; vertical-align:middle;`;
+        const alignStyle = 'text-align:center;';
+        const cellStyle = `border:${border}; padding:10px 14px; color:#000000; ${bgStyle} ${weightStyle} ${alignStyle} font-family:Arial, sans-serif; font-size:14px; vertical-align:middle;`;
         const colspanAttr = cell.colSpan > 1 ? ` colspan="${cell.colSpan}"` : '';
+        const bgcolorAttr = isHeader ? ' bgcolor="#FFFF00"' : ' bgcolor="#FFFFFF"';
 
-        return `<${tag} style="${cellStyle}"${colspanAttr}>${escapeHtml(cell.textContent)}</${tag}>`;
+        return `<${tag} style="${cellStyle}"${colspanAttr}${bgcolorAttr} align="center">${escapeHtml(cell.textContent)}</${tag}>`;
       }).join('');
       return `<tr>${cells}</tr>`;
     }).join('');
-    return `<table style="${tableStyle}">${rows}</table>`;
+    return `<table style="${tableStyle}" border="1" cellpadding="8" cellspacing="0">${rows}</table>`;
   }).join('<br>');
+
+  const disclaimerHtml = '<p style="text-align:center; font-weight:700; font-family:Arial, sans-serif; font-size:13px; color:#000000; margin:10px 0 0 0;">Please note that the fares are not guaranteed until ticketed and are subject to change as per availability</p>';
+
+  return `${tableHtml}<br>${disclaimerHtml}`;
 }
 
 function copySummaryTable() {
@@ -2482,11 +2491,13 @@ function copySummaryTable() {
     showError('No summary to copy.');
     return;
   }
-  const text = Array.from(tables).map(table =>
+  const disclaimerText = 'Please note that the fares are not guaranteed until ticketed and are subject to change as per availability';
+  const tableText = Array.from(tables).map(table =>
     Array.from(table.rows).map(row =>
       Array.from(row.cells).map(cell => cell.textContent).join('\t')
     ).join('\n')
   ).join('\n\n');
+  const text = `${tableText}\n\n${disclaimerText}`;
 
   function fallbackCopyPlainText() {
     navigator.clipboard.writeText(text).then(() => {
