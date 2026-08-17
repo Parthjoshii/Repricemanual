@@ -418,7 +418,7 @@ const PTC_SNAPSHOT_FIELDS = [
 // write as "the current working set" — swapped alongside the DOM fields above on tab switch.
 const PTC_STATE_KEYS = [
   'lastTaxResult', 'lastFareK3Total', 'lastFareCurrency', 'lastK3AddTaxes',
-  'lastSummaryData', 'lastConvertedFareCalcString',
+  'lastSummaryData', 'lastConvertedFareCalcString', 'rawChangeFee',
 ];
 
 function defaultPtcSnapshot() {
@@ -827,6 +827,7 @@ const state = {
   lastK3AddTaxes: '',
   lastSummaryData: null,
   lastConvertedFareCalcString: null,
+  rawChangeFee: null,
   // Last NUC-validated ADT Fare Calculation String, used as the source for CNN/INF auto-calculation.
   // Not part of PTC_STATE_KEYS: it's ADT-specific data that CNN/INF tabs read, not their own per-tab state.
   adtParsedFareCalc: null,
@@ -1012,7 +1013,7 @@ els.fareRoe.addEventListener('input', () => {
 });
 
 function updateFeeConversion() {
-  const rawText = els.changeFee.value.trim();
+  const rawText = (state.rawChangeFee ?? els.changeFee.value).trim();
   const parsed = parseAmount(rawText);
   const rawAmount = parsed ? parsed.amount : parseFloat(rawText);
   const oldFare = parseAmount(els.oldFare.value);
@@ -1037,18 +1038,24 @@ function updateFeeConversion() {
     const roe = parseFloat(els.feeRoe.value) || 1.0;
     if (!isNaN(rawAmount) && rawAmount > 0) {
       const converted = rawAmount * roe;
-      els.convertedChangeFee.value = `${tgtCur}${formatAmount(converted, tgtCur)}`;
+      const formattedFee = `${tgtCur}${formatAmount(converted, tgtCur)}`;
+      els.convertedChangeFee.value = formattedFee;
+      els.changeFee.value = formattedFee;
     } else {
       els.convertedChangeFee.value = '';
     }
   } else {
     els.convertedChangeFee.value = '';
+    if (state.rawChangeFee !== null && state.rawChangeFee !== undefined) {
+      els.changeFee.value = state.rawChangeFee;
+    }
   }
   state.clearFareCache();
   debouncedCalculateFare();
 }
 
 els.changeFee.addEventListener('input', () => {
+  state.rawChangeFee = els.changeFee.value;
   if (els.feeTargetCurrency.value) {
     updateFeeConversion();
   }
@@ -2521,7 +2528,7 @@ function calculateFare() {
   }
 
   // Handle Change Fee conversion
-  const rawFeeInput = parseAmount(els.changeFee.value);
+  const rawFeeInput = parseAmount(state.rawChangeFee ?? els.changeFee.value);
   const feeSourceCur = els.feeSourceCurrency.value || rawFeeInput?.currency || baseCurrency;
   const feeTargetCur = els.feeTargetCurrency.value;
 
@@ -2542,11 +2549,15 @@ function calculateFare() {
     baseFeeCurrency = feeSourceCur;
     const formattedFee = `${feeTargetCur}${formatAmount(feeAmount, feeTargetCur)}`;
     els.convertedChangeFee.value = formattedFee;
+    els.changeFee.value = formattedFee;
   } else if (rawFeeInput) {
     feeAmount = rawFeeInput.amount;
     feeCurrency = rawFeeInput.currency || currency;
     baseFeeCurrency = rawFeeInput.currency || currency;
     els.convertedChangeFee.value = '';
+    if (state.rawChangeFee !== null && state.rawChangeFee !== undefined) {
+      els.changeFee.value = state.rawChangeFee;
+    }
   } else {
     els.convertedChangeFee.value = '';
   }
@@ -2814,9 +2825,11 @@ function clearFare() {
   state.updateFareK3(null, 0, '');
   state.clearFareCache();
   state.lastSummaryData = null;
+  state.rawChangeFee = null;
   if (state.ptcData[state.activePtc]) {
     state.ptcData[state.activePtc].summaryData = null;
     state.ptcData[state.activePtc].manualFareDiff = false;
+    state.ptcData[state.activePtc].rawChangeFee = null;
   }
   clearActiveTabDirty();
   updatePtcTabUI();
