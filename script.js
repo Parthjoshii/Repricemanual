@@ -235,6 +235,7 @@ const els = {
   fareDiff: byId('fareDiff'),
   converterToggleBtn: byId('converterToggleBtn'),
   converterCollapsible: byId('converterCollapsible'),
+  converterMarquee: byId('converterMarquee'),
   targetCurrency: byId('targetCurrency'),
   fareRoe: byId('fareRoe'),
   convertedFareDiff: byId('convertedFareDiff'),
@@ -1971,8 +1972,12 @@ function toggleTaxSection() {
 
 function toggleConverterSection() {
   els.converterCollapsible.classList.toggle('collapsed');
-  els.converterToggleBtn.classList.toggle('collapsed', els.converterCollapsible.classList.contains('collapsed'));
-  els.converterToggleBtn.textContent = els.converterCollapsible.classList.contains('collapsed') ? 'Show' : 'Hide';
+  const isCollapsed = els.converterCollapsible.classList.contains('collapsed');
+  els.converterToggleBtn.classList.toggle('collapsed', isCollapsed);
+  els.converterToggleBtn.textContent = isCollapsed ? 'Show' : 'Hide';
+  if (els.converterMarquee) {
+    els.converterMarquee.style.display = isCollapsed ? 'none' : 'flex';
+  }
 }
 
 function formatAmount(value, currency = '') {

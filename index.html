@@ -31,573 +31,619 @@ Changes in V4.6 (Bug Fix Release):
 
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
   <meta charset="UTF-8" />
   <title>Fare + Tax Master Calculator</title>
   <link rel="stylesheet" href="styles.css">
 </head>
+
 <body>
-<h1>Manual Reprice - Master Calculator</h1>
-<button id="helpIcon" class="help-icon" type="button" aria-label="Show keyboard shortcuts">⌨️</button>
-<button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle light/dark mode">🌙</button>
-<div id="errorModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalMessage">
-  <div class="modal-box error">
-    <div class="modal-message" id="modalMessage"></div>
-    <button class="modal-close-btn" onclick="closeErrorModal()" aria-label="Close error message">OK</button>
-  </div>
-</div>
-<div id="helpModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
-  <div class="modal-box">
-    <h3 id="helpModalTitle">Keyboard Shortcuts</h3>
-    <div class="help-content">
-      <p><kbd>Enter</kbd> - Calculate Tax/Fare</p>
-      <p><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> - Clear Fare</p>
-      <p><kbd>Ctrl</kbd> + <kbd>X</kbd> - Clear Taxes</p>
-      <p><kbd>Ctrl</kbd> + <kbd>M</kbd> - Toggle Dark/Light Mode</p>
-      <p><kbd>Ctrl</kbd> + <kbd>?</kbd> - Show this help</p>
-      <p><kbd>Escape</kbd> - Close modals</p>
-    </div>
-    <button class="modal-close-btn" onclick="closeHelpModal()" aria-label="Close help">Close</button>
-  </div>
-</div>
-<div id="ptcPromptModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ptcPromptMessage">
-  <div class="modal-box">
-    <div class="modal-message" id="ptcPromptMessage"></div>
-    <input type="text" id="ptcPromptInput" class="modal-input" aria-label="Tab name">
-    <div class="modal-actions">
-      <button class="modal-close-btn secondary" id="ptcPromptCancelBtn" type="button">Cancel</button>
-      <button class="modal-close-btn" id="ptcPromptOkBtn" type="button">OK</button>
+  <h1>Manual Reprice - Master Calculator</h1>
+  <button id="helpIcon" class="help-icon" type="button" aria-label="Show keyboard shortcuts">⌨️</button>
+  <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle light/dark mode">🌙</button>
+  <div id="errorModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalMessage">
+    <div class="modal-box error">
+      <div class="modal-message" id="modalMessage"></div>
+      <button class="modal-close-btn" onclick="closeErrorModal()" aria-label="Close error message">OK</button>
     </div>
   </div>
-</div>
-<div id="errorDisplay" class="error-display" role="alert" aria-live="assertive" aria-atomic="true"></div>
-<div id="restoreBanner" class="restore-banner" role="status" aria-live="polite" style="display: none;">
-  <span class="restore-banner-text">A previous session was found.</span>
-  <div class="restore-banner-actions">
-    <button type="button" id="restoreSessionButton">Restore Previous Session</button>
-    <button type="button" id="dismissRestoreButton" class="secondary">Dismiss</button>
+  <div id="helpModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="helpModalTitle">
+    <div class="modal-box">
+      <h3 id="helpModalTitle">Keyboard Shortcuts</h3>
+      <div class="help-content">
+        <p><kbd>Enter</kbd> - Calculate Tax/Fare</p>
+        <p><kbd>Ctrl</kbd> + <kbd>Shift</kbd> + <kbd>C</kbd> - Clear Fare</p>
+        <p><kbd>Ctrl</kbd> + <kbd>X</kbd> - Clear Taxes</p>
+        <p><kbd>Ctrl</kbd> + <kbd>M</kbd> - Toggle Dark/Light Mode</p>
+        <p><kbd>Ctrl</kbd> + <kbd>?</kbd> - Show this help</p>
+        <p><kbd>Escape</kbd> - Close modals</p>
+      </div>
+      <button class="modal-close-btn" onclick="closeHelpModal()" aria-label="Close help">Close</button>
+    </div>
   </div>
-</div>
-<div class="ptc-tabs" role="tablist" aria-label="Passenger Type">
-  <button type="button" class="ptc-tab" id="ptcTabADT" data-ptc="ADT" role="tab" aria-selected="true">ADT<span class="ptc-tab-dot" aria-hidden="true"></span></button>
-  <button type="button" class="ptc-tab" id="ptcTabCNN" data-ptc="CNN" role="tab" aria-selected="false">CNN<span class="ptc-tab-dot" aria-hidden="true"></span></button>
-  <button type="button" class="ptc-tab" id="ptcTabINF" data-ptc="INF" role="tab" aria-selected="false">INF<span class="ptc-tab-dot" aria-hidden="true"></span></button>
-  <button type="button" class="ptc-tab" id="ptcTabINF_CNN" data-ptc="INF_CNN" role="tab" aria-selected="false">INF/CNN<span class="ptc-tab-dot" aria-hidden="true"></span></button>
-  <button type="button" class="ptc-tab" id="ptcTabCNN_ADT" data-ptc="CNN_ADT" role="tab" aria-selected="false">CNN/ADT<span class="ptc-tab-dot" aria-hidden="true"></span></button>
-  <button type="button" class="ptc-add-tab" id="ptcAddTabButton" aria-label="Add custom passenger type tab">+</button>
-</div>
-<div class="calculator-container">
-<div class="left-column">
-<section aria-labelledby="taxSectionHeading">
-  <div class="section-header">
-    <h2 id="taxSectionHeading">Tax Adjustment Calculator</h2>
-    <button class="toggle-btn" id="taxToggleBtn" type="button" aria-expanded="true" aria-controls="taxCollapsible">Hide</button>
-  </div>
-  <div class="collapsible-content" id="taxCollapsible" role="region" aria-live="polite">
-    <div class="section-grid">
-      <div class="section-grid-full">
-        <label for="oldTax">OLD TAX</label>
-        <textarea id="oldTax" placeholder="OLD TAX" aria-describedby="oldTaxDesc"></textarea>
-        <span id="oldTaxDesc" class="sr-only">Enter old tax amounts in format: INR100YQ or 100YQ</span>
-      </div>
-      <div class="section-grid-full">
-        <label for="newTax">NEW TAX</label>
-        <textarea id="newTax" placeholder="NEW TAX" aria-describedby="newTaxDesc"></textarea>
-        <span id="newTaxDesc" class="sr-only">Enter new tax amounts in format: INR100YQ or 100YQ</span>
-      </div>
-      <div class="checkbox-cell checkbox-inline">
-        <input id="applyK3OnYQ" type="checkbox" aria-describedby="k3YQDescription">
-        <label for="applyK3OnYQ">Apply K3 on Positive YQ Tax</label>
-      </div>
-      <span id="k3YQDescription" class="sr-only">Calculates K3 tax on the positive YQ fuel surcharge difference, based on the selected cabin type.</span>
-      <div class="section-grid-full button-row">
-        <button id="taxCalcButton" type="button" aria-label="Calculate tax adjustment">Calculate Tax Adjustment</button>
-        <button id="taxClearButton" type="button" class="secondary" aria-label="Clear tax fields">Clear Taxes</button>
+  <div id="ptcPromptModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ptcPromptMessage">
+    <div class="modal-box">
+      <div class="modal-message" id="ptcPromptMessage"></div>
+      <input type="text" id="ptcPromptInput" class="modal-input" aria-label="Tab name">
+      <div class="modal-actions">
+        <button class="modal-close-btn secondary" id="ptcPromptCancelBtn" type="button">Cancel</button>
+        <button class="modal-close-btn" id="ptcPromptOkBtn" type="button">OK</button>
       </div>
     </div>
-    <div id="taxResult" role="region" aria-live="polite" aria-label="Tax calculation results"></div>
   </div>
-</section>
+  <div id="errorDisplay" class="error-display" role="alert" aria-live="assertive" aria-atomic="true"></div>
+  <div id="restoreBanner" class="restore-banner" role="status" aria-live="polite" style="display: none;">
+    <span class="restore-banner-text">A previous session was found.</span>
+    <div class="restore-banner-actions">
+      <button type="button" id="restoreSessionButton">Restore Previous Session</button>
+      <button type="button" id="dismissRestoreButton" class="secondary">Dismiss</button>
+    </div>
+  </div>
+  <div class="ptc-tabs" role="tablist" aria-label="Passenger Type">
+    <button type="button" class="ptc-tab" id="ptcTabADT" data-ptc="ADT" role="tab" aria-selected="true">ADT<span
+        class="ptc-tab-dot" aria-hidden="true"></span></button>
+    <button type="button" class="ptc-tab" id="ptcTabCNN" data-ptc="CNN" role="tab" aria-selected="false">CNN<span
+        class="ptc-tab-dot" aria-hidden="true"></span></button>
+    <button type="button" class="ptc-tab" id="ptcTabINF" data-ptc="INF" role="tab" aria-selected="false">INF<span
+        class="ptc-tab-dot" aria-hidden="true"></span></button>
+    <button type="button" class="ptc-tab" id="ptcTabINF_CNN" data-ptc="INF_CNN" role="tab"
+      aria-selected="false">INF/CNN<span class="ptc-tab-dot" aria-hidden="true"></span></button>
+    <button type="button" class="ptc-tab" id="ptcTabCNN_ADT" data-ptc="CNN_ADT" role="tab"
+      aria-selected="false">CNN/ADT<span class="ptc-tab-dot" aria-hidden="true"></span></button>
+    <button type="button" class="ptc-add-tab" id="ptcAddTabButton" aria-label="Add custom passenger type tab">+</button>
+  </div>
+  <div class="calculator-container">
+    <div class="left-column">
+      <section aria-labelledby="taxSectionHeading">
+        <div class="section-header">
+          <h2 id="taxSectionHeading">Tax Adjustment Calculator</h2>
+          <button class="toggle-btn" id="taxToggleBtn" type="button" aria-expanded="true"
+            aria-controls="taxCollapsible">Hide</button>
+        </div>
+        <div class="collapsible-content" id="taxCollapsible" role="region" aria-live="polite">
+          <div class="section-grid">
+            <div class="section-grid-full">
+              <label for="oldTax">OLD TAX</label>
+              <textarea id="oldTax" placeholder="OLD TAX" aria-describedby="oldTaxDesc"></textarea>
+              <span id="oldTaxDesc" class="sr-only">Enter old tax amounts in format: INR100YQ or 100YQ</span>
+            </div>
+            <div class="section-grid-full">
+              <label for="newTax">NEW TAX</label>
+              <textarea id="newTax" placeholder="NEW TAX" aria-describedby="newTaxDesc"></textarea>
+              <span id="newTaxDesc" class="sr-only">Enter new tax amounts in format: INR100YQ or 100YQ</span>
+            </div>
+            <div class="checkbox-cell checkbox-inline">
+              <input id="applyK3OnYQ" type="checkbox" aria-describedby="k3YQDescription">
+              <label for="applyK3OnYQ">Apply K3 on Positive YQ Tax</label>
+            </div>
+            <span id="k3YQDescription" class="sr-only">Calculates K3 tax on the positive YQ fuel surcharge difference,
+              based on the selected cabin type.</span>
+            <div class="section-grid-full button-row">
+              <button id="taxCalcButton" type="button" aria-label="Calculate tax adjustment">Calculate Tax
+                Adjustment</button>
+              <button id="taxClearButton" type="button" class="secondary" aria-label="Clear tax fields">Clear
+                Taxes</button>
+            </div>
+          </div>
+          <div id="taxResult" role="region" aria-live="polite" aria-label="Tax calculation results"></div>
+        </div>
+      </section>
 
-<section aria-labelledby="parserSectionHeading">
-  <div class="section-header">
-    <h2 id="parserSectionHeading">Fare Calculation String Parser</h2>
-    <button class="toggle-btn" id="parserToggleBtn" type="button" aria-expanded="true" aria-controls="parserCollapsible">Hide</button>
-  </div>
-  <div class="collapsible-content" id="parserCollapsible" role="region" aria-live="polite">
-    <div class="section-grid">
-      <div class="section-grid-full">
-        <label for="fareCalcString">Fare Calculation String</label>
-        <textarea id="fareCalcString" placeholder="Example: BOM EK X/DXB EK NYC 102.21TLEEPIN1/NDC2 EK X/DXB BOM 404.56XWEEFIN1/NDC2 Q5.00 NUC511.77 ROE90.3344456"></textarea>
-      </div>
-      <div class="section-grid-full checkbox-cell checkbox-inline" id="autoCalcFromAdultRow" style="display: none;">
-        <input id="autoCalcFromAdult" type="checkbox" aria-describedby="autoCalcDescription">
-        <label for="autoCalcFromAdult">Auto-calculate from Adult</label>
-        <span id="autoCalcHint" class="auto-calc-hint" style="display: none;"></span>
-      </div>
-      <span id="autoCalcDescription" class="sr-only">Scales the validated Adult fare calculation string by the passenger type percentage (or, on the hybrid tabs, by outbound/inbound leg) and fills this field automatically.</span>
-      <div class="section-grid-full button-row">
-        <button id="parseButton" type="button" aria-label="Parse fare calculation string">Convert</button>
-        <button id="parserClearButton" type="button" class="secondary" aria-label="Clear parser fields">Clear</button>
-      </div>
+      <section aria-labelledby="parserSectionHeading">
+        <div class="section-header">
+          <h2 id="parserSectionHeading">Fare Calculation String Parser</h2>
+          <button class="toggle-btn" id="parserToggleBtn" type="button" aria-expanded="true"
+            aria-controls="parserCollapsible">Hide</button>
+        </div>
+        <div class="collapsible-content" id="parserCollapsible" role="region" aria-live="polite">
+          <div class="section-grid">
+            <div class="section-grid-full">
+              <label for="fareCalcString">Fare Calculation String</label>
+              <textarea id="fareCalcString"
+                placeholder="Example: BOM EK X/DXB EK NYC 102.21TLEEPIN1/NDC2 EK X/DXB BOM 404.56XWEEFIN1/NDC2 Q5.00 NUC511.77 ROE90.3344456"></textarea>
+            </div>
+            <div class="section-grid-full checkbox-cell checkbox-inline" id="autoCalcFromAdultRow"
+              style="display: none;">
+              <input id="autoCalcFromAdult" type="checkbox" aria-describedby="autoCalcDescription">
+              <label for="autoCalcFromAdult">Auto-calculate from Adult</label>
+              <span id="autoCalcHint" class="auto-calc-hint" style="display: none;"></span>
+            </div>
+            <span id="autoCalcDescription" class="sr-only">Scales the validated Adult fare calculation string by the
+              passenger type percentage (or, on the hybrid tabs, by outbound/inbound leg) and fills this field
+              automatically.</span>
+            <div class="section-grid-full button-row">
+              <button id="parseButton" type="button" aria-label="Parse fare calculation string">Convert</button>
+              <button id="parserClearButton" type="button" class="secondary"
+                aria-label="Clear parser fields">Clear</button>
+            </div>
+          </div>
+          <div id="parserResults" role="region" aria-live="polite" aria-label="Parser results" style="display: none;">
+            <div class="result-section"
+              style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color);">
+              <div class="result-item">
+                <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">
+                  Fare Components</div>
+                <ul id="fareComponents" class="result-list" style="margin: 4px 0 0 0; padding-left: 20px;"></ul>
+              </div>
+              <div class="result-item" id="qSurchargesSection" style="display: none;">
+                <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">Q
+                  Surcharges</div>
+                <ul id="qSurcharges" class="result-list" style="margin: 4px 0 0 0; padding-left: 20px;"></ul>
+              </div>
+              <div class="result-item">
+                <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">
+                  Calculated NUC</div>
+                <div id="calculatedNuc" class="result-value"
+                  style="font-size: 1.1rem; color: var(--text-primary); margin-top: 4px;"></div>
+              </div>
+              <div class="result-item">
+                <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">
+                  Stated NUC</div>
+                <div id="statedNuc" class="result-value"
+                  style="font-size: 1.1rem; color: var(--text-primary); margin-top: 4px;"></div>
+              </div>
+              <div class="result-item">
+                <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">NUC
+                  Validation</div>
+                <div id="nucValidation" class="result-value"
+                  style="font-size: 1.1rem; color: var(--text-primary); margin-top: 4px;"></div>
+              </div>
+              <div class="result-item">
+                <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">ROE
+                </div>
+                <div id="roe" class="result-value"
+                  style="font-size: 1.1rem; color: var(--text-primary); margin-top: 4px;"></div>
+              </div>
+              <div class="result-item">
+                <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">
+                  Base Fare (NUC × ROE)</div>
+                <div id="baseFare" class="result-value highlight"
+                  style="font-size: 1.1rem; color: var(--primary-cyan); font-weight: 700; margin-top: 4px;"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
-    <div id="parserResults" role="region" aria-live="polite" aria-label="Parser results" style="display: none;">
-      <div class="result-section" style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border-color);">
-        <div class="result-item">
-          <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">Fare Components</div>
-          <ul id="fareComponents" class="result-list" style="margin: 4px 0 0 0; padding-left: 20px;"></ul>
-        </div>
-        <div class="result-item" id="qSurchargesSection" style="display: none;">
-          <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">Q Surcharges</div>
-          <ul id="qSurcharges" class="result-list" style="margin: 4px 0 0 0; padding-left: 20px;"></ul>
-        </div>
-        <div class="result-item">
-          <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">Calculated NUC</div>
-          <div id="calculatedNuc" class="result-value" style="font-size: 1.1rem; color: var(--text-primary); margin-top: 4px;"></div>
-        </div>
-        <div class="result-item">
-          <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">Stated NUC</div>
-          <div id="statedNuc" class="result-value" style="font-size: 1.1rem; color: var(--text-primary); margin-top: 4px;"></div>
-        </div>
-        <div class="result-item">
-          <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">NUC Validation</div>
-          <div id="nucValidation" class="result-value" style="font-size: 1.1rem; color: var(--text-primary); margin-top: 4px;"></div>
-        </div>
-        <div class="result-item">
-          <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">ROE</div>
-          <div id="roe" class="result-value" style="font-size: 1.1rem; color: var(--text-primary); margin-top: 4px;"></div>
-        </div>
-        <div class="result-item">
-          <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">Base Fare (NUC × ROE)</div>
-          <div id="baseFare" class="result-value highlight" style="font-size: 1.1rem; color: var(--primary-cyan); font-weight: 700; margin-top: 4px;"></div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-</div>
 
-<section aria-labelledby="fareSectionHeading">
-  <h2 id="fareSectionHeading">Fare Calculator</h2>
-  <div class="section-grid">
-    <div>
-      <label for="currency">Currency</label>
-      <select id="currency" aria-label="Select currency">
-        <option value="" disabled selected>Choose Currency</option>
-        <option value="AED">AED - UAE Dirham</option>
-        <option value="AOA">AOA - Angolan Kwanza</option>
-        <option value="ARS">ARS - Argentine Peso</option>
-        <option value="AUD">AUD - Australian Dollar</option>
-        <option value="BDT">BDT - Bangladesh Taka</option>
-        <option value="BHD">BHD - Bahraini Dinar</option>
-        <option value="BND">BND - Brunei Dollar</option>
-        <option value="BRL">BRL - Brazilian Real</option>
-        <option value="CAD">CAD - Canadian Dollar</option>
-        <option value="CHF">CHF - Swiss Franc</option>
-        <option value="CLP">CLP - Chilean peso</option>
-        <option value="CNY">CNY - Yuan Renminbi</option>
-        <option value="COP">COP - Colombian peso</option>
-        <option value="CZK">CZK - Czech Koruna</option>
-        <option value="DKK">DKK - Danish Krone</option>
-        <option value="DZD">DZD - Algerian Dinar</option>
-        <option value="EGP">EGP - Egyptian Pound</option>
-        <option value="ETB">ETB - Ethiopian Birr</option>
-        <option value="EUR">EUR - Euro</option>
-        <option value="FJD">FJD - Fiji Dollar</option>
-        <option value="GBP">GBP - Pound Sterling</option>
-        <option value="GHS">GHS - Ghana Cedi</option>
-        <option value="HKD">HKD - Hong Kong Dollar</option>
-        <option value="HUF">HUF - Hungary Forint</option>
-        <option value="HRK">HRK - Croatian Kuna</option>
-        <option value="IDR">IDR - Indonesia Rupiah</option>
-        <option value="ILS">ILS - Israeli Shekel</option>
-        <option value="INR">INR - Indian Rupee</option>
-        <option value="IRR">IRR - Iranian Rial</option>
-        <option value="JOD">JOD - Jordanian Dinar</option>
-        <option value="JPY">JPY - Japanese Yen</option>
-        <option value="KES">KES - Kenyan Shilling</option>
-        <option value="KRW">KRW - South Korean Won</option>
-        <option value="KWD">KWD - Kuwaiti Dinar</option>
-        <option value="KZT">KZT - Kazakhstani Tenge</option>
-        <option value="LKR">LKR - Sri Lanka Rupee</option>
-        <option value="MAD">MAD - Moroccan Dirham</option>
-        <option value="MUR">MUR - Mauritius Rupee</option>
-        <option value="MXN">MXN - Mexican peso</option>
-        <option value="MYR">MYR - Malaysian Ringgit</option>
-        <option value="NGN">NGN - Nigeria Naira</option>
-        <option value="NOK">NOK - Norwegian Krone</option>
-        <option value="NPR">NPR - Nepalese Rupee</option>
-        <option value="NZD">NZD - New Zealand Dollar</option>
-        <option value="OMR">OMR - Rial Omani</option>
-        <option value="PHP">PHP - Phillipine Peso</option>
-        <option value="PKR">PKR - Pakistan Rupee</option>
-        <option value="PLN">PLN - Polish Zloty</option>
-        <option value="QAR">QAR - Qatari Rial</option>
-        <option value="RUB">RUB - Russian Ruble</option>
-        <option value="SAR">SAR - Saudi Riyal</option>
-        <option value="SCR">SCR - Seychelles Rupee</option>
-        <option value="SEK">SEK - Swedish Krona</option>
-        <option value="SGD">SGD - Singapore Dollar</option>
-        <option value="THB">THB - Thailand Baht</option>
-        <option value="TND">TND - Tunisian Dinar</option>
-        <option value="TRY">TRY - Turkish Lira</option>
-        <option value="TWD">TWD - Taiwan Dollar</option>
-        <option value="UAH">UAH - Ukraine Hryvnia</option>
-        <option value="USD">USD - US Dollar</option>
-        <option value="VND">VND - Vietnam Dong</option>
-        <option value="XOF">XOF - Cfa Franc Bceao</option>
-        <option value="XAF">XAF - Cfa Franc Bceao</option>
-        <option value="XPF">XPF - CFP Franc</option>
-        <option value="ZAR">ZAR - South African Rand</option>
-        <option value="ZMW">ZMW - Zambia Kwacha</option>
-      </select>
-    </div>
-    <div>
-      <label for="cabin">Cabin Type</label>
-      <select id="cabin" aria-label="Select cabin type for K3 calculation">
-        <option value="">-- Select Cabin --</option>
-        <option value="economy">Economy</option>
-        <option value="premium">Premium Economy</option>
-        <option value="business">Business</option>
-        <option value="first">First</option>
-      </select>
-    </div>
-    <div>
-      <label for="oldFare">Old Base Fare</label>
-      <input id="oldFare" placeholder="e.g. 12000 or INR12000" aria-label="Old base fare amount">
-    </div>
-    <div>
-      <label for="newFare">New Base Fare</label>
-      <input id="newFare" placeholder="e.g. 15000 or USD15000" aria-label="New base fare amount">
-    </div>
-    <div>
-      <label for="fareDiff">Fare Difference</label>
-      <input id="fareDiff" placeholder="e.g. 3000 or INR12400" aria-label="Fare difference amount">
-    </div>
-    <div class="checkbox-cell">
-      <label>&nbsp;</label>
-      <div>
-        <input id="applyK3OnFareDiff" type="checkbox" aria-describedby="k3Description">
-        <label for="applyK3OnFareDiff">Apply K3 on Fare Difference</label>
-      </div>
-    </div>
-    <span id="k3Description" class="sr-only">Calculates K3 service tax on the applicable amount based on the selected cabin type.</span>
-    <div>
-      <label for="k3Tax">Calculated K3</label>
-      <input id="k3Tax" readonly aria-label="Calculated K3 tax amount">
-    </div>
-    <div>
-      <label for="changeFee">Change Fee</label>
-      <input id="changeFee" placeholder="e.g. 3000" aria-label="Change fee amount">
-    </div>
-    <div class="checkbox-cell">
-      <label>&nbsp;</label>
-      <div>
-        <input id="applyK3OnChangeFee" type="checkbox" aria-describedby="k3Description">
-        <label for="applyK3OnChangeFee">Apply K3 on Change Fee</label>
-      </div>
-    </div>
-    <div class="section-grid-full converter-panel">
-      <div class="section-header" style="margin-bottom: 6px;">
-        <span style="font-size: 0.92rem; font-weight: 600; color: var(--text-secondary);">Currency Converter</span>
-        <button class="toggle-btn" id="converterToggleBtn" type="button" aria-expanded="true" aria-controls="converterCollapsible">Hide</button>
-      </div>
-      <div class="collapsible-content" id="converterCollapsible" role="region" aria-live="polite">
-        <div style="margin-bottom: 6px; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Fare Difference Converter</div>
-        <div class="section-grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px;">
+    <section aria-labelledby="fareSectionHeading">
+      <h2 id="fareSectionHeading">Fare Calculator</h2>
+      <div class="section-grid">
+        <div>
+          <label for="currency">Currency</label>
+          <select id="currency" aria-label="Select currency">
+            <option value="" disabled selected>Choose Currency</option>
+            <option value="AED">AED - UAE Dirham</option>
+            <option value="AOA">AOA - Angolan Kwanza</option>
+            <option value="ARS">ARS - Argentine Peso</option>
+            <option value="AUD">AUD - Australian Dollar</option>
+            <option value="BDT">BDT - Bangladesh Taka</option>
+            <option value="BHD">BHD - Bahraini Dinar</option>
+            <option value="BND">BND - Brunei Dollar</option>
+            <option value="BRL">BRL - Brazilian Real</option>
+            <option value="CAD">CAD - Canadian Dollar</option>
+            <option value="CHF">CHF - Swiss Franc</option>
+            <option value="CLP">CLP - Chilean peso</option>
+            <option value="CNY">CNY - Yuan Renminbi</option>
+            <option value="COP">COP - Colombian peso</option>
+            <option value="CZK">CZK - Czech Koruna</option>
+            <option value="DKK">DKK - Danish Krone</option>
+            <option value="DZD">DZD - Algerian Dinar</option>
+            <option value="EGP">EGP - Egyptian Pound</option>
+            <option value="ETB">ETB - Ethiopian Birr</option>
+            <option value="EUR">EUR - Euro</option>
+            <option value="FJD">FJD - Fiji Dollar</option>
+            <option value="GBP">GBP - Pound Sterling</option>
+            <option value="GHS">GHS - Ghana Cedi</option>
+            <option value="HKD">HKD - Hong Kong Dollar</option>
+            <option value="HUF">HUF - Hungary Forint</option>
+            <option value="HRK">HRK - Croatian Kuna</option>
+            <option value="IDR">IDR - Indonesia Rupiah</option>
+            <option value="ILS">ILS - Israeli Shekel</option>
+            <option value="INR">INR - Indian Rupee</option>
+            <option value="IRR">IRR - Iranian Rial</option>
+            <option value="JOD">JOD - Jordanian Dinar</option>
+            <option value="JPY">JPY - Japanese Yen</option>
+            <option value="KES">KES - Kenyan Shilling</option>
+            <option value="KRW">KRW - South Korean Won</option>
+            <option value="KWD">KWD - Kuwaiti Dinar</option>
+            <option value="KZT">KZT - Kazakhstani Tenge</option>
+            <option value="LKR">LKR - Sri Lanka Rupee</option>
+            <option value="MAD">MAD - Moroccan Dirham</option>
+            <option value="MUR">MUR - Mauritius Rupee</option>
+            <option value="MXN">MXN - Mexican peso</option>
+            <option value="MYR">MYR - Malaysian Ringgit</option>
+            <option value="NGN">NGN - Nigeria Naira</option>
+            <option value="NOK">NOK - Norwegian Krone</option>
+            <option value="NPR">NPR - Nepalese Rupee</option>
+            <option value="NZD">NZD - New Zealand Dollar</option>
+            <option value="OMR">OMR - Rial Omani</option>
+            <option value="PHP">PHP - Phillipine Peso</option>
+            <option value="PKR">PKR - Pakistan Rupee</option>
+            <option value="PLN">PLN - Polish Zloty</option>
+            <option value="QAR">QAR - Qatari Rial</option>
+            <option value="RUB">RUB - Russian Ruble</option>
+            <option value="SAR">SAR - Saudi Riyal</option>
+            <option value="SCR">SCR - Seychelles Rupee</option>
+            <option value="SEK">SEK - Swedish Krona</option>
+            <option value="SGD">SGD - Singapore Dollar</option>
+            <option value="THB">THB - Thailand Baht</option>
+            <option value="TND">TND - Tunisian Dinar</option>
+            <option value="TRY">TRY - Turkish Lira</option>
+            <option value="TWD">TWD - Taiwan Dollar</option>
+            <option value="UAH">UAH - Ukraine Hryvnia</option>
+            <option value="USD">USD - US Dollar</option>
+            <option value="VND">VND - Vietnam Dong</option>
+            <option value="XOF">XOF - Cfa Franc Bceao</option>
+            <option value="XAF">XAF - Cfa Franc Bceao</option>
+            <option value="XPF">XPF - CFP Franc</option>
+            <option value="ZAR">ZAR - South African Rand</option>
+            <option value="ZMW">ZMW - Zambia Kwacha</option>
+          </select>
+        </div>
+        <div>
+          <label for="cabin">Cabin Type</label>
+          <select id="cabin" aria-label="Select cabin type for K3 calculation">
+            <option value="">-- Select Cabin --</option>
+            <option value="economy">Economy</option>
+            <option value="premium">Premium Economy</option>
+            <option value="business">Business</option>
+            <option value="first">First</option>
+          </select>
+        </div>
+        <div>
+          <label for="oldFare">Old Base Fare</label>
+          <input id="oldFare" placeholder="e.g. 12000 or INR12000" aria-label="Old base fare amount">
+        </div>
+        <div>
+          <label for="newFare">New Base Fare</label>
+          <input id="newFare" placeholder="e.g. 15000 or USD15000" aria-label="New base fare amount">
+        </div>
+        <div>
+          <label for="fareDiff">Fare Difference</label>
+          <input id="fareDiff" placeholder="e.g. 3000 or INR12400" aria-label="Fare difference amount">
+        </div>
+        <div class="checkbox-cell">
+          <label>&nbsp;</label>
           <div>
-            <label for="targetCurrency">Target Currency</label>
-            <select id="targetCurrency" aria-label="Select target currency">
-              <option value="">-- No Conversion --</option>
-              <option value="AED">AED - UAE Dirham</option>
-              <option value="AOA">AOA - Angolan Kwanza</option>
-              <option value="ARS">ARS - Argentine Peso</option>
-              <option value="AUD">AUD - Australian Dollar</option>
-              <option value="BDT">BDT - Bangladesh Taka</option>
-              <option value="BHD">BHD - Bahraini Dinar</option>
-              <option value="BND">BND - Brunei Dollar</option>
-              <option value="BRL">BRL - Brazilian Real</option>
-              <option value="CAD">CAD - Canadian Dollar</option>
-              <option value="CHF">CHF - Swiss Franc</option>
-              <option value="CLP">CLP - Chilean peso</option>
-              <option value="CNY">CNY - Yuan Renminbi</option>
-              <option value="COP">COP - Colombian peso</option>
-              <option value="CZK">CZK - Czech Koruna</option>
-              <option value="DKK">DKK - Danish Krone</option>
-              <option value="DZD">DZD - Algerian Dinar</option>
-              <option value="EGP">EGP - Egyptian Pound</option>
-              <option value="ETB">ETB - Ethiopian Birr</option>
-              <option value="EUR">EUR - Euro</option>
-              <option value="FJD">FJD - Fiji Dollar</option>
-              <option value="GBP">GBP - Pound Sterling</option>
-              <option value="GHS">GHS - Ghana Cedi</option>
-              <option value="HKD">HKD - Hong Kong Dollar</option>
-              <option value="HUF">HUF - Hungary Forint</option>
-              <option value="HRK">HRK - Croatian Kuna</option>
-              <option value="IDR">IDR - Indonesia Rupiah</option>
-              <option value="ILS">ILS - Israeli Shekel</option>
-              <option value="INR">INR - Indian Rupee</option>
-              <option value="IRR">IRR - Iranian Rial</option>
-              <option value="JOD">JOD - Jordanian Dinar</option>
-              <option value="JPY">JPY - Japanese Yen</option>
-              <option value="KES">KES - Kenyan Shilling</option>
-              <option value="KRW">KRW - South Korean Won</option>
-              <option value="KWD">KWD - Kuwaiti Dinar</option>
-              <option value="KZT">KZT - Kazakhstani Tenge</option>
-              <option value="LKR">LKR - Sri Lanka Rupee</option>
-              <option value="MAD">MAD - Moroccan Dirham</option>
-              <option value="MUR">MUR - Mauritius Rupee</option>
-              <option value="MXN">MXN - Mexican peso</option>
-              <option value="MYR">MYR - Malaysian Ringgit</option>
-              <option value="NGN">NGN - Nigeria Naira</option>
-              <option value="NOK">NOK - Norwegian Krone</option>
-              <option value="NPR">NPR - Nepalese Rupee</option>
-              <option value="NZD">NZD - New Zealand Dollar</option>
-              <option value="OMR">OMR - Rial Omani</option>
-              <option value="PHP">PHP - Phillipine Peso</option>
-              <option value="PKR">PKR - Pakistan Rupee</option>
-              <option value="PLN">PLN - Polish Zloty</option>
-              <option value="QAR">QAR - Qatari Rial</option>
-              <option value="RUB">RUB - Russian Ruble</option>
-              <option value="SAR">SAR - Saudi Riyal</option>
-              <option value="SCR">SCR - Seychelles Rupee</option>
-              <option value="SEK">SEK - Swedish Krona</option>
-              <option value="SGD">SGD - Singapore Dollar</option>
-              <option value="THB">THB - Thailand Baht</option>
-              <option value="TND">TND - Tunisian Dinar</option>
-              <option value="TRY">TRY - Turkish Lira</option>
-              <option value="TWD">TWD - Taiwan Dollar</option>
-              <option value="UAH">UAH - Ukraine Hryvnia</option>
-              <option value="USD">USD - US Dollar</option>
-              <option value="VND">VND - Vietnam Dong</option>
-              <option value="XOF">XOF - Cfa Franc Bceao</option>
-              <option value="XAF">XAF - Cfa Franc Bceao</option>
-              <option value="XPF">XPF - CFP Franc</option>
-              <option value="ZAR">ZAR - South African Rand</option>
-              <option value="ZMW">ZMW - Zambia Kwacha</option>
-            </select>
-          </div>
-          <div>
-            <label for="fareRoe">Exchange Rate / ROE</label>
-            <input id="fareRoe" type="number" step="any" placeholder="Auto rate" aria-label="Exchange Rate or ROE">
-          </div>
-          <div>
-            <label for="convertedFareDiff">Converted Fare Diff</label>
-            <input id="convertedFareDiff" readonly placeholder="Converted" aria-label="Converted fare difference">
+            <input id="applyK3OnFareDiff" type="checkbox" aria-describedby="k3Description">
+            <label for="applyK3OnFareDiff">Apply K3 on Fare Difference</label>
           </div>
         </div>
-
-        <div style="margin-bottom: 6px; padding-top: 10px; border-top: 1px solid var(--border-color); font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">Change Fee Converter</div>
-        <div class="section-grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;">
+        <span id="k3Description" class="sr-only">Calculates K3 service tax on the applicable amount based on the
+          selected cabin type.</span>
+        <div>
+          <label for="k3Tax">Calculated K3</label>
+          <input id="k3Tax" readonly aria-label="Calculated K3 tax amount">
+        </div>
+        <div>
+          <label for="changeFee">Change Fee</label>
+          <input id="changeFee" placeholder="e.g. 3000" aria-label="Change fee amount">
+        </div>
+        <div class="checkbox-cell">
+          <label>&nbsp;</label>
           <div>
-            <label for="feeSourceCurrency">From Currency</label>
-            <select id="feeSourceCurrency" aria-label="Change fee source currency">
-              <option value="">-- From --</option>
-              <option value="AED">AED - UAE Dirham</option>
-              <option value="AOA">AOA - Angolan Kwanza</option>
-              <option value="ARS">ARS - Argentine Peso</option>
-              <option value="AUD">AUD - Australian Dollar</option>
-              <option value="BDT">BDT - Bangladesh Taka</option>
-              <option value="BHD">BHD - Bahraini Dinar</option>
-              <option value="BND">BND - Brunei Dollar</option>
-              <option value="BRL">BRL - Brazilian Real</option>
-              <option value="CAD">CAD - Canadian Dollar</option>
-              <option value="CHF">CHF - Swiss Franc</option>
-              <option value="CLP">CLP - Chilean peso</option>
-              <option value="CNY">CNY - Yuan Renminbi</option>
-              <option value="COP">COP - Colombian peso</option>
-              <option value="CZK">CZK - Czech Koruna</option>
-              <option value="DKK">DKK - Danish Krone</option>
-              <option value="DZD">DZD - Algerian Dinar</option>
-              <option value="EGP">EGP - Egyptian Pound</option>
-              <option value="ETB">ETB - Ethiopian Birr</option>
-              <option value="EUR">EUR - Euro</option>
-              <option value="FJD">FJD - Fiji Dollar</option>
-              <option value="GBP">GBP - Pound Sterling</option>
-              <option value="GHS">GHS - Ghana Cedi</option>
-              <option value="HKD">HKD - Hong Kong Dollar</option>
-              <option value="HUF">HUF - Hungary Forint</option>
-              <option value="HRK">HRK - Croatian Kuna</option>
-              <option value="IDR">IDR - Indonesia Rupiah</option>
-              <option value="ILS">ILS - Israeli Shekel</option>
-              <option value="INR">INR - Indian Rupee</option>
-              <option value="IRR">IRR - Iranian Rial</option>
-              <option value="JOD">JOD - Jordanian Dinar</option>
-              <option value="JPY">JPY - Japanese Yen</option>
-              <option value="KES">KES - Kenyan Shilling</option>
-              <option value="KRW">KRW - South Korean Won</option>
-              <option value="KWD">KWD - Kuwaiti Dinar</option>
-              <option value="KZT">KZT - Kazakhstani Tenge</option>
-              <option value="LKR">LKR - Sri Lanka Rupee</option>
-              <option value="MAD">MAD - Moroccan Dirham</option>
-              <option value="MUR">MUR - Mauritius Rupee</option>
-              <option value="MXN">MXN - Mexican peso</option>
-              <option value="MYR">MYR - Malaysian Ringgit</option>
-              <option value="NGN">NGN - Nigeria Naira</option>
-              <option value="NOK">NOK - Norwegian Krone</option>
-              <option value="NPR">NPR - Nepalese Rupee</option>
-              <option value="NZD">NZD - New Zealand Dollar</option>
-              <option value="OMR">OMR - Rial Omani</option>
-              <option value="PHP">PHP - Phillipine Peso</option>
-              <option value="PKR">PKR - Pakistan Rupee</option>
-              <option value="PLN">PLN - Polish Zloty</option>
-              <option value="QAR">QAR - Qatari Rial</option>
-              <option value="RUB">RUB - Russian Ruble</option>
-              <option value="SAR">SAR - Saudi Riyal</option>
-              <option value="SCR">SCR - Seychelles Rupee</option>
-              <option value="SEK">SEK - Swedish Krona</option>
-              <option value="SGD">SGD - Singapore Dollar</option>
-              <option value="THB">THB - Thailand Baht</option>
-              <option value="TND">TND - Tunisian Dinar</option>
-              <option value="TRY">TRY - Turkish Lira</option>
-              <option value="TWD">TWD - Taiwan Dollar</option>
-              <option value="UAH">UAH - Ukraine Hryvnia</option>
-              <option value="USD">USD - US Dollar</option>
-              <option value="VND">VND - Vietnam Dong</option>
-              <option value="XOF">XOF - Cfa Franc Bceao</option>
-              <option value="XAF">XAF - Cfa Franc Bceao</option>
-              <option value="XPF">XPF - CFP Franc</option>
-              <option value="ZAR">ZAR - South African Rand</option>
-              <option value="ZMW">ZMW - Zambia Kwacha</option>
-            </select>
-          </div>
-          <div>
-            <label for="feeTargetCurrency">To Currency</label>
-            <select id="feeTargetCurrency" aria-label="Change fee target currency">
-              <option value="">-- To --</option>
-              <option value="AED">AED - UAE Dirham</option>
-              <option value="AOA">AOA - Angolan Kwanza</option>
-              <option value="ARS">ARS - Argentine Peso</option>
-              <option value="AUD">AUD - Australian Dollar</option>
-              <option value="BDT">BDT - Bangladesh Taka</option>
-              <option value="BHD">BHD - Bahraini Dinar</option>
-              <option value="BND">BND - Brunei Dollar</option>
-              <option value="BRL">BRL - Brazilian Real</option>
-              <option value="CAD">CAD - Canadian Dollar</option>
-              <option value="CHF">CHF - Swiss Franc</option>
-              <option value="CLP">CLP - Chilean peso</option>
-              <option value="CNY">CNY - Yuan Renminbi</option>
-              <option value="COP">COP - Colombian peso</option>
-              <option value="CZK">CZK - Czech Koruna</option>
-              <option value="DKK">DKK - Danish Krone</option>
-              <option value="DZD">DZD - Algerian Dinar</option>
-              <option value="EGP">EGP - Egyptian Pound</option>
-              <option value="ETB">ETB - Ethiopian Birr</option>
-              <option value="EUR">EUR - Euro</option>
-              <option value="FJD">FJD - Fiji Dollar</option>
-              <option value="GBP">GBP - Pound Sterling</option>
-              <option value="GHS">GHS - Ghana Cedi</option>
-              <option value="HKD">HKD - Hong Kong Dollar</option>
-              <option value="HUF">HUF - Hungary Forint</option>
-              <option value="HRK">HRK - Croatian Kuna</option>
-              <option value="IDR">IDR - Indonesia Rupiah</option>
-              <option value="ILS">ILS - Israeli Shekel</option>
-              <option value="INR">INR - Indian Rupee</option>
-              <option value="IRR">IRR - Iranian Rial</option>
-              <option value="JOD">JOD - Jordanian Dinar</option>
-              <option value="JPY">JPY - Japanese Yen</option>
-              <option value="KES">KES - Kenyan Shilling</option>
-              <option value="KRW">KRW - South Korean Won</option>
-              <option value="KWD">KWD - Kuwaiti Dinar</option>
-              <option value="KZT">KZT - Kazakhstani Tenge</option>
-              <option value="LKR">LKR - Sri Lanka Rupee</option>
-              <option value="MAD">MAD - Moroccan Dirham</option>
-              <option value="MUR">MUR - Mauritius Rupee</option>
-              <option value="MXN">MXN - Mexican peso</option>
-              <option value="MYR">MYR - Malaysian Ringgit</option>
-              <option value="NGN">NGN - Nigeria Naira</option>
-              <option value="NOK">NOK - Norwegian Krone</option>
-              <option value="NPR">NPR - Nepalese Rupee</option>
-              <option value="NZD">NZD - New Zealand Dollar</option>
-              <option value="OMR">OMR - Rial Omani</option>
-              <option value="PHP">PHP - Phillipine Peso</option>
-              <option value="PKR">PKR - Pakistan Rupee</option>
-              <option value="PLN">PLN - Polish Zloty</option>
-              <option value="QAR">QAR - Qatari Rial</option>
-              <option value="RUB">RUB - Russian Ruble</option>
-              <option value="SAR">SAR - Saudi Riyal</option>
-              <option value="SCR">SCR - Seychelles Rupee</option>
-              <option value="SEK">SEK - Swedish Krona</option>
-              <option value="SGD">SGD - Singapore Dollar</option>
-              <option value="THB">THB - Thailand Baht</option>
-              <option value="TND">TND - Tunisian Dinar</option>
-              <option value="TRY">TRY - Turkish Lira</option>
-              <option value="TWD">TWD - Taiwan Dollar</option>
-              <option value="UAH">UAH - Ukraine Hryvnia</option>
-              <option value="USD">USD - US Dollar</option>
-              <option value="VND">VND - Vietnam Dong</option>
-              <option value="XOF">XOF - Cfa Franc Bceao</option>
-              <option value="XAF">XAF - Cfa Franc Bceao</option>
-              <option value="XPF">XPF - CFP Franc</option>
-              <option value="ZAR">ZAR - South African Rand</option>
-              <option value="ZMW">ZMW - Zambia Kwacha</option>
-            </select>
-          </div>
-          <div>
-            <label for="feeRoe">Exchange Rate / ROE</label>
-            <input id="feeRoe" type="number" step="any" placeholder="Auto rate" aria-label="Change fee exchange rate">
-          </div>
-          <div>
-            <label for="convertedChangeFee">Converted Fee</label>
-            <input id="convertedChangeFee" readonly placeholder="Converted" aria-label="Converted change fee amount">
+            <input id="applyK3OnChangeFee" type="checkbox" aria-describedby="k3Description">
+            <label for="applyK3OnChangeFee">Apply K3 on Change Fee</label>
           </div>
         </div>
-      </div>
-    </div>
-    <div class="section-grid-full">
-      <label for="addTaxes">Add Taxes</label>
-      <textarea id="addTaxes" readonly aria-label="Taxes to be added"></textarea>
-    </div>
-    <div class="section-grid-full">
-      <label for="refundTaxes">Refund Taxes</label>
-      <textarea id="refundTaxes" readonly aria-label="Taxes to be refunded"></textarea>
-    </div>
-    <div>
-      <label for="taxAdj">Tax Adjustment (Net)</label>
-      <input id="taxAdj" readonly aria-label="Net tax adjustment amount">
-    </div>
-    <div>
-      <label for="perPax">Amount Payable per Passenger</label>
-      <input id="perPax" readonly aria-label="Amount payable per passenger">
-    </div>
-    <div>
-      <label for="pax">No. of Pax</label>
-      <input id="pax" type="number" value="1" min="1" aria-label="Number of passengers">
-    </div>
-    <div>
-      <label for="subTotal">Sub Total</label>
-      <input id="subTotal" readonly aria-label="Subtotal for all passengers">
-    </div>
-    <div class="section-grid-full button-row">
-      <button id="fareCalcButton" type="button" aria-label="Calculate fare">Calculate Fare</button>
-      <button id="fareClearButton" type="button" class="secondary" aria-label="Clear fare fields">Clear Fare</button>
-      <div id="inrMessage" class="inr-warning" role="alert" aria-live="polite"></div>
-    </div>
-  </div>
-</section>
-</div>
+        <div class="section-grid-full converter-panel">
+          <div class="section-header converter-header" style="margin-bottom: 6px;">
+            <span class="converter-title">Currency Converter</span>
+            <div class="converter-marquee" id="converterMarquee" aria-label="ROE Notice" title="Cross-check ROE with ResConnect & manually enter if current rate is lower." style="display: none;">
+              <div class="marquee-track">
+                <span class="marquee-item">Cross-check ROE with ResConnect & manually enter if current rate is lower.</span>
+                <span class="marquee-item">Cross-check ROE with ResConnect & manually enter if current rate is lower.</span>
+              </div>
+            </div>
+            <button class="toggle-btn collapsed" id="converterToggleBtn" type="button" aria-expanded="false"
+              aria-controls="converterCollapsible">Show</button>
+          </div>
+          <div class="collapsible-content collapsed" id="converterCollapsible" role="region" aria-live="polite">
+            <div
+              style="margin-bottom: 6px; font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
+              Fare Difference Converter</div>
+            <div class="section-grid"
+              style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px; margin-bottom: 12px;">
+              <div>
+                <label for="targetCurrency">Target Currency</label>
+                <select id="targetCurrency" aria-label="Select target currency">
+                  <option value="">-- No Conversion --</option>
+                  <option value="AED">AED - UAE Dirham</option>
+                  <option value="AOA">AOA - Angolan Kwanza</option>
+                  <option value="ARS">ARS - Argentine Peso</option>
+                  <option value="AUD">AUD - Australian Dollar</option>
+                  <option value="BDT">BDT - Bangladesh Taka</option>
+                  <option value="BHD">BHD - Bahraini Dinar</option>
+                  <option value="BND">BND - Brunei Dollar</option>
+                  <option value="BRL">BRL - Brazilian Real</option>
+                  <option value="CAD">CAD - Canadian Dollar</option>
+                  <option value="CHF">CHF - Swiss Franc</option>
+                  <option value="CLP">CLP - Chilean peso</option>
+                  <option value="CNY">CNY - Yuan Renminbi</option>
+                  <option value="COP">COP - Colombian peso</option>
+                  <option value="CZK">CZK - Czech Koruna</option>
+                  <option value="DKK">DKK - Danish Krone</option>
+                  <option value="DZD">DZD - Algerian Dinar</option>
+                  <option value="EGP">EGP - Egyptian Pound</option>
+                  <option value="ETB">ETB - Ethiopian Birr</option>
+                  <option value="EUR">EUR - Euro</option>
+                  <option value="FJD">FJD - Fiji Dollar</option>
+                  <option value="GBP">GBP - Pound Sterling</option>
+                  <option value="GHS">GHS - Ghana Cedi</option>
+                  <option value="HKD">HKD - Hong Kong Dollar</option>
+                  <option value="HUF">HUF - Hungary Forint</option>
+                  <option value="HRK">HRK - Croatian Kuna</option>
+                  <option value="IDR">IDR - Indonesia Rupiah</option>
+                  <option value="ILS">ILS - Israeli Shekel</option>
+                  <option value="INR">INR - Indian Rupee</option>
+                  <option value="IRR">IRR - Iranian Rial</option>
+                  <option value="JOD">JOD - Jordanian Dinar</option>
+                  <option value="JPY">JPY - Japanese Yen</option>
+                  <option value="KES">KES - Kenyan Shilling</option>
+                  <option value="KRW">KRW - South Korean Won</option>
+                  <option value="KWD">KWD - Kuwaiti Dinar</option>
+                  <option value="KZT">KZT - Kazakhstani Tenge</option>
+                  <option value="LKR">LKR - Sri Lanka Rupee</option>
+                  <option value="MAD">MAD - Moroccan Dirham</option>
+                  <option value="MUR">MUR - Mauritius Rupee</option>
+                  <option value="MXN">MXN - Mexican peso</option>
+                  <option value="MYR">MYR - Malaysian Ringgit</option>
+                  <option value="NGN">NGN - Nigeria Naira</option>
+                  <option value="NOK">NOK - Norwegian Krone</option>
+                  <option value="NPR">NPR - Nepalese Rupee</option>
+                  <option value="NZD">NZD - New Zealand Dollar</option>
+                  <option value="OMR">OMR - Rial Omani</option>
+                  <option value="PHP">PHP - Phillipine Peso</option>
+                  <option value="PKR">PKR - Pakistan Rupee</option>
+                  <option value="PLN">PLN - Polish Zloty</option>
+                  <option value="QAR">QAR - Qatari Rial</option>
+                  <option value="RUB">RUB - Russian Ruble</option>
+                  <option value="SAR">SAR - Saudi Riyal</option>
+                  <option value="SCR">SCR - Seychelles Rupee</option>
+                  <option value="SEK">SEK - Swedish Krona</option>
+                  <option value="SGD">SGD - Singapore Dollar</option>
+                  <option value="THB">THB - Thailand Baht</option>
+                  <option value="TND">TND - Tunisian Dinar</option>
+                  <option value="TRY">TRY - Turkish Lira</option>
+                  <option value="TWD">TWD - Taiwan Dollar</option>
+                  <option value="UAH">UAH - Ukraine Hryvnia</option>
+                  <option value="USD">USD - US Dollar</option>
+                  <option value="VND">VND - Vietnam Dong</option>
+                  <option value="XOF">XOF - Cfa Franc Bceao</option>
+                  <option value="XAF">XAF - Cfa Franc Bceao</option>
+                  <option value="XPF">XPF - CFP Franc</option>
+                  <option value="ZAR">ZAR - South African Rand</option>
+                  <option value="ZMW">ZMW - Zambia Kwacha</option>
+                </select>
+              </div>
+              <div>
+                <label for="fareRoe">ROE</label>
+                <input id="fareRoe" type="number" step="any" placeholder="Auto rate" aria-label="Exchange Rate or ROE">
+              </div>
+              <div>
+                <label for="convertedFareDiff">Converted Fare Diff</label>
+                <input id="convertedFareDiff" readonly placeholder="Converted" aria-label="Converted fare difference">
+              </div>
+            </div>
 
-<section class="full-width" aria-labelledby="summaryHeading">
-  <h2 id="summaryHeading">Final Summary</h2>
-  <div class="button-row section-grid-full">
-    <button id="summariseButton" type="button" aria-label="Generate summary and GDS string">Summarise</button>
-  </div>
-  <div id="summaryContent" style="display: none;">
-    <div class="gds-section">
-      <div class="gds-input-wrapper">
-        <input id="gdsString" readonly aria-label="GDS-formatted string for command line">
-        <button id="copyGdsButton" type="button" class="gds-copy-btn" aria-label="Copy GDS string to clipboard">Copy</button>
+            <div
+              style="margin-bottom: 6px; padding-top: 10px; border-top: 1px solid var(--border-color); font-size: 0.82rem; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.5px;">
+              Change Fee Converter</div>
+            <div class="section-grid" style="grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 8px;">
+              <div>
+                <label for="feeSourceCurrency">From Currency</label>
+                <select id="feeSourceCurrency" aria-label="Change fee source currency">
+                  <option value="">-- From --</option>
+                  <option value="AED">AED - UAE Dirham</option>
+                  <option value="AOA">AOA - Angolan Kwanza</option>
+                  <option value="ARS">ARS - Argentine Peso</option>
+                  <option value="AUD">AUD - Australian Dollar</option>
+                  <option value="BDT">BDT - Bangladesh Taka</option>
+                  <option value="BHD">BHD - Bahraini Dinar</option>
+                  <option value="BND">BND - Brunei Dollar</option>
+                  <option value="BRL">BRL - Brazilian Real</option>
+                  <option value="CAD">CAD - Canadian Dollar</option>
+                  <option value="CHF">CHF - Swiss Franc</option>
+                  <option value="CLP">CLP - Chilean peso</option>
+                  <option value="CNY">CNY - Yuan Renminbi</option>
+                  <option value="COP">COP - Colombian peso</option>
+                  <option value="CZK">CZK - Czech Koruna</option>
+                  <option value="DKK">DKK - Danish Krone</option>
+                  <option value="DZD">DZD - Algerian Dinar</option>
+                  <option value="EGP">EGP - Egyptian Pound</option>
+                  <option value="ETB">ETB - Ethiopian Birr</option>
+                  <option value="EUR">EUR - Euro</option>
+                  <option value="FJD">FJD - Fiji Dollar</option>
+                  <option value="GBP">GBP - Pound Sterling</option>
+                  <option value="GHS">GHS - Ghana Cedi</option>
+                  <option value="HKD">HKD - Hong Kong Dollar</option>
+                  <option value="HUF">HUF - Hungary Forint</option>
+                  <option value="HRK">HRK - Croatian Kuna</option>
+                  <option value="IDR">IDR - Indonesia Rupiah</option>
+                  <option value="ILS">ILS - Israeli Shekel</option>
+                  <option value="INR">INR - Indian Rupee</option>
+                  <option value="IRR">IRR - Iranian Rial</option>
+                  <option value="JOD">JOD - Jordanian Dinar</option>
+                  <option value="JPY">JPY - Japanese Yen</option>
+                  <option value="KES">KES - Kenyan Shilling</option>
+                  <option value="KRW">KRW - South Korean Won</option>
+                  <option value="KWD">KWD - Kuwaiti Dinar</option>
+                  <option value="KZT">KZT - Kazakhstani Tenge</option>
+                  <option value="LKR">LKR - Sri Lanka Rupee</option>
+                  <option value="MAD">MAD - Moroccan Dirham</option>
+                  <option value="MUR">MUR - Mauritius Rupee</option>
+                  <option value="MXN">MXN - Mexican peso</option>
+                  <option value="MYR">MYR - Malaysian Ringgit</option>
+                  <option value="NGN">NGN - Nigeria Naira</option>
+                  <option value="NOK">NOK - Norwegian Krone</option>
+                  <option value="NPR">NPR - Nepalese Rupee</option>
+                  <option value="NZD">NZD - New Zealand Dollar</option>
+                  <option value="OMR">OMR - Rial Omani</option>
+                  <option value="PHP">PHP - Phillipine Peso</option>
+                  <option value="PKR">PKR - Pakistan Rupee</option>
+                  <option value="PLN">PLN - Polish Zloty</option>
+                  <option value="QAR">QAR - Qatari Rial</option>
+                  <option value="RUB">RUB - Russian Ruble</option>
+                  <option value="SAR">SAR - Saudi Riyal</option>
+                  <option value="SCR">SCR - Seychelles Rupee</option>
+                  <option value="SEK">SEK - Swedish Krona</option>
+                  <option value="SGD">SGD - Singapore Dollar</option>
+                  <option value="THB">THB - Thailand Baht</option>
+                  <option value="TND">TND - Tunisian Dinar</option>
+                  <option value="TRY">TRY - Turkish Lira</option>
+                  <option value="TWD">TWD - Taiwan Dollar</option>
+                  <option value="UAH">UAH - Ukraine Hryvnia</option>
+                  <option value="USD">USD - US Dollar</option>
+                  <option value="VND">VND - Vietnam Dong</option>
+                  <option value="XOF">XOF - Cfa Franc Bceao</option>
+                  <option value="XAF">XAF - Cfa Franc Bceao</option>
+                  <option value="XPF">XPF - CFP Franc</option>
+                  <option value="ZAR">ZAR - South African Rand</option>
+                  <option value="ZMW">ZMW - Zambia Kwacha</option>
+                </select>
+              </div>
+              <div>
+                <label for="feeTargetCurrency">To Currency</label>
+                <select id="feeTargetCurrency" aria-label="Change fee target currency">
+                  <option value="">-- To --</option>
+                  <option value="AED">AED - UAE Dirham</option>
+                  <option value="AOA">AOA - Angolan Kwanza</option>
+                  <option value="ARS">ARS - Argentine Peso</option>
+                  <option value="AUD">AUD - Australian Dollar</option>
+                  <option value="BDT">BDT - Bangladesh Taka</option>
+                  <option value="BHD">BHD - Bahraini Dinar</option>
+                  <option value="BND">BND - Brunei Dollar</option>
+                  <option value="BRL">BRL - Brazilian Real</option>
+                  <option value="CAD">CAD - Canadian Dollar</option>
+                  <option value="CHF">CHF - Swiss Franc</option>
+                  <option value="CLP">CLP - Chilean peso</option>
+                  <option value="CNY">CNY - Yuan Renminbi</option>
+                  <option value="COP">COP - Colombian peso</option>
+                  <option value="CZK">CZK - Czech Koruna</option>
+                  <option value="DKK">DKK - Danish Krone</option>
+                  <option value="DZD">DZD - Algerian Dinar</option>
+                  <option value="EGP">EGP - Egyptian Pound</option>
+                  <option value="ETB">ETB - Ethiopian Birr</option>
+                  <option value="EUR">EUR - Euro</option>
+                  <option value="FJD">FJD - Fiji Dollar</option>
+                  <option value="GBP">GBP - Pound Sterling</option>
+                  <option value="GHS">GHS - Ghana Cedi</option>
+                  <option value="HKD">HKD - Hong Kong Dollar</option>
+                  <option value="HUF">HUF - Hungary Forint</option>
+                  <option value="HRK">HRK - Croatian Kuna</option>
+                  <option value="IDR">IDR - Indonesia Rupiah</option>
+                  <option value="ILS">ILS - Israeli Shekel</option>
+                  <option value="INR">INR - Indian Rupee</option>
+                  <option value="IRR">IRR - Iranian Rial</option>
+                  <option value="JOD">JOD - Jordanian Dinar</option>
+                  <option value="JPY">JPY - Japanese Yen</option>
+                  <option value="KES">KES - Kenyan Shilling</option>
+                  <option value="KRW">KRW - South Korean Won</option>
+                  <option value="KWD">KWD - Kuwaiti Dinar</option>
+                  <option value="KZT">KZT - Kazakhstani Tenge</option>
+                  <option value="LKR">LKR - Sri Lanka Rupee</option>
+                  <option value="MAD">MAD - Moroccan Dirham</option>
+                  <option value="MUR">MUR - Mauritius Rupee</option>
+                  <option value="MXN">MXN - Mexican peso</option>
+                  <option value="MYR">MYR - Malaysian Ringgit</option>
+                  <option value="NGN">NGN - Nigeria Naira</option>
+                  <option value="NOK">NOK - Norwegian Krone</option>
+                  <option value="NPR">NPR - Nepalese Rupee</option>
+                  <option value="NZD">NZD - New Zealand Dollar</option>
+                  <option value="OMR">OMR - Rial Omani</option>
+                  <option value="PHP">PHP - Phillipine Peso</option>
+                  <option value="PKR">PKR - Pakistan Rupee</option>
+                  <option value="PLN">PLN - Polish Zloty</option>
+                  <option value="QAR">QAR - Qatari Rial</option>
+                  <option value="RUB">RUB - Russian Ruble</option>
+                  <option value="SAR">SAR - Saudi Riyal</option>
+                  <option value="SCR">SCR - Seychelles Rupee</option>
+                  <option value="SEK">SEK - Swedish Krona</option>
+                  <option value="SGD">SGD - Singapore Dollar</option>
+                  <option value="THB">THB - Thailand Baht</option>
+                  <option value="TND">TND - Tunisian Dinar</option>
+                  <option value="TRY">TRY - Turkish Lira</option>
+                  <option value="TWD">TWD - Taiwan Dollar</option>
+                  <option value="UAH">UAH - Ukraine Hryvnia</option>
+                  <option value="USD">USD - US Dollar</option>
+                  <option value="VND">VND - Vietnam Dong</option>
+                  <option value="XOF">XOF - Cfa Franc Bceao</option>
+                  <option value="XAF">XAF - Cfa Franc Bceao</option>
+                  <option value="XPF">XPF - CFP Franc</option>
+                  <option value="ZAR">ZAR - South African Rand</option>
+                  <option value="ZMW">ZMW - Zambia Kwacha</option>
+                </select>
+              </div>
+              <div>
+                <label for="feeRoe">ROE</label>
+                <input id="feeRoe" type="number" step="any" placeholder="Auto rate"
+                  aria-label="Change fee exchange rate">
+              </div>
+              <div>
+                <label for="convertedChangeFee">Converted Fee</label>
+                <input id="convertedChangeFee" readonly placeholder="Converted"
+                  aria-label="Converted change fee amount">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="section-grid-full">
+          <label for="addTaxes">Add Taxes</label>
+          <textarea id="addTaxes" readonly aria-label="Taxes to be added"></textarea>
+        </div>
+        <div class="section-grid-full">
+          <label for="refundTaxes">Refund Taxes</label>
+          <textarea id="refundTaxes" readonly aria-label="Taxes to be refunded"></textarea>
+        </div>
+        <div>
+          <label for="taxAdj">Tax Adjustment (Net)</label>
+          <input id="taxAdj" readonly aria-label="Net tax adjustment amount">
+        </div>
+        <div>
+          <label for="perPax">Amount Payable per Passenger</label>
+          <input id="perPax" readonly aria-label="Amount payable per passenger">
+        </div>
+        <div>
+          <label for="pax">No. of Pax</label>
+          <input id="pax" type="number" value="1" min="1" aria-label="Number of passengers">
+        </div>
+        <div>
+          <label for="subTotal">Sub Total</label>
+          <input id="subTotal" readonly aria-label="Subtotal for all passengers">
+        </div>
+        <div class="section-grid-full button-row">
+          <button id="fareCalcButton" type="button" aria-label="Calculate fare">Calculate Fare</button>
+          <button id="fareClearButton" type="button" class="secondary" aria-label="Clear fare fields">Clear
+            Fare</button>
+          <div id="inrMessage" class="inr-warning" role="alert" aria-live="polite"></div>
+        </div>
       </div>
-    </div>
+    </section>
+  </div>
+
+  <section class="full-width" aria-labelledby="summaryHeading">
+    <h2 id="summaryHeading">Final Summary</h2>
     <div class="button-row section-grid-full">
-      <button id="copySummaryButton" type="button" aria-label="Copy summary to clipboard">Copy Summary</button>
+      <button id="summariseButton" type="button" aria-label="Generate summary and GDS string">Summarise</button>
     </div>
-    <div id="summary" role="region" aria-live="polite" aria-label="Calculation summary table"></div>
-  </div>
-</section>
+    <div id="summaryContent" style="display: none;">
+      <div class="gds-section">
+        <div class="gds-input-wrapper">
+          <input id="gdsString" readonly aria-label="GDS-formatted string for command line">
+          <button id="copyGdsButton" type="button" class="gds-copy-btn"
+            aria-label="Copy GDS string to clipboard">Copy</button>
+        </div>
+      </div>
+      <div class="button-row section-grid-full">
+        <button id="copySummaryButton" type="button" aria-label="Copy summary to clipboard">Copy Summary</button>
+      </div>
+      <div id="summary" role="region" aria-live="polite" aria-label="Calculation summary table"></div>
+    </div>
+  </section>
 
-<script src="script.js"></script>
+  <script src="script.js"></script>
 </body>
+
 </html>
-
-

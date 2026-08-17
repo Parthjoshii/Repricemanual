@@ -32,18 +32,28 @@ const assert = require('assert');
   const isReadOnly = await fareDiff.getAttribute('readonly');
   assert.strictEqual(isReadOnly, null, 'Fare Difference input must be editable (not readonly)');
 
-  // 2. Test Hide/Show toggle
-  await converterToggleBtn.click();
+  // 2. Test Hide/Show toggle (starts collapsed by default)
   let isCollapsed = await converterCollapsible.evaluate(el => el.classList.contains('collapsed'));
-  assert.strictEqual(isCollapsed, true, 'Collapsible content should be collapsed after clicking Hide');
+  assert.strictEqual(isCollapsed, true, 'Collapsible content should be collapsed by default');
   let btnText = await converterToggleBtn.textContent();
-  assert.strictEqual(btnText.trim(), 'Show', 'Button text should be Show when collapsed');
+  assert.strictEqual(btnText.trim(), 'Show', 'Button text should be Show by default');
 
+  // Click Show to expand
   await converterToggleBtn.click();
   isCollapsed = await converterCollapsible.evaluate(el => el.classList.contains('collapsed'));
   assert.strictEqual(isCollapsed, false, 'Collapsible content should expand after clicking Show');
   btnText = await converterToggleBtn.textContent();
   assert.strictEqual(btnText.trim(), 'Hide', 'Button text should be Hide when expanded');
+
+  // Click Hide to collapse
+  await converterToggleBtn.click();
+  isCollapsed = await converterCollapsible.evaluate(el => el.classList.contains('collapsed'));
+  assert.strictEqual(isCollapsed, true, 'Collapsible content should collapse after clicking Hide');
+  btnText = await converterToggleBtn.textContent();
+  assert.strictEqual(btnText.trim(), 'Show', 'Button text should be Show when collapsed');
+
+  // Re-expand for remaining conversion tests
+  await converterToggleBtn.click();
 
   // 3. Test Automated Currency Conversion (USD 50 -> USD 80, convert to INR)
   await page.selectOption('#currency', 'USD');
