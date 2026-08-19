@@ -100,131 +100,6 @@ const K3_RATES = {
   first: 0.18,
 };
 
-const EXCHANGE_RATES = {
-  USD: 1.0,
-  AED: 3.6725,
-  AOA: 920.0,
-  ARS: 940.0,
-  AUD: 1.54,
-  BDT: 119.5,
-  BHD: 0.376,
-  BND: 1.34,
-  BRL: 5.65,
-  CAD: 1.38,
-  CHF: 0.89,
-  CLP: 945.0,
-  CNY: 7.25,
-  COP: 4150.0,
-  CZK: 23.3,
-  DKK: 6.95,
-  DZD: 134.0,
-  EGP: 48.5,
-  ETB: 110.0,
-  EUR: 0.93,
-  FJD: 2.25,
-  GBP: 0.79,
-  GHS: 15.6,
-  HKD: 7.81,
-  HRK: 7.01,
-  HUF: 365.0,
-  IDR: 16200.0,
-  ILS: 3.72,
-  INR: 87.15,
-  IRR: 42000.0,
-  ISK: 138.0,
-  JOD: 0.709,
-  JPY: 157.0,
-  KES: 129.0,
-  KRW: 1380.0,
-  KWD: 0.307,
-  KZT: 475.0,
-  LKR: 302.0,
-  MAD: 9.85,
-  MUR: 46.5,
-  MXN: 18.5,
-  MYR: 4.71,
-  NGN: 1600.0,
-  NOK: 10.85,
-  NPR: 139.4,
-  NZD: 1.66,
-  OMR: 0.384,
-  PHP: 58.5,
-  PKR: 278.5,
-  PLN: 4.02,
-  QAR: 3.64,
-  RUB: 88.5,
-  SAR: 3.75,
-  SCR: 13.8,
-  SEK: 10.65,
-  SGD: 1.35,
-  THB: 36.8,
-  TND: 3.12,
-  TRY: 33.0,
-  TWD: 32.5,
-  UAH: 41.2,
-  VND: 25400.0,
-  XAF: 610.0,
-  XOF: 610.0,
-  XPF: 111.0,
-  ZAR: 18.25,
-  ZMW: 26.0,
-};
-
-function getExchangeRate(fromCur, toCur) {
-  if (!fromCur || !toCur) return 1.0;
-  if (fromCur === toCur) return 1.0;
-  const fromRate = EXCHANGE_RATES[fromCur] || 1.0;
-  const toRate = EXCHANGE_RATES[toCur] || 1.0;
-  const crossRate = toRate / fromRate;
-  return parseFloat(crossRate.toFixed(6));
-}
-
-function fetchLiveExchangeRates() {
-  try {
-    const cached = localStorage.getItem('cached_exchange_rates');
-    if (cached) {
-      const { rates, timestamp } = JSON.parse(cached);
-      if (Date.now() - timestamp < 24 * 60 * 60 * 1000) {
-        Object.assign(EXCHANGE_RATES, rates);
-        return;
-      }
-    }
-  } catch {}
-
-  function handleFetchError() {
-    const msg = '⚠️ Live exchange rate fetch failed. Pre-loaded baseline rates are active. Please verify or manually enter the ROE.';
-    if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', () => showError(msg));
-    } else {
-      showError(msg);
-    }
-  }
-
-  if (typeof fetch === 'function') {
-    fetch('https://open.er-api.com/v6/latest/USD')
-      .then(res => {
-        if (!res.ok) throw new Error('Network response was not ok');
-        return res.json();
-      })
-      .then(data => {
-        if (data && data.rates) {
-          Object.assign(EXCHANGE_RATES, data.rates);
-          try {
-            localStorage.setItem('cached_exchange_rates', JSON.stringify({ rates: data.rates, timestamp: Date.now() }));
-          } catch {}
-        } else {
-          handleFetchError();
-        }
-      })
-      .catch(() => {
-        handleFetchError();
-      });
-  } else {
-    handleFetchError();
-  }
-}
-fetchLiveExchangeRates();
-
 const els = {
   errorDisplay: byId('errorDisplay'),
   currency: byId('currency'),
@@ -235,18 +110,11 @@ const els = {
   oldFare: byId('oldFare'),
   newFare: byId('newFare'),
   fareDiff: byId('fareDiff'),
-  converterToggleBtn: byId('converterToggleBtn'),
-  converterCollapsible: byId('converterCollapsible'),
-  converterMarquee: byId('converterMarquee'),
-  targetCurrency: byId('targetCurrency'),
-  fareRoe: byId('fareRoe'),
-  convertedFareDiff: byId('convertedFareDiff'),
-  feeSourceCurrency: byId('feeSourceCurrency'),
-  feeTargetCurrency: byId('feeTargetCurrency'),
-  feeRoe: byId('feeRoe'),
-  convertedChangeFee: byId('convertedChangeFee'),
+  baseFareDiffBadge: byId('baseFareDiffBadge'),
+  fareDiffBulb: byId('fareDiffBulb'),
   k3Tax: byId('k3Tax'),
   changeFee: byId('changeFee'),
+  changeFeeBulb: byId('changeFeeBulb'),
   applyK3OnFareDiff: byId('applyK3OnFareDiff'),
   applyK3OnChangeFee: byId('applyK3OnChangeFee'),
   applyK3OnYQ: byId('applyK3OnYQ'),
@@ -390,13 +258,6 @@ const PTC_SNAPSHOT_FIELDS = [
   { id: 'oldFare', kind: 'value' },
   { id: 'newFare', kind: 'value' },
   { id: 'fareDiff', kind: 'value' },
-  { id: 'targetCurrency', kind: 'value' },
-  { id: 'fareRoe', kind: 'value' },
-  { id: 'convertedFareDiff', kind: 'value' },
-  { id: 'feeSourceCurrency', kind: 'value' },
-  { id: 'feeTargetCurrency', kind: 'value' },
-  { id: 'feeRoe', kind: 'value' },
-  { id: 'convertedChangeFee', kind: 'value' },
   { id: 'k3Tax', kind: 'value' },
   { id: 'changeFee', kind: 'value' },
   { id: 'applyK3OnFareDiff', kind: 'checked' },
@@ -420,7 +281,7 @@ const PTC_SNAPSHOT_FIELDS = [
 // write as "the current working set" — swapped alongside the DOM fields above on tab switch.
 const PTC_STATE_KEYS = [
   'lastTaxResult', 'lastFareK3Total', 'lastFareCurrency', 'lastK3AddTaxes',
-  'lastSummaryData', 'lastConvertedFareCalcString', 'rawChangeFee',
+  'lastSummaryData', 'lastConvertedFareCalcString',
 ];
 
 function defaultPtcSnapshot() {
@@ -481,6 +342,24 @@ function restorePtc(snapshot) {
   els.nucValidation.innerHTML = snapshot.nucValidationHtml || '';
   els.roe.textContent = snapshot.roeText || '';
   els.baseFare.textContent = snapshot.baseFareText || '';
+  const hasOld = (els.oldFare.value || '').trim() !== '';
+  const hasNew = (els.newFare.value || '').trim() !== '';
+  const displayStyle = (hasOld && hasNew) ? 'inline-flex' : 'none';
+  if (els.fareDiffBulb) els.fareDiffBulb.style.display = displayStyle;
+  if (els.changeFeeBulb) els.changeFeeBulb.style.display = displayStyle;
+
+  if (els.baseFareDiffBadge) {
+    const oldFare = parseAmount(els.oldFare.value);
+    const newFare = parseAmount(els.newFare.value);
+    if (oldFare && newFare) {
+      const baseCurrency = oldFare.currency || newFare.currency || els.currency.value || 'INR';
+      const baseDiff = newFare.amount - oldFare.amount;
+      els.baseFareDiffBadge.textContent = `Base: ${baseCurrency}${formatAmount(baseDiff, baseCurrency)}`;
+      els.baseFareDiffBadge.style.display = 'inline-flex';
+    } else {
+      els.baseFareDiffBadge.style.display = 'none';
+    }
+  }
 }
 
 function hasPtcData(ptc) {
@@ -928,7 +807,6 @@ els.fareClearButton.addEventListener('click', clearFare);
 els.copySummaryButton.addEventListener('click', copySummaryTable);
 els.copyGdsButton.addEventListener('click', copyGdsString);
 els.taxToggleBtn.addEventListener('click', toggleTaxSection);
-els.converterToggleBtn.addEventListener('click', toggleConverterSection);
 els.parserToggleBtn.addEventListener('click', toggleParserSection);
 els.summariseButton.addEventListener('click', handleSummarise);
 els.ptcAddTabButton.addEventListener('click', addCustomTab);
@@ -982,107 +860,22 @@ function validateTaxInputs() {
 
 els.fareDiff.addEventListener('input', () => {
   if (state.ptcData[state.activePtc]) {
-    state.ptcData[state.activePtc].manualFareDiff = true;
+    state.ptcData[state.activePtc].manualFareDiff = els.fareDiff.value.trim() !== '';
   }
   state.clearFareCache();
   debouncedCalculateFare();
 });
 
-els.targetCurrency.addEventListener('change', () => {
-  if (state.ptcData[state.activePtc]) {
-    state.ptcData[state.activePtc].manualFareDiff = false;
-  }
-  const oldFare = parseAmount(els.oldFare.value);
-  const newFare = parseAmount(els.newFare.value);
-  const baseCur = oldFare?.currency ?? newFare?.currency ?? els.currency.value ?? 'INR';
-  const targetCur = els.targetCurrency.value;
-  if (targetCur) {
-    els.fareRoe.value = getExchangeRate(baseCur, targetCur);
-  } else {
-    els.fareRoe.value = '';
-    els.convertedFareDiff.value = '';
-  }
-  state.clearFareCache();
-  debouncedCalculateFare();
+els.fareDiff.addEventListener('focus', () => {
+  els.fareDiff.select();
 });
 
-els.fareRoe.addEventListener('input', () => {
-  if (state.ptcData[state.activePtc]) {
-    state.ptcData[state.activePtc].manualFareDiff = false;
-  }
-  state.clearFareCache();
-  debouncedCalculateFare();
-});
-
-function updateFeeConversion() {
-  const rawText = (state.rawChangeFee ?? els.changeFee.value).trim();
-  const parsed = parseAmount(rawText);
-  const rawAmount = parsed ? parsed.amount : parseFloat(rawText);
-  const oldFare = parseAmount(els.oldFare.value);
-  const newFare = parseAmount(els.newFare.value);
-  const baseCur = parsed?.currency ?? oldFare?.currency ?? newFare?.currency ?? els.currency.value ?? 'INR';
-  
-  if (parsed?.currency && (!els.feeSourceCurrency.value || els.feeSourceCurrency.dataset.autoSource === 'true')) {
-    els.feeSourceCurrency.value = parsed.currency;
-    els.feeSourceCurrency.dataset.autoSource = 'true';
-  } else if (!els.feeSourceCurrency.value) {
-    els.feeSourceCurrency.value = baseCur;
-    els.feeSourceCurrency.dataset.autoSource = 'true';
-  }
-  
-  const srcCur = els.feeSourceCurrency.value;
-  const tgtCur = els.feeTargetCurrency.value;
-  if (srcCur && tgtCur) {
-    if (!els.feeRoe.value || els.feeRoe.dataset.autoRate === 'true') {
-      els.feeRoe.value = getExchangeRate(srcCur, tgtCur);
-      els.feeRoe.dataset.autoRate = 'true';
-    }
-    const roe = parseFloat(els.feeRoe.value) || 1.0;
-    if (!isNaN(rawAmount) && rawAmount > 0) {
-      const converted = rawAmount * roe;
-      const formattedFee = `${tgtCur}${formatAmount(converted, tgtCur)}`;
-      els.convertedChangeFee.value = formattedFee;
-      els.changeFee.value = formattedFee;
-    } else {
-      els.convertedChangeFee.value = '';
-    }
-  } else {
-    els.convertedChangeFee.value = '';
-    if (state.rawChangeFee !== null && state.rawChangeFee !== undefined) {
-      els.changeFee.value = state.rawChangeFee;
-    }
-  }
-  state.clearFareCache();
-  debouncedCalculateFare();
-}
-
-els.changeFee.addEventListener('input', () => {
-  state.rawChangeFee = els.changeFee.value;
-  if (els.feeTargetCurrency.value) {
-    updateFeeConversion();
-  }
-});
-els.feeSourceCurrency.addEventListener('change', () => {
-  els.feeSourceCurrency.dataset.autoSource = 'false';
-  els.feeRoe.dataset.autoRate = 'true';
-  els.feeRoe.value = '';
-  updateFeeConversion();
-});
-els.feeTargetCurrency.addEventListener('change', () => {
-  els.feeRoe.dataset.autoRate = 'true';
-  els.feeRoe.value = '';
-  updateFeeConversion();
-});
-els.feeRoe.addEventListener('input', () => {
-  els.feeRoe.dataset.autoRate = 'false';
-  updateFeeConversion();
+els.changeFee.addEventListener('focus', () => {
+  els.changeFee.select();
 });
 
 // Add change event listener for select elements (currency, cabin)
 els.currency.addEventListener('change', () => {
-  if (els.targetCurrency.value) {
-    els.fareRoe.value = getExchangeRate(els.currency.value, els.targetCurrency.value);
-  }
   debouncedCalculateFare();
 });
 els.cabin.addEventListener('change', () => {
@@ -1167,7 +960,7 @@ function clearActiveTabDirty() {
 // recalculation listeners above already watch, plus the Fare Calc String (which has no live-calc
 // listener of its own; it only recalculates on explicit Convert).
 [
-  'currency', 'cabin', 'oldFare', 'newFare', 'fareDiff', 'targetCurrency', 'fareRoe', 'changeFee',
+  'currency', 'cabin', 'oldFare', 'newFare', 'fareDiff', 'changeFee',
   'applyK3OnFareDiff', 'applyK3OnChangeFee', 'applyK3OnYQ',
   'oldTax', 'newTax', 'pax', 'fareCalcString',
 ].forEach(id => {
@@ -2323,29 +2116,15 @@ function buildCurrentSummaryData() {
   const oldFare = parseAmount(els.oldFare.value);
   const newFare = parseAmount(els.newFare.value);
   const baseCurrency = oldFare?.currency ?? newFare?.currency ?? els.currency.value ?? 'INR';
-  const targetCur = els.targetCurrency.value;
-  const diffCurrency = parsedFareDiff?.currency ?? (targetCur || baseCurrency);
+  const diffCurrency = parsedFareDiff?.currency ?? baseCurrency;
   const currency = diffCurrency;
   const diff = parsedFareDiff ? parsedFareDiff.amount : (oldFare && newFare ? newFare.amount - oldFare.amount : 0);
 
   // Change fee resolution
   const rawFeeInput = parseAmount(els.changeFee.value);
-  const feeSourceCur = els.feeSourceCurrency.value || rawFeeInput?.currency || baseCurrency;
-  const feeTargetCur = els.feeTargetCurrency.value;
-  let feeAmount = 0;
-  let feeCurrency = currency;
-  let baseFeeCurrency = feeSourceCur;
-
-  if (feeTargetCur && rawFeeInput && rawFeeInput.amount > 0) {
-    const roe = parseFloat(els.feeRoe.value) || 1.0;
-    feeAmount = rawFeeInput.amount * roe;
-    feeCurrency = feeTargetCur;
-    baseFeeCurrency = feeSourceCur;
-  } else if (rawFeeInput) {
-    feeAmount = rawFeeInput.amount;
-    feeCurrency = rawFeeInput.currency || currency;
-    baseFeeCurrency = rawFeeInput.currency || currency;
-  }
+  const feeAmount = rawFeeInput ? rawFeeInput.amount : 0;
+  const feeCurrency = rawFeeInput?.currency || currency;
+  const baseFeeCurrency = feeCurrency;
 
   const fareK3State = getCurrentFareK3State(currency, diff, feeAmount);
   const k3FareAmount = fareK3State.k3Fare;
@@ -2372,7 +2151,7 @@ function buildCurrentSummaryData() {
     k3Fee: k3FeeAmount,
     k3OnYQ,
     fee: feeAmount,
-    rawFeeAmount: feeConvRaw || feeAmount,
+    rawFeeAmount: feeAmount,
     addTaxes: els.addTaxes.value,
     refundTaxes: els.refundTaxes.value,
     taxAdj,
@@ -2497,29 +2276,29 @@ function calculateFare() {
 
   const baseDiff = oldFare && newFare ? newFare.amount - oldFare.amount : (manualDiff ? manualDiff.amount : 0);
 
-  // Handle currency conversion
-  const targetCur = els.targetCurrency.value;
-  if (targetCur) {
-    if (!els.fareRoe.value) {
-      els.fareRoe.value = getExchangeRate(baseCurrency, targetCur);
+  // Update Base Diff Badge
+  if (els.baseFareDiffBadge) {
+    if (oldFare && newFare) {
+      els.baseFareDiffBadge.textContent = `Base: ${baseCurrency}${formatAmount(baseDiff, baseCurrency)}`;
+      els.baseFareDiffBadge.style.display = 'inline-flex';
+    } else {
+      els.baseFareDiffBadge.style.display = 'none';
     }
-    const roe = parseFloat(els.fareRoe.value) || 1.0;
-    const convertedAmount = baseDiff * roe;
-    const formattedConverted = `${targetCur}${formatAmount(convertedAmount, targetCur)}`;
-    els.convertedFareDiff.value = formattedConverted;
-    if (!state.ptcData[state.activePtc]?.manualFareDiff) {
-      els.fareDiff.value = formattedConverted;
-    }
-  } else {
-    els.convertedFareDiff.value = '';
-    if (!state.ptcData[state.activePtc]?.manualFareDiff) {
-      els.fareDiff.value = `${baseCurrency}${formatAmount(baseDiff, baseCurrency)}`;
-    }
+  }
+
+  const isFareDiffFocused = document.activeElement === els.fareDiff;
+  const isCustomDiff = state.ptcData[state.activePtc]?.manualFareDiff || 
+    (manualDiff && manualDiff.currency && manualDiff.currency !== baseCurrency) || 
+    (manualDiff && (!oldFare || !newFare));
+
+  // Auto-populate base diff only if not a custom diff and user is not actively editing
+  if (!isCustomDiff && !isFareDiffFocused && (!els.fareDiff.value.trim() || !manualDiff)) {
+    els.fareDiff.value = `${baseCurrency}${formatAmount(baseDiff, baseCurrency)}`;
   }
 
   const effectiveParsedDiff = parseAmount(els.fareDiff.value);
   const diff = effectiveParsedDiff ? effectiveParsedDiff.amount : baseDiff;
-  const diffCurrency = effectiveParsedDiff?.currency ?? (targetCur || baseCurrency);
+  const diffCurrency = effectiveParsedDiff?.currency ?? baseCurrency;
   const currency = diffCurrency;
 
   if (currency === 'INR') {
@@ -2528,40 +2307,18 @@ function calculateFare() {
     clearINRMessage();
   }
 
-  // Handle Change Fee conversion
-  const rawFeeInput = parseAmount(state.rawChangeFee ?? els.changeFee.value);
-  const feeSourceCur = els.feeSourceCurrency.value || rawFeeInput?.currency || baseCurrency;
-  const feeTargetCur = els.feeTargetCurrency.value;
+  // Control animated bulb tips visibility (displayed next to titles only after user enters old fare and new fare)
+  const hasOld = (els.oldFare.value || '').trim() !== '';
+  const hasNew = (els.newFare.value || '').trim() !== '';
+  const displayStyle = (hasOld && hasNew) ? 'inline-flex' : 'none';
+  if (els.fareDiffBulb) els.fareDiffBulb.style.display = displayStyle;
+  if (els.changeFeeBulb) els.changeFeeBulb.style.display = displayStyle;
 
-  let feeAmount = 0;
-  let feeCurrency = currency;
-  let baseFeeCurrency = feeSourceCur;
-
-  if (feeTargetCur && rawFeeInput && rawFeeInput.amount > 0) {
-    if (!els.feeSourceCurrency.value) {
-      els.feeSourceCurrency.value = feeSourceCur;
-    }
-    if (!els.feeRoe.value) {
-      els.feeRoe.value = getExchangeRate(feeSourceCur, feeTargetCur);
-    }
-    const feeRoeVal = parseFloat(els.feeRoe.value) || 1.0;
-    feeAmount = rawFeeInput.amount * feeRoeVal;
-    feeCurrency = feeTargetCur;
-    baseFeeCurrency = feeSourceCur;
-    const formattedFee = `${feeTargetCur}${formatAmount(feeAmount, feeTargetCur)}`;
-    els.convertedChangeFee.value = formattedFee;
-    els.changeFee.value = formattedFee;
-  } else if (rawFeeInput) {
-    feeAmount = rawFeeInput.amount;
-    feeCurrency = rawFeeInput.currency || currency;
-    baseFeeCurrency = rawFeeInput.currency || currency;
-    els.convertedChangeFee.value = '';
-    if (state.rawChangeFee !== null && state.rawChangeFee !== undefined) {
-      els.changeFee.value = state.rawChangeFee;
-    }
-  } else {
-    els.convertedChangeFee.value = '';
-  }
+  // Handle Change Fee
+  const rawFeeInput = parseAmount(els.changeFee.value);
+  const feeAmount = rawFeeInput ? rawFeeInput.amount : 0;
+  const feeCurrency = rawFeeInput?.currency || currency;
+  const baseFeeCurrency = feeCurrency;
 
   const passengerCount = Math.max(1, parseInt(els.pax.value, 10) ?? 1);
 
@@ -2574,11 +2331,6 @@ function calculateFare() {
     oldFare: els.oldFare.value,
     newFare: els.newFare.value,
     fareDiff: els.fareDiff.value,
-    targetCurrency: els.targetCurrency.value,
-    fareRoe: els.fareRoe.value,
-    feeSourceCurrency: els.feeSourceCurrency.value,
-    feeTargetCurrency: els.feeTargetCurrency.value,
-    feeRoe: els.feeRoe.value,
     changeFee: els.changeFee.value,
     applyFareDiffK3,
     applyChangeFeeK3,
@@ -2656,7 +2408,7 @@ function calculateFare() {
     k3Fee,
     k3OnYQ,
     fee: feeAmount,
-    rawFeeAmount: rawFeeInput ? rawFeeInput.amount : 0,
+    rawFeeAmount: feeAmount,
     addTaxes: els.addTaxes.value,
     refundTaxes: els.refundTaxes.value,
     taxAdj: netTaxWithK3,
@@ -2710,6 +2462,23 @@ const SUMMARY_ROW_DEFS = [
 // `breakdown`: [{ ptc, data }] for every PTC with data (1-3 entries). `amountPayable`
 // (optional): total Sub Total across all active PTCs, shown as a single full-width row
 // between Sub Total and the Fare Calculation String rows — only when more than one PTC is
+function extractBookingClassFromFareCalc(str) {
+  if (!str) return '';
+  const parsed = parseFareCalcStringInternal(str);
+  if (!parsed.fareComponents || parsed.fareComponents.length === 0) return '';
+  const rbds = parsed.fareComponents
+    .map(fc => (fc.fareBasis ? fc.fareBasis[0].toUpperCase() : ''))
+    .filter(Boolean);
+  if (rbds.length === 0) return '';
+  if (rbds.length === 1) {
+    return `Outbound ${rbds[0]}`;
+  }
+  return `Outbound ${rbds[0]} & Inbound ${rbds[rbds.length - 1]}`;
+}
+
+// `breakdown`: [{ ptc, data }] for every PTC with data (1-3 entries). `amountPayable`
+// (optional): total Sub Total across all active PTCs, shown as a single full-width row
+// between Sub Total and the Fare Calculation String rows — only when more than one PTC is
 // active (a lone PTC's Amount Payable would just repeat its own Sub Total). Builds one table:
 // header row of PTC names, one row per metric (each PTC gets its own column, no Total column).
 function buildSummaryTable(breakdown, amountPayable) {
@@ -2717,7 +2486,17 @@ function buildSummaryTable(breakdown, amountPayable) {
 
   const thead = document.createElement('thead');
   const headRow = document.createElement('tr');
-  headRow.appendChild(document.createElement('th'));
+
+  // Extract booking class (RBD) from the fare calculation string
+  const fareCalcStringForRbd = breakdown.map(b => b.data.convertedFareCalcString).find(Boolean) || 
+    state.lastConvertedFareCalcString || 
+    els.fareCalcString.value;
+  const bookingClass = extractBookingClassFromFareCalc(fareCalcStringForRbd);
+
+  const firstTh = document.createElement('th');
+  firstTh.textContent = bookingClass ? `Booking class : ${bookingClass}` : 'Booking class';
+  headRow.appendChild(firstTh);
+
   breakdown.forEach(({ ptc }) => {
     const th = document.createElement('th');
     th.textContent = PTC_LABELS[ptc] || ptc;
@@ -2802,13 +2581,6 @@ function clearFare() {
   els.oldFare.value = '';
   els.newFare.value = '';
   els.fareDiff.value = '';
-  els.targetCurrency.value = '';
-  els.fareRoe.value = '';
-  els.convertedFareDiff.value = '';
-  els.feeSourceCurrency.value = '';
-  els.feeTargetCurrency.value = '';
-  els.feeRoe.value = '';
-  els.convertedChangeFee.value = '';
   els.k3Tax.value = '';
   els.changeFee.value = '';
   els.applyK3OnFareDiff.checked = false;
@@ -2825,12 +2597,12 @@ function clearFare() {
   // Preserve tax values when clearing fare only
   state.updateFareK3(null, 0, '');
   state.clearFareCache();
-  state.lastSummaryData = null;
-  state.rawChangeFee = null;
+  if (els.baseFareDiffBadge) els.baseFareDiffBadge.style.display = 'none';
+  if (els.fareDiffBulb) els.fareDiffBulb.style.display = 'none';
+  if (els.changeFeeBulb) els.changeFeeBulb.style.display = 'none';
   if (state.ptcData[state.activePtc]) {
     state.ptcData[state.activePtc].summaryData = null;
     state.ptcData[state.activePtc].manualFareDiff = false;
-    state.ptcData[state.activePtc].rawChangeFee = null;
   }
   clearActiveTabDirty();
   updatePtcTabUI();

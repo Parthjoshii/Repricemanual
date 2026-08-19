@@ -49,56 +49,48 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
   // --------------------------------------------------------------------------
   console.log('\n--- CATEGORY 1: Calculation Logic & Precision ---');
 
-  // Test 1.1: Base Fare Difference (USD -> INR)
+  // Test 1.1: Base Fare Difference Auto Calculation (USD)
   try {
     await page.selectOption('#currency', 'USD');
     await page.fill('#oldFare', '150');
     await page.fill('#newFare', '280');
-    // Open converter
-    if (await page.$eval('#converterCollapsible', el => el.classList.contains('collapsed'))) {
-      await page.click('#converterToggleBtn');
-      await page.waitForTimeout(350);
-    }
-    await page.selectOption('#targetCurrency', 'INR');
-    await page.fill('#fareRoe', '86.50');
     await page.click('#fareCalcButton');
     await page.waitForTimeout(200);
 
-    const convertedDiff = await page.inputValue('#convertedFareDiff');
-    const pass = convertedDiff === 'INR11245';
+    const autoDiff = await page.inputValue('#fareDiff');
+    const pass = autoDiff === 'USD130.00';
     recordResult(
       'Calculation Logic',
-      'USD -> INR Fare Difference Conversion (130 * 86.50 = 11245)',
-      { oldFare: 'USD 150', newFare: 'USD 280', target: 'INR', roe: '86.50' },
-      'INR11245',
-      convertedDiff,
+      'USD Fare Difference Auto-Calculation (280 - 150 = USD130.00)',
+      { oldFare: '150', newFare: '280', currency: 'USD' },
+      'USD130.00',
+      autoDiff,
       pass
     );
   } catch (e) {
-    recordResult('Calculation Logic', 'USD -> INR Fare Difference Conversion', {}, 'INR11245', e.message, false);
+    recordResult('Calculation Logic', 'USD Fare Difference Auto-Calculation', {}, 'USD130.00', e.message, false);
   }
 
-  // Test 1.2: Change Fee Conversion (USD -> INR)
+  // Test 1.2: Manual Overwrite of Fare Diff to INR11245 & Change Fee INR6488
   try {
-    await page.fill('#changeFee', '75');
-    await page.selectOption('#feeSourceCurrency', 'USD');
-    await page.selectOption('#feeTargetCurrency', 'INR');
-    await page.fill('#feeRoe', '86.50');
+    await page.fill('#fareDiff', 'INR11245');
+    await page.fill('#changeFee', 'INR6488');
+    await page.click('#fareCalcButton');
     await page.waitForTimeout(200);
 
-    const convertedFee = await page.inputValue('#convertedChangeFee');
-    // 75 * 86.50 = 6487.50 -> INR rounds to 6488
-    const pass = convertedFee === 'INR6488';
+    const perPax = await page.inputValue('#perPax');
+    // 11245 + 6488 = 17733
+    const pass = perPax === 'INR17733';
     recordResult(
       'Calculation Logic',
-      'USD -> INR Change Fee Conversion (75 * 86.50 = 6488)',
-      { changeFee: '75', source: 'USD', target: 'INR', roe: '86.50' },
-      'INR6488',
-      convertedFee,
+      'Manual Dual Currency Entry (INR11245 + INR6488 = INR17733)',
+      { fareDiff: 'INR11245', changeFee: 'INR6488' },
+      'INR17733',
+      perPax,
       pass
     );
   } catch (e) {
-    recordResult('Calculation Logic', 'USD -> INR Change Fee Conversion', {}, 'INR6488', e.message, false);
+    recordResult('Calculation Logic', 'Manual Dual Currency Entry', {}, 'INR17733', e.message, false);
   }
 
   // Test 1.3: K3 on Fare Difference (Economy = 5%)
@@ -131,11 +123,11 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
     await page.waitForTimeout(200);
 
     const calculatedK3Total = await page.inputValue('#k3Tax');
-    // Fare Diff K3 (562.25) + Fee K3 (324.375) = 886.625 -> INR887
+    // Fare Diff K3 (562.25) + Fee K3 (324.4) = 886.65 -> INR887
     const pass = calculatedK3Total === 'INR887';
     recordResult(
       'Calculation Logic',
-      'Combined K3 on Fare Diff & Change Fee (562.25 + 324.375 = INR887)',
+      'Combined K3 on Fare Diff & Change Fee (562.25 + 324.4 = INR887)',
       { cabin: 'economy', applyK3OnFareDiff: true, applyK3OnChangeFee: true },
       'INR887',
       calculatedK3Total,
@@ -216,14 +208,14 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
     await page.screenshot({ path: k3SyncScreenshotPath, fullPage: false });
 
     const pass = changeFeeRowK3Off.includes('INR6488') && 
-                 changeFeeRowK3On.includes('INR6812 (incl. K3 INR325)') &&
-                 gdsStringK3On.includes('+ CHG FEE INR6812');
+                 changeFeeRowK3On.includes('INR6813 (incl. K3 INR325)') &&
+                 gdsStringK3On.includes('+ CHG FEE INR6813');
 
     recordResult(
       'Reactivity & State',
       'Real-time K3 Toggle Synchronization across Summary Table and GDS String',
       { applyK3OnChangeFee: 'toggled from false to true' },
-      'Change Fee reflects INR6812 (incl. K3 INR325) and GDS reflects + CHG FEE INR6812',
+      'Change Fee reflects INR6813 (incl. K3 INR325) and GDS reflects + CHG FEE INR6813',
       `Summary: ${changeFeeRowK3On} | GDS: ${gdsStringK3On}`,
       pass
     );
@@ -231,26 +223,23 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
     recordResult('Reactivity & State', 'K3 Toggle Synchronization', {}, 'Synchronized', e.message, false);
   }
 
-  // Test 2.3: Dual Currency Converter Active for both Fare Diff and Change Fee
+  // Test 2.3: Animated Bulb Tips & Hover Tooltips
   try {
-    const dualConvScreenshotPath = path.join(artifactDir, 'e2e_dual_currency_conversion.png');
-    const converterPanel = await page.locator('.converter-panel');
-    await converterPanel.screenshot({ path: dualConvScreenshotPath });
-
-    const convertedDiff = await page.inputValue('#convertedFareDiff');
-    const convertedFee = await page.inputValue('#convertedChangeFee');
-    const pass = convertedDiff === 'INR11245' && convertedFee === 'INR6488';
+    const isFareDiffVisible = await page.isVisible('#fareDiffBulb');
+    const isChangeFeeVisible = await page.isVisible('#changeFeeBulb');
+    const fareDiffTooltip = await page.getAttribute('#fareDiffBulb', 'data-tooltip');
+    const pass = isFareDiffVisible && isChangeFeeVisible && fareDiffTooltip.includes('converted settlement amount');
 
     recordResult(
-      'Dual Currency Converter',
-      'Dual Currency conversion verified for both Fare Difference and Change Fee simultaneously',
-      { fareDiffConv: convertedDiff, changeFeeConv: convertedFee },
-      'INR11245 & INR6488',
-      `${convertedDiff} & ${convertedFee}`,
+      'Helper Information',
+      'Animated bulb tips display next to Fare Difference and Change Fee titles with hover tooltips',
+      { isFareDiffVisible, isChangeFeeVisible, fareDiffTooltip },
+      'Visible animated bulb tips with hover tooltips',
+      `Fare Diff: ${isFareDiffVisible} | Change Fee: ${isChangeFeeVisible}`,
       pass
     );
   } catch (e) {
-    recordResult('Dual Currency Converter', 'Dual Currency conversion', {}, 'INR11245 & INR6488', e.message, false);
+    recordResult('Helper Information', 'Animated bulb tips', {}, 'Visible bulbs', e.message, false);
   }
 
   // --------------------------------------------------------------------------
@@ -264,23 +253,14 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
     await page.click('#ptcTabCNN');
     await page.waitForTimeout(300);
 
-    // Enter CNN fares in USD
+    // Enter CNN fares in USD and manual INR conversion
     await page.selectOption('#currency', 'USD');
     await page.fill('#oldFare', '112.50');
     await page.fill('#newFare', '210.00');
     await page.selectOption('#cabin', 'economy');
     await page.check('#applyK3OnFareDiff');
-    // Open CNN converter
-    if (await page.$eval('#converterCollapsible', el => el.classList.contains('collapsed'))) {
-      await page.click('#converterToggleBtn');
-      await page.waitForTimeout(300);
-    }
-    await page.selectOption('#targetCurrency', 'INR');
-    await page.fill('#fareRoe', '86.50');
-    await page.fill('#changeFee', '50');
-    await page.selectOption('#feeSourceCurrency', 'USD');
-    await page.selectOption('#feeTargetCurrency', 'INR');
-    await page.fill('#feeRoe', '86.50');
+    await page.fill('#fareDiff', 'INR8434');
+    await page.fill('#changeFee', 'INR4325');
     await page.check('#applyK3OnChangeFee');
     await page.click('#fareCalcButton');
     await page.waitForTimeout(200);
@@ -290,17 +270,12 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
     await page.click('#ptcTabINF');
     await page.waitForTimeout(300);
 
-    // Enter INF fares in USD
+    // Enter INF fares in USD and manual INR conversion
     await page.selectOption('#currency', 'USD');
     await page.fill('#oldFare', '15.00');
     await page.fill('#newFare', '28.00');
     await page.selectOption('#cabin', 'economy');
-    if (await page.$eval('#converterCollapsible', el => el.classList.contains('collapsed'))) {
-      await page.click('#converterToggleBtn');
-      await page.waitForTimeout(300);
-    }
-    await page.selectOption('#targetCurrency', 'INR');
-    await page.fill('#fareRoe', '86.50');
+    await page.fill('#fareDiff', 'INR1125');
     await page.click('#fareCalcButton');
     await page.waitForTimeout(200);
 
@@ -336,53 +311,53 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
   // --------------------------------------------------------------------------
   console.log('\n--- CATEGORY 4: Input Validation & Edge Cases ---');
 
-  // Test 4.1: Zero Fare Difference with Change Fee Only
+  // Test 4.1: Zero Fare Difference
   try {
     await page.click('#ptcTabADT');
     await page.waitForTimeout(200);
+    await page.selectOption('#currency', 'USD');
     await page.fill('#oldFare', '200');
     await page.fill('#newFare', '200');
+    await page.fill('#fareDiff', '');
     await page.fill('#changeFee', '50');
     await page.click('#fareCalcButton');
     await page.waitForTimeout(200);
 
-    const convertedDiff = await page.inputValue('#convertedFareDiff');
-    const pass = convertedDiff === 'INR0';
+    const diff = await page.inputValue('#fareDiff');
+    const pass = diff === 'USD0.00';
     recordResult(
       'Edge Cases',
       'Zero Fare Difference (Old Fare == New Fare)',
       { oldFare: '200', newFare: '200' },
-      'INR0',
-      convertedDiff,
+      'USD0.00',
+      diff,
       pass
     );
   } catch (e) {
-    recordResult('Edge Cases', 'Zero Fare Difference', {}, 'INR0', e.message, false);
+    recordResult('Edge Cases', 'Zero Fare Difference', {}, 'USD0.00', e.message, false);
   }
 
-  // Test 4.2: Decimal precision and rounding (JPY = 0 decimals, USD = 2 decimals)
+  // Test 4.2: Decimal precision and rounding (JPY = 0 decimals)
   try {
-    await page.selectOption('#currency', 'USD');
-    await page.fill('#oldFare', '100.33');
-    await page.fill('#newFare', '150.77');
-    await page.selectOption('#targetCurrency', 'JPY');
-    await page.fill('#fareRoe', '155.4321');
+    await page.selectOption('#currency', 'JPY');
+    await page.fill('#oldFare', '10000');
+    await page.fill('#newFare', '15000');
+    await page.fill('#fareDiff', '');
     await page.click('#fareCalcButton');
     await page.waitForTimeout(200);
 
-    const convertedDiffJpy = await page.inputValue('#convertedFareDiff');
-    // (150.77 - 100.33) * 155.4321 = 50.44 * 155.4321 = 7839.995... -> JPY ceiling/rule rounds to integer 7840
-    const pass = convertedDiffJpy === 'JPY7840';
+    const diffJpy = await page.inputValue('#fareDiff');
+    const pass = diffJpy === 'JPY5000';
     recordResult(
       'Edge Cases',
       'JPY Currency Zero-Decimal Rounding Rule',
-      { diff: '50.44', roe: '155.4321', target: 'JPY' },
-      'JPY7840',
-      convertedDiffJpy,
+      { oldFare: '10000', newFare: '15000', currency: 'JPY' },
+      'JPY5000',
+      diffJpy,
       pass
     );
   } catch (e) {
-    recordResult('Edge Cases', 'JPY Currency Zero-Decimal Rounding Rule', {}, 'JPY7840', e.message, false);
+    recordResult('Edge Cases', 'JPY Currency Zero-Decimal Rounding Rule', {}, 'JPY5000', e.message, false);
   }
 
   // Test 4.3: Negative Taxes categorized in Refund Taxes
