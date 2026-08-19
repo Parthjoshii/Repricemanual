@@ -17,78 +17,80 @@ function escapeHtml(str) {
 // which keep this app's existing fare-rounding convention (whole-unit fares are how these are
 // conventionally issued in air ticketing, even though ISO 4217 itself specifies 2 decimals).
 const roundingRules = {
-  // 0 decimals (ISO 4217 zero-decimal currencies, plus INR/IDR/TWD's fare-issuance convention)
-  'INR': { type: 'ceiling', decimals: 0 },      // Round up, no decimals (fare-issuance convention)
-  'JPY': { type: 'nearest', decimals: 0 },      // Japanese Yen - no decimals
-  'KRW': { type: 'nearest', decimals: 0 },      // Korean Won - no decimals
-  'TWD': { type: 'nearest', decimals: 0 },      // Taiwan Dollar - no decimals (fare-issuance convention)
-  'XAF': { type: 'nearest', decimals: 0 },      // Central African CFA Franc - no decimals
-  'XOF': { type: 'nearest', decimals: 0 },      // West African CFA Franc - no decimals
-  'XPF': { type: 'nearest', decimals: 0 },      // CFP Franc - no decimals
-  'CLP': { type: 'nearest', decimals: 0 },      // Chilean Peso - no decimals
-  'ISK': { type: 'nearest', decimals: 0 },      // Icelandic Króna - no decimals
-  'VND': { type: 'nearest', decimals: 0 },      // Vietnamese Dong - no decimals
-  'IDR': { type: 'standard', decimals: 0 },     // Indonesian Rupiah - no decimals (fare-issuance convention)
-  'IRR': { type: 'standard', decimals: 0 },     // Iranian Rial - no decimals (fares run into the hundreds of thousands/millions, so whole-unit issuance is standard)
+  // 0 decimals / Whole-unit & Multiple Rounding (IATA Standard)
+  'AED': { type: 'ceiling', decimals: 0, unit: 10 },      // UAE Dirham - Round UP to next 10
+  'INR': { type: 'ceiling', decimals: 0, unit: 1 },       // Indian Rupee - Round UP to next 1
+  'JPY': { type: 'nearest', decimals: 0, unit: 1 },       // Japanese Yen - Nearest 1
+  'KRW': { type: 'ceiling', decimals: 0, unit: 10 },      // South Korean Won - Round UP to next 10
+  'TWD': { type: 'ceiling', decimals: 0, unit: 1 },       // Taiwan Dollar - Round UP to next 1
+  'THB': { type: 'ceiling', decimals: 0, unit: 5 },       // Thai Baht - Round UP to next 5
+  'IDR': { type: 'ceiling', decimals: 0, unit: 100 },     // Indonesian Rupiah - Round UP to next 100
+  'VND': { type: 'ceiling', decimals: 0, unit: 1000 },    // Vietnamese Dong - Round UP to next 1000
+  'IRR': { type: 'ceiling', decimals: 0, unit: 1000 },    // Iranian Rial - Round UP to next 1000
+  'CLP': { type: 'ceiling', decimals: 0, unit: 1 },       // Chilean Peso - Round UP to next 1
+  'ISK': { type: 'ceiling', decimals: 0, unit: 1 },       // Icelandic Króna - Round UP to next 1
+  'XAF': { type: 'ceiling', decimals: 0, unit: 100 },     // Central African CFA - Round UP to next 100
+  'XOF': { type: 'ceiling', decimals: 0, unit: 100 },     // West African CFA - Round UP to next 100
+  'XPF': { type: 'ceiling', decimals: 0, unit: 1 },       // CFP Franc - Round UP to next 1
 
-  // 3 decimals (ISO 4217 three-decimal currencies — mostly Gulf/North African dinars & rials)
-  'BHD': { type: 'standard', decimals: 3 },     // Bahraini Dinar - 3 decimals
-  'JOD': { type: 'standard', decimals: 3 },     // Jordanian Dinar - 3 decimals
-  'KWD': { type: 'standard', decimals: 3 },     // Kuwaiti Dinar - 3 decimals
-  'OMR': { type: 'standard', decimals: 3 },     // Omani Rial - 3 decimals
-  'TND': { type: 'standard', decimals: 3 },     // Tunisian Dinar - 3 decimals
+  // 3 decimals (Gulf / North African Dinars & Rials - IATA 0.001 standard)
+  'BHD': { type: 'ceiling', decimals: 3, unit: 0.001 },   // Bahraini Dinar - 3 decimals
+  'JOD': { type: 'ceiling', decimals: 3, unit: 0.001 },   // Jordanian Dinar - 3 decimals
+  'KWD': { type: 'ceiling', decimals: 3, unit: 0.001 },   // Kuwaiti Dinar - 3 decimals
+  'OMR': { type: 'ceiling', decimals: 3, unit: 0.001 },   // Omani Rial - 3 decimals
+  'TND': { type: 'ceiling', decimals: 3, unit: 0.001 },   // Tunisian Dinar - 3 decimals
 
-  // 2 decimals (ISO 4217 standard — the default for everything else in the currency dropdown)
-  'USD': { type: 'standard', decimals: 2 },     // US Dollar - 2 decimals
-  'EUR': { type: 'standard', decimals: 2 },     // Euro - 2 decimals
-  'GBP': { type: 'standard', decimals: 2 },     // British Pound - 2 decimals
-  'AUD': { type: 'standard', decimals: 2 },     // Australian Dollar - 2 decimals
-  'CAD': { type: 'standard', decimals: 2 },     // Canadian Dollar - 2 decimals
-  'CHF': { type: 'standard', decimals: 2 },     // Swiss Franc - 2 decimals
-  'CNY': { type: 'standard', decimals: 2 },     // Chinese Yuan - 2 decimals
-  'SEK': { type: 'standard', decimals: 2 },     // Swedish Krona - 2 decimals
-  'NZD': { type: 'standard', decimals: 2 },     // New Zealand Dollar - 2 decimals
-  'MXN': { type: 'standard', decimals: 2 },     // Mexican Peso - 2 decimals
-  'SGD': { type: 'standard', decimals: 2 },     // Singapore Dollar - 2 decimals
-  'HKD': { type: 'standard', decimals: 2 },     // Hong Kong Dollar - 2 decimals
-  'NOK': { type: 'standard', decimals: 2 },     // Norwegian Krone - 2 decimals
-  'TRY': { type: 'standard', decimals: 2 },     // Turkish Lira - 2 decimals
-  'RUB': { type: 'standard', decimals: 2 },     // Russian Ruble - 2 decimals
-  'BRL': { type: 'standard', decimals: 2 },     // Brazilian Real - 2 decimals
-  'ZAR': { type: 'standard', decimals: 2 },     // South African Rand - 2 decimals
-  'AED': { type: 'standard', decimals: 2 },     // UAE Dirham - 2 decimals
-  'SAR': { type: 'standard', decimals: 2 },     // Saudi Riyal - 2 decimals
-  'THB': { type: 'standard', decimals: 2 },     // Thai Baht - 2 decimals
-  'MYR': { type: 'standard', decimals: 2 },     // Malaysian Ringgit - 2 decimals
-  'PHP': { type: 'standard', decimals: 2 },     // Philippine Peso - 2 decimals
-  'PKR': { type: 'standard', decimals: 2 },     // Pakistani Rupee - 2 decimals
-  'BDT': { type: 'standard', decimals: 2 },     // Bangladeshi Taka - 2 decimals
-  'LKR': { type: 'standard', decimals: 2 },     // Sri Lankan Rupee - 2 decimals
-  'AOA': { type: 'standard', decimals: 2 },     // Angolan Kwanza - 2 decimals
-  'ARS': { type: 'standard', decimals: 2 },     // Argentine Peso - 2 decimals
-  'BND': { type: 'standard', decimals: 2 },     // Brunei Dollar - 2 decimals
-  'COP': { type: 'standard', decimals: 2 },     // Colombian Peso - 2 decimals
-  'CZK': { type: 'standard', decimals: 2 },     // Czech Koruna - 2 decimals
-  'DKK': { type: 'standard', decimals: 2 },     // Danish Krone - 2 decimals
-  'DZD': { type: 'standard', decimals: 2 },     // Algerian Dinar - 2 decimals
-  'EGP': { type: 'standard', decimals: 2 },     // Egyptian Pound - 2 decimals
-  'ETB': { type: 'standard', decimals: 2 },     // Ethiopian Birr - 2 decimals
-  'FJD': { type: 'standard', decimals: 2 },     // Fiji Dollar - 2 decimals
-  'GHS': { type: 'standard', decimals: 2 },     // Ghana Cedi - 2 decimals
-  'HUF': { type: 'standard', decimals: 2 },     // Hungarian Forint - 2 decimals
-  'HRK': { type: 'standard', decimals: 2 },     // Croatian Kuna - 2 decimals
-  'ILS': { type: 'standard', decimals: 2 },     // Israeli Shekel - 2 decimals
-  'KES': { type: 'standard', decimals: 2 },     // Kenyan Shilling - 2 decimals
-  'KZT': { type: 'standard', decimals: 2 },     // Kazakhstani Tenge - 2 decimals
-  'MAD': { type: 'standard', decimals: 2 },     // Moroccan Dirham - 2 decimals
-  'MUR': { type: 'standard', decimals: 2 },     // Mauritius Rupee - 2 decimals
-  'NGN': { type: 'standard', decimals: 2 },     // Nigerian Naira - 2 decimals
-  'NPR': { type: 'standard', decimals: 2 },     // Nepalese Rupee - 2 decimals
-  'PLN': { type: 'standard', decimals: 2 },     // Polish Zloty - 2 decimals
-  'QAR': { type: 'standard', decimals: 2 },     // Qatari Rial - 2 decimals
-  'SCR': { type: 'standard', decimals: 2 },     // Seychelles Rupee - 2 decimals
-  'UAH': { type: 'standard', decimals: 2 },     // Ukrainian Hryvnia - 2 decimals
-  'ZMW': { type: 'standard', decimals: 2 },     // Zambian Kwacha - 2 decimals
+  // 2 decimals with Integer Unit Rounding (IATA Standard)
+  'SAR': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Saudi Riyal - Round UP to next 1
+  'PKR': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Pakistani Rupee - Round UP to next 1
+  'BDT': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Bangladeshi Taka - Round UP to next 1
+  'LKR': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Sri Lankan Rupee - Round UP to next 1
+  'AOA': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Angolan Kwanza - Round UP to next 1
+  'ARS': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Argentine Peso - Round UP to next 1
+  'COP': { type: 'ceiling', decimals: 2, unit: 100.00 },  // Colombian Peso - Round UP to next 100
+  'CZK': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Czech Koruna - Round UP to next 1
+  'DZD': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Algerian Dinar - Round UP to next 1
+  'HUF': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Hungarian Forint - Round UP to next 1
+  'KES': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Kenyan Shilling - Round UP to next 1
+  'KZT': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Kazakhstani Tenge - Round UP to next 1
+  'MAD': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Moroccan Dirham - Round UP to next 1
+  'MUR': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Mauritius Rupee - Round UP to next 1
+  'NGN': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Nigerian Naira - Round UP to next 1
+  'NPR': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Nepalese Rupee - Round UP to next 1
+  'QAR': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Qatari Rial - Round UP to next 1
+  'SCR': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Seychelles Rupee - Round UP to next 1
+  'UAH': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Ukrainian Hryvnia - Round UP to next 1
+  'ZMW': { type: 'ceiling', decimals: 2, unit: 1.00 },    // Zambian Kwacha - Round UP to next 1
+
+  // 2 decimals (Nearest 0.01 / Standard Major Currencies)
+  'USD': { type: 'nearest', decimals: 2, unit: 0.01 },    // US Dollar - Nearest 0.01
+  'EUR': { type: 'nearest', decimals: 2, unit: 0.01 },    // Euro - Nearest 0.01
+  'GBP': { type: 'nearest', decimals: 2, unit: 0.01 },    // British Pound - Nearest 0.01
+  'AUD': { type: 'nearest', decimals: 2, unit: 0.01 },    // Australian Dollar - Nearest 0.01
+  'CAD': { type: 'nearest', decimals: 2, unit: 0.01 },    // Canadian Dollar - Nearest 0.01
+  'CHF': { type: 'nearest', decimals: 2, unit: 0.01 },    // Swiss Franc - Nearest 0.01
+  'NZD': { type: 'nearest', decimals: 2, unit: 0.01 },    // New Zealand Dollar - Nearest 0.01
+  'SGD': { type: 'nearest', decimals: 2, unit: 0.01 },    // Singapore Dollar - Nearest 0.01
+  'CNY': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Chinese Yuan - Round UP 0.01
+  'SEK': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Swedish Krona - Round UP 0.01
+  'MXN': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Mexican Peso - Round UP 0.01
+  'HKD': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Hong Kong Dollar - Round UP 0.01
+  'NOK': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Norwegian Krone - Round UP 0.01
+  'TRY': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Turkish Lira - Round UP 0.01
+  'RUB': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Russian Ruble - Round UP 0.01
+  'BRL': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Brazilian Real - Round UP 0.01
+  'ZAR': { type: 'ceiling', decimals: 2, unit: 0.01 },    // South African Rand - Round UP 0.01
+  'MYR': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Malaysian Ringgit - Round UP 0.01
+  'PHP': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Philippine Peso - Round UP 0.01
+  'BND': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Brunei Dollar - Round UP 0.01
+  'DKK': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Danish Krone - Round UP 0.01
+  'EGP': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Egyptian Pound - Round UP 0.01
+  'ETB': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Ethiopian Birr - Round UP 0.01
+  'FJD': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Fiji Dollar - Round UP 0.01
+  'GHS': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Ghana Cedi - Round UP 0.01
+  'HRK': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Croatian Kuna - Round UP 0.01
+  'ILS': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Israeli Shekel - Round UP 0.01
+  'PLN': { type: 'ceiling', decimals: 2, unit: 0.01 },    // Polish Zloty - Round UP 0.01
 };
 
 const K3_RATES = {
@@ -1988,30 +1990,29 @@ function toggleConverterSection() {
 }
 
 function formatAmount(value, currency = '') {
-  if (!value) return '0';
+  if (!value && value !== 0) return '0';
   const num = parseFloat(value);
   if (isNaN(num)) return '0';
   
   // Get rounding rule for currency, default to standard 2 decimals
-  const rule = roundingRules[currency] || { type: 'standard', decimals: 2 };
+  const rule = roundingRules[currency] || { type: 'standard', decimals: 2, unit: 0.01 };
+  const unit = rule.unit || (rule.decimals === 0 ? 1 : Math.pow(10, -rule.decimals));
   let rounded;
   
-  if (rule.type === 'ceiling') {
-    // Round up (Math.ceil)
-    rounded = Math.ceil(num);
-  } else if (rule.type === 'nearest') {
-    // Round to nearest
-    const multiplier = Math.pow(10, rule.decimals);
-    rounded = Math.round(num * multiplier) / multiplier;
+  if (rule.type === 'ceiling' || rule.type === 'UP') {
+    // Round up to next multiple of unit
+    rounded = Math.ceil(num / unit) * unit;
+  } else if (rule.type === 'floor' || rule.type === 'DOWN') {
+    // Round down to multiple of unit
+    rounded = Math.floor(num / unit) * unit;
   } else {
-    // Standard rounding (default)
-    const multiplier = Math.pow(10, rule.decimals);
-    rounded = Math.round(num * multiplier) / multiplier;
+    // Round to nearest multiple of unit
+    rounded = Math.round(num / unit) * unit;
   }
   
   // Format with correct decimal places (no thousand separators for parsing consistency)
   if (rule.decimals === 0) {
-    return rounded.toString();
+    return Math.round(rounded).toString();
   }
   return rounded.toFixed(rule.decimals);
 }
