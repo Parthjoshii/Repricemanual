@@ -410,25 +410,23 @@ let sessionCanRestore = false;
 function saveStateToStorage() {
   if (suppressAutoSave) return;
   try {
-    // Capture the active tab's live DOM values too — formSnapshot for the active tab is normally
-    // only refreshed when switching *away* from it, so without this its most recent edits
-    // wouldn't be in state.ptcData yet at save time.
-    state.ptcData[state.activePtc].formSnapshot = snapshotPtc();
+    if (state.ptcData[state.activePtc]) {
+      state.ptcData[state.activePtc].formSnapshot = snapshotPtc();
+    }
     const payload = {
       activePtc: state.activePtc,
       ptcCodes: PTC_CODES,
       ptcLabels: PTC_LABELS,
       ptcData: state.ptcData,
+      adtParsedFareCalc: state.adtParsedFareCalc,
     };
     localStorage.setItem(PERSIST_KEY, JSON.stringify(payload));
   } catch (e) {
-    // Best-effort: storage disabled (private browsing), quota exceeded, etc. — the app still
-    // works without persistence, it just won't survive a refresh.
+    // Best-effort: storage disabled (private browsing), quota exceeded, etc.
   }
 }
 
-// Reads and validates the saved snapshot without applying it anywhere — pure/side-effect-free, so
-// it's safe to call from hasSavedSession() just to check, separately from actually restoring it.
+// Reads and validates the saved snapshot without applying it anywhere.
 function readSavedSnapshot() {
   try {
     const raw = localStorage.getItem(PERSIST_KEY);
@@ -441,17 +439,12 @@ function readSavedSnapshot() {
   }
 }
 
-// A structurally-valid snapshot isn't necessarily worth offering to restore — saveStateToStorage()
-// writes on every state-changing action regardless of whether anything meaningful was ever
-// entered, so a snapshot of an untouched default session is common (e.g. right after Dismiss:
-// suppressAutoSave lifts, then the reload's own beforeunload immediately writes a fresh empty
-// snapshot). Only count it as "has a session" if some real data is actually in it.
 function snapshotHasMeaningfulData(saved) {
   if (saved.ptcCodes.length > BUILT_IN_PTC_COUNT) return true;
   return Object.values(saved.ptcData).some(entry => {
     if (entry.summaryData) return true;
     const f = entry.formSnapshot?.fields;
-    return !!(f && (f.oldFare || f.newFare || f.oldTax || f.newTax || f.fareCalcString));
+    return !!(f && (f.oldFare || f.newFare || f.oldTax || f.newTax || f.fareCalcString || f.changeFee || f.fareDiff));
   });
 }
 
@@ -464,25 +457,22 @@ function clearSavedSession() {
   try {
     localStorage.removeItem(PERSIST_KEY);
   } catch (e) {
-    // Best-effort, same as saveStateToStorage().
+    // Best-effort
   }
 }
 
-// Applies a previously-saved snapshot into state/PTC_CODES/PTC_LABELS/DOM, including re-creating
-// any custom tabs' DOM buttons (built-in ADT/CNN/INF/INF_CNN/CNN_ADT already exist in the HTML).
-// Only ever called in response to the user clicking "Restore Previous Session" — page load itself
-// never auto-hydrates the form; see initSessionRestore().
+// Restores a saved session into state/PTC_CODES/PTC_LABELS/DOM, including re-creating
+// custom tabs and re-rendering the summary table if summaryData exists.
 function restoreSession() {
   const saved = readSavedSnapshot();
   if (!saved) return;
 
-  // PTC_CODES/PTC_LABELS are declared const — mutate in place rather than reassigning, since
-  // other modules already hold a reference to these exact objects.
   PTC_CODES.length = 0;
   saved.ptcCodes.forEach(code => PTC_CODES.push(code));
   Object.keys(PTC_LABELS).forEach(key => delete PTC_LABELS[key]);
   Object.assign(PTC_LABELS, saved.ptcLabels || {});
   state.ptcData = saved.ptcData;
+  state.adtParsedFareCalc = saved.adtParsedFareCalc || null;
 
   PTC_CODES.slice(BUILT_IN_PTC_COUNT).forEach(code => {
     if (ptcTabButton(code)) return;
@@ -497,6 +487,24 @@ function restoreSession() {
   sessionCanRestore = false;
   suppressAutoSave = false;
   updatePtcTabUI();
+
+  // If summary data was previously computed, restore the summary table
+  try {
+    const activePtcs = getActivePtcCodes();
+    if (activePtcs.length > 0) {
+      const breakdown = activePtcs.map(ptc => ({ ptc, data: state.ptcData[ptc].summaryData }));
+      if (activePtcs.length === 1) {
+        renderSummary(breakdown[0].data, breakdown);
+      } else {
+        const consolidated = mergeSummaryData(breakdown.map(b => b.data));
+        if (!consolidated.error) {
+          renderSummary(consolidated, breakdown);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('Error restoring summary table:', err);
+  }
 }
 
 function showRestoreBanner() {
@@ -507,39 +515,10 @@ function hideRestoreBanner() {
   els.restoreBanner.style.display = 'none';
 }
 
-// Runs once at page load. Never auto-fills the form — only decides whether a restore prompt is
-// worth showing, and if so, holds off on saving (see suppressAutoSave) until the user acts.
+// Automatically restores any saved session on page load so reloading seamlessly preserves work.
 function initSessionRestore() {
   if (!hasSavedSession()) return;
-  sessionCanRestore = true;
-  suppressAutoSave = true;
-  showRestoreBanner();
-
-  els.restoreSessionButton.addEventListener('click', restoreSession);
-  els.dismissRestoreButton.addEventListener('click', () => {
-    hideRestoreBanner();
-    sessionCanRestore = false;
-    suppressAutoSave = false;
-    clearSavedSession();
-  });
-
-  // "If the user modifies input without restoring, dismiss the restore option once new data
-  // entry begins" — 'input'/'change' cover every form control (text fields, selects, checkboxes).
-  // Clicks on the banner's own buttons are excluded since those already have their own handlers
-  // above; without the exclusion this listener would fire for those clicks too (event bubbling)
-  // and immediately re-clear suppressAutoSave right as restoreSession() is trying to use it.
-  const dismissOnDataEntry = (e) => {
-    if (!sessionCanRestore) return;
-    if (e.target.closest && e.target.closest('#restoreBanner')) return;
-    hideRestoreBanner();
-    sessionCanRestore = false;
-    suppressAutoSave = false;
-    // Deliberately not clearing storage here (unlike the explicit Dismiss button) — the old
-    // snapshot is simply superseded by normal saveStateToStorage() calls as the new session
-    // progresses, with no need to force it out immediately.
-  };
-  document.addEventListener('input', dismissOnDataEntry);
-  document.addEventListener('change', dismissOnDataEntry);
+  restoreSession();
 }
 
 // Best-effort final save on tab close/refresh, in addition to the many explicit save points
@@ -2756,3 +2735,8 @@ function copyGdsString() {
     }
   });
 }
+
+// Initialize theme, restore any existing session, and sync UI
+loadTheme();
+initSessionRestore();
+updatePtcTabUI();
