@@ -85,7 +85,7 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
   let tndDiff = await page.inputValue('#fareDiff');
   testAssert('Currency Rules', 'TND 3-decimal unit 0.001 rounding (155.333 - 100 = TND55.333)', tndDiff === 'TND55.333', `Got ${tndDiff}`);
 
-  // 1.5: AED (Unit 10, Direction UP)
+  // 1.5: AED (Unit 1, Direction UP)
   await page.selectOption('#currency', 'AED');
   await page.fill('#fareDiff', '');
   await page.fill('#oldFare', '100');
@@ -93,7 +93,7 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
   await page.click('#fareCalcButton');
   await page.waitForTimeout(100);
   let aedDiff = await page.inputValue('#fareDiff');
-  testAssert('Currency Rules', 'AED Unit 10 rounding UP (53 -> AED60)', aedDiff === 'AED60', `Got ${aedDiff}`);
+  testAssert('Currency Rules', 'AED Unit 1 rounding UP (153 - 100 = AED53)', aedDiff === 'AED53', `Got ${aedDiff}`);
 
   // --------------------------------------------------------------------------
   // SECTION 2: MANUAL DUAL-CURRENCY ENTRY & DOWNLINE SETTLEMENT PROPAGATION

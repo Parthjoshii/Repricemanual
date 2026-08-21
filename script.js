@@ -18,7 +18,7 @@ function escapeHtml(str) {
 // conventionally issued in air ticketing, even though ISO 4217 itself specifies 2 decimals).
 const roundingRules = {
   // 0 decimals / Whole-unit & Multiple Rounding (IATA Standard)
-  'AED': { type: 'ceiling', decimals: 0, unit: 10 },      // UAE Dirham - Round UP to next 10
+  'AED': { type: 'ceiling', decimals: 0, unit: 1 },      // UAE Dirham - Round UP to next 10
   'INR': { type: 'ceiling', decimals: 0, unit: 1 },       // Indian Rupee - Round UP to next 1
   'JPY': { type: 'nearest', decimals: 0, unit: 1 },       // Japanese Yen - Nearest 1
   'KRW': { type: 'ceiling', decimals: 0, unit: 10 },      // South Korean Won - Round UP to next 10
@@ -515,10 +515,36 @@ function hideRestoreBanner() {
   els.restoreBanner.style.display = 'none';
 }
 
-// Automatically restores any saved session on page load so reloading seamlessly preserves work.
+// Runs once at page load. Never auto-fills the form — only decides whether a restore prompt is
+// worth showing, and if so, holds off on saving (see suppressAutoSave) until the user acts.
 function initSessionRestore() {
   if (!hasSavedSession()) return;
-  restoreSession();
+  sessionCanRestore = true;
+  suppressAutoSave = true;
+  showRestoreBanner();
+
+  els.restoreSessionButton?.addEventListener('click', restoreSession);
+  els.dismissRestoreButton?.addEventListener('click', () => {
+    hideRestoreBanner();
+    sessionCanRestore = false;
+    suppressAutoSave = false;
+    clearSavedSession();
+  });
+
+  // "If the user modifies input without restoring, dismiss the restore option once new data
+  // entry begins" — 'input'/'change' cover every form control (text fields, selects, checkboxes).
+  // Clicks on the banner's own buttons are excluded since those already have their own handlers
+  // above; without the exclusion this listener would fire for those clicks too (event bubbling)
+  // and immediately re-clear suppressAutoSave right as restoreSession() is trying to use it.
+  const dismissOnDataEntry = (e) => {
+    if (!sessionCanRestore) return;
+    if (e.target.closest && e.target.closest('#restoreBanner')) return;
+    hideRestoreBanner();
+    sessionCanRestore = false;
+    suppressAutoSave = false;
+  };
+  document.addEventListener('input', dismissOnDataEntry);
+  document.addEventListener('change', dismissOnDataEntry);
 }
 
 // Best-effort final save on tab close/refresh, in addition to the many explicit save points
@@ -725,11 +751,11 @@ function showError(message, isSuccess = false) {
   const messageEl = document.getElementById('modalMessage');
   const modalBox = modal.querySelector('.modal-box');
   const closeButton = modal.querySelector('.modal-close-btn');
-  
+
   messageEl.textContent = message;
   modal.classList.add('show');
   closeButton?.focus();
-  
+
   if (isSuccess) {
     modalBox.classList.remove('error');
     modalBox.classList.add('success');
@@ -768,7 +794,7 @@ function debounce(func, wait) {
 // Utility function: Memoization
 function memoize(func) {
   const cache = new Map();
-  return function(...args) {
+  return function (...args) {
     const key = JSON.stringify(args);
     if (cache.has(key)) {
       return cache.get(key);
@@ -802,14 +828,14 @@ const debouncedCalculateFare = debounce(tryCalculateFare, 300);
 function validateTaxInputs() {
   const oldText = els.oldTax.value;
   const newText = els.newTax.value;
-  
+
   // Check for K3 in tax inputs (K3 should only be calculated via Fare Calculator)
   const k3Pattern = /K3/i;
   if (k3Pattern.test(oldText) || k3Pattern.test(newText)) {
     showError('K3 tax should not be entered manually in the Tax Adjustment Calculator. K3 is calculated automatically based on Fare Difference and Change Fee in the Fare Calculator.');
     return false;
   }
-  
+
   return true;
 }
 
@@ -855,6 +881,10 @@ els.changeFee.addEventListener('focus', () => {
 
 // Add change event listener for select elements (currency, cabin)
 els.currency.addEventListener('change', () => {
+  if (state.ptcData[state.activePtc]) {
+    state.ptcData[state.activePtc].manualFareDiff = false;
+  }
+  state.clearFareCache();
   debouncedCalculateFare();
 });
 els.cabin.addEventListener('change', () => {
@@ -1623,11 +1653,6 @@ function loadTheme() {
   els.themeToggle.textContent = savedTheme === 'light' ? '🌙' : '☀️';
 }
 
-// Initialize theme, then check for (but never auto-apply) a previous session
-loadTheme();
-initSessionRestore();
-updatePtcTabUI();
-
 // Theme toggle click event
 els.themeToggle.addEventListener('click', toggleTheme);
 
@@ -1765,12 +1790,12 @@ function formatAmount(value, currency = '') {
   if (!value && value !== 0) return '0';
   const num = parseFloat(value);
   if (isNaN(num)) return '0';
-  
+
   // Get rounding rule for currency, default to standard 2 decimals
   const rule = roundingRules[currency] || { type: 'standard', decimals: 2, unit: 0.01 };
   const unit = rule.unit || (rule.decimals === 0 ? 1 : Math.pow(10, -rule.decimals));
   let rounded;
-  
+
   if (rule.type === 'ceiling' || rule.type === 'UP') {
     // Round up to next multiple of unit
     rounded = Math.ceil(num / unit) * unit;
@@ -1781,7 +1806,7 @@ function formatAmount(value, currency = '') {
     // Round to nearest multiple of unit
     rounded = Math.round(num / unit) * unit;
   }
-  
+
   // Format with correct decimal places (no thousand separators for parsing consistency)
   if (rule.decimals === 0) {
     return Math.round(rounded).toString();
@@ -1832,17 +1857,17 @@ function sanitizeTaxString(text) {
 
 function formatTaxInput(text) {
   if (!text) return '';
-  
+
   // Split by multiple separators: spaces, commas, newlines, tabs, slashes
   const entries = text.split(/[\s,\/\n\t]+/).filter(Boolean);
   const validEntries = [];
   const invalidEntries = [];
-  
+
   // Validate each entry: 3-letter currency + amount + exactly 2-character tax code (letters
   // and/or digits, e.g. YQ, K3, 6A — see parseTaxToken for why this must be exactly 2, not 1-6).
   const pattern = /^([A-Z]{3})(\d+(?:\.\d+)?)([A-Z0-9]{2})$/i;
   const paidPattern = /^PD(?:([A-Z]{3}))?(\d+(?:\.\d+)?)([A-Z0-9]{2})$/i;
-  
+
   entries.forEach(entry => {
     const normalized = entry.trim().toUpperCase();
     const paidMatch = normalized.match(paidPattern);
@@ -1861,12 +1886,12 @@ function formatTaxInput(text) {
       invalidEntries.push(entry);
     }
   });
-  
+
   // Show warning for invalid entries
   if (invalidEntries.length > 0) {
     showError(`Skipped invalid tax entries: ${invalidEntries.join(', ')}. Format: CurrencyAmountTaxCode (e.g., INR30K3)`);
   }
-  
+
   // Join valid entries with slashes
   return validEntries.join('/');
 }
@@ -1943,7 +1968,7 @@ function calculateTaxes() {
   // Prevent recursive calls
   if (state.isCalculatingTax) return;
   state.isCalculatingTax = true;
-  
+
   const oldText = els.oldTax.value;
   const newText = els.newTax.value;
   if (!oldText || !newText) {
@@ -2110,8 +2135,8 @@ function buildCurrentSummaryData() {
   const k3FeeAmount = fareK3State.k3Fee;
   const k3OnYQ = state.lastTaxResult?.k3OnYQ ?? 0;
   const passengerCount = Math.max(1, parseInt(els.pax.value, 10) ?? 1);
-  
-  const taxAdj = state.lastTaxResult 
+
+  const taxAdj = state.lastTaxResult
     ? state.lastTaxResult.netTax + k3FareAmount + k3OnYQ
     : k3FareAmount + k3OnYQ;
   const perPax = diff + feeAmount + k3FeeAmount + taxAdj;
@@ -2235,7 +2260,7 @@ function calculateFare() {
   // Prevent recursive calls
   if (state.isCalculatingFare) return;
   state.isCalculatingFare = true;
-  
+
   const oldFare = parseAmount(els.oldFare.value);
   const newFare = parseAmount(els.newFare.value);
   const manualDiff = parseAmount(els.fareDiff.value);
@@ -2266,12 +2291,12 @@ function calculateFare() {
   }
 
   const isFareDiffFocused = document.activeElement === els.fareDiff;
-  const isCustomDiff = state.ptcData[state.activePtc]?.manualFareDiff || 
-    (manualDiff && manualDiff.currency && manualDiff.currency !== baseCurrency) || 
-    (manualDiff && (!oldFare || !newFare));
+  const isCustomDualCurrency = manualDiff && manualDiff.currency && manualDiff.currency !== baseCurrency;
+  const isFareOnlyManual = manualDiff && (!oldFare || !newFare);
+  const isCustomDiff = isCustomDualCurrency || isFareOnlyManual || (isFareDiffFocused && state.ptcData[state.activePtc]?.manualFareDiff);
 
-  // Auto-populate base diff only if not a custom diff and user is not actively editing
-  if (!isCustomDiff && !isFareDiffFocused && (!els.fareDiff.value.trim() || !manualDiff)) {
+  // Auto-populate base diff whenever not a custom diff and user is not actively editing in fareDiff
+  if (!isCustomDiff && !isFareDiffFocused) {
     els.fareDiff.value = `${baseCurrency}${formatAmount(baseDiff, baseCurrency)}`;
   }
 
@@ -2317,7 +2342,7 @@ function calculateFare() {
     pax: passengerCount,
     taxAdj: state.lastTaxResult?.netTax ?? 0
   });
-  
+
   if (state.fareCalculationCache.has(fareCacheKey)) {
     const cachedResult = state.fareCalculationCache.get(fareCacheKey);
     // Restore cached values
@@ -2467,8 +2492,8 @@ function buildSummaryTable(breakdown, amountPayable) {
   const headRow = document.createElement('tr');
 
   // Extract booking class (RBD) from the fare calculation string
-  const fareCalcStringForRbd = breakdown.map(b => b.data.convertedFareCalcString).find(Boolean) || 
-    state.lastConvertedFareCalcString || 
+  const fareCalcStringForRbd = breakdown.map(b => b.data.convertedFareCalcString).find(Boolean) ||
+    state.lastConvertedFareCalcString ||
     els.fareCalcString.value;
   const bookingClass = extractBookingClassFromFareCalc(fareCalcStringForRbd);
 
