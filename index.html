@@ -97,7 +97,15 @@ Changes in V4.6 (Bug Fix Release):
     <div class="left-column">
       <section aria-labelledby="taxSectionHeading">
         <div class="section-header">
-          <h2 id="taxSectionHeading">Tax Adjustment Calculator</h2>
+          <h2 id="taxSectionHeading">Tax Adjustment Calculator
+            <span class="info-guide-badge" tabindex="0" role="tooltip" data-tooltip="Directly paste tax breakdown from E-ticket — Tax codes are automatically converted to required format" aria-label="Tax Adjustment Help Guide">
+              <span class="badge-3d-icon">
+                <span class="badge-3d-inner">
+                  <span class="badge-question-mark">?</span>
+                </span>
+              </span>
+            </span>
+          </h2>
           <button class="toggle-btn" id="taxToggleBtn" type="button" aria-expanded="true"
             aria-controls="taxCollapsible">Hide</button>
         </div>
@@ -132,7 +140,15 @@ Changes in V4.6 (Bug Fix Release):
 
       <section aria-labelledby="parserSectionHeading">
         <div class="section-header">
-          <h2 id="parserSectionHeading">Fare Calculation String Parser</h2>
+          <h2 id="parserSectionHeading">Fare Calculation String Validator
+            <span class="info-guide-badge" tabindex="0" role="tooltip" data-tooltip="Input fare components and surcharges — total NUC, ROE, and Base Fare are automatically calculated and validated." aria-label="Fare Calculation Validator Help Guide">
+              <span class="badge-3d-icon">
+                <span class="badge-3d-inner">
+                  <span class="badge-question-mark">?</span>
+                </span>
+              </span>
+            </span>
+          </h2>
           <button class="toggle-btn" id="parserToggleBtn" type="button" aria-expanded="true"
             aria-controls="parserCollapsible">Hide</button>
         </div>
@@ -208,7 +224,15 @@ Changes in V4.6 (Bug Fix Release):
     </div>
 
     <section aria-labelledby="fareSectionHeading">
-      <h2 id="fareSectionHeading">Fare Calculator</h2>
+      <h2 id="fareSectionHeading">Fare Calculator
+        <span class="info-guide-badge" tabindex="0" role="tooltip" data-tooltip="Enter currency as per filed fare. If issuing in a 2nd currency, enter converted settlement amount in Fare Difference / Change Fee." aria-label="Fare Calculator Help Guide">
+          <span class="badge-3d-icon">
+            <span class="badge-3d-inner">
+              <span class="badge-question-mark">?</span>
+            </span>
+          </span>
+        </span>
+      </h2>
       <div class="section-grid">
         <div>
           <label for="currency">Currency</label>
@@ -306,7 +330,15 @@ Changes in V4.6 (Bug Fix Release):
             <span>Fare Difference</span>
             <span id="baseFareDiffBadge" class="base-diff-badge" style="display: none;"></span>
             <span id="fareDiffBulb" class="animated-bulb-tip" style="display: none;" tabindex="0" role="tooltip" data-tooltip="Manually enter converted settlement amount (e.g. INR 4277) if issuing in a different currency.">
-              <span class="bulb-icon">💡</span>
+              <span class="badge-3d-bulb-icon">
+                <span class="badge-3d-bulb-inner">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="outline-bulb-svg">
+                    <path d="M9 18h6"></path>
+                    <path d="M10 22h4"></path>
+                    <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1.55.64 2.94 1.6 3.93.77.78 1.22 1.53 1.4 2.51"></path>
+                  </svg>
+                </span>
+              </span>
             </span>
           </label>
           <input id="fareDiff" placeholder="e.g. 3000 or INR12400" aria-label="Fare difference amount">
@@ -328,7 +360,15 @@ Changes in V4.6 (Bug Fix Release):
           <label for="changeFee" class="field-label-with-bulb">
             <span>Change Fee</span>
             <span id="changeFeeBulb" class="animated-bulb-tip" style="display: none;" tabindex="0" role="tooltip" data-tooltip="Enter in settlement currency (e.g. INR 3000) if issuing in a different currency.">
-              <span class="bulb-icon">💡</span>
+              <span class="badge-3d-bulb-icon">
+                <span class="badge-3d-bulb-inner">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="outline-bulb-svg">
+                    <path d="M9 18h6"></path>
+                    <path d="M10 22h4"></path>
+                    <path d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1.55.64 2.94 1.6 3.93.77.78 1.22 1.53 1.4 2.51"></path>
+                  </svg>
+                </span>
+              </span>
             </span>
           </label>
           <input id="changeFee" placeholder="e.g. 3000 or INR3000" aria-label="Change fee amount">
@@ -375,7 +415,15 @@ Changes in V4.6 (Bug Fix Release):
   </div>
 
   <section class="full-width" aria-labelledby="summaryHeading">
-    <h2 id="summaryHeading">Final Summary</h2>
+    <h2 id="summaryHeading">Final Summary
+      <span class="info-guide-badge" tabindex="0" role="tooltip" data-tooltip="Click to generate multi-PTC summary and One-line string. Made changes? Click again to update" aria-label="Final Summary Help Guide">
+        <span class="badge-3d-icon">
+          <span class="badge-3d-inner">
+            <span class="badge-question-mark">?</span>
+          </span>
+        </span>
+      </span>
+    </h2>
     <div class="button-row section-grid-full">
       <button id="summariseButton" type="button" aria-label="Generate summary and GDS string">Summarise</button>
     </div>

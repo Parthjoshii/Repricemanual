@@ -875,6 +875,16 @@ els.fareDiff.addEventListener('focus', () => {
   els.fareDiff.select();
 });
 
+els.fareDiff.addEventListener('blur', () => {
+  if (!els.fareDiff.value.trim() && els.oldFare.value && els.newFare.value) {
+    if (state.ptcData[state.activePtc]) {
+      state.ptcData[state.activePtc].manualFareDiff = false;
+    }
+    state.clearFareCache();
+    calculateFare();
+  }
+});
+
 els.changeFee.addEventListener('focus', () => {
   els.changeFee.select();
 });
@@ -1084,6 +1094,27 @@ function parseFareCalcString() {
   // the latest Adult data.
   if (state.activePtc === 'ADT') {
     state.adtParsedFareCalc = state.lastConvertedFareCalcString;
+  }
+
+  // Update active tab's summaryData with the converted fare calc string
+  if (state.ptcData[state.activePtc]?.summaryData) {
+    state.ptcData[state.activePtc].summaryData.convertedFareCalcString = state.lastConvertedFareCalcString;
+  }
+
+  // If summary is currently open/visible, re-render it dynamically to reflect the new booking class and FCS
+  if (els.summaryContent.style.display === 'block') {
+    const activePtcs = getActivePtcCodes();
+    if (activePtcs.length > 0) {
+      const breakdown = activePtcs.map(ptc => ({ ptc, data: state.ptcData[ptc].summaryData }));
+      if (activePtcs.length === 1) {
+        renderSummary(breakdown[0].data, breakdown);
+      } else {
+        const consolidated = mergeSummaryData(breakdown.map(b => b.data));
+        if (!consolidated.error) {
+          renderSummary(consolidated, breakdown);
+        }
+      }
+    }
   }
 
   // Display ROE
@@ -1913,7 +1944,7 @@ function updateAddTaxesWithK3(baseAddTaxes, k3FareStr) {
 function parseTaxes(text) {
   const taxes = {};
   if (!text) return { taxes, currency: null };
-  const tokens = text.split(/[\/\n,]+/);
+  const tokens = text.split(/[\s,\/\n\t]+/).map(t => t.trim()).filter(Boolean);
   const parsedTokens = tokens.map(parseTaxToken).filter(Boolean);
   const inferredCurrency = parsedTokens.find(t => t.currency)?.currency || 'INR';
   parsedTokens.forEach(parsed => {
@@ -2291,9 +2322,10 @@ function calculateFare() {
   }
 
   const isFareDiffFocused = document.activeElement === els.fareDiff;
-  const isCustomDualCurrency = manualDiff && manualDiff.currency && manualDiff.currency !== baseCurrency;
-  const isFareOnlyManual = manualDiff && (!oldFare || !newFare);
-  const isCustomDiff = isCustomDualCurrency || isFareOnlyManual || (isFareDiffFocused && state.ptcData[state.activePtc]?.manualFareDiff);
+  const isUserManualEntry = !!state.ptcData[state.activePtc]?.manualFareDiff;
+  const isCustomDualCurrency = isUserManualEntry && manualDiff && manualDiff.currency && manualDiff.currency !== baseCurrency;
+  const isFareOnlyManual = isUserManualEntry && manualDiff && (!oldFare || !newFare);
+  const isCustomDiff = isCustomDualCurrency || isFareOnlyManual || (isFareDiffFocused && isUserManualEntry);
 
   // Auto-populate base diff whenever not a custom diff and user is not actively editing in fareDiff
   if (!isCustomDiff && !isFareDiffFocused) {
