@@ -2728,34 +2728,36 @@ function copySummaryTable() {
   }
 }
 
-// Builds one "FARE DIFF ... + CHG FEE ... +/- TAX ... = ..." line for a single PTC's data
-// (per-pax amount — GDS commands are per-transaction, not per-group).
-function buildGdsLine(data) {
-  const parts = [];
-  parts.push(`FARE DIFF ${data.diffCurrency || data.currency}${formatAmount(data.diff, data.diffCurrency || data.currency)}`);
-  // Include K3 in the displayed change fee, matching the summary table's Change Fee row
-  const feeCur = data.feeCurrency || data.currency;
-  const feeWithK3 = data.fee + (data.k3Fee || 0);
-  parts.push(`+ CHG FEE ${feeCur}${formatAmount(feeWithK3, feeCur)}`);
-  // Exclude change fee K3 from the standalone TAX term so the line items sum exactly to perPax
-  const netTaxForGds = data.taxAdj - (data.k3Fee || 0);
-  const taxPrefix = netTaxForGds >= 0 ? '+' : '-';
-  parts.push(`${taxPrefix} TAX ${data.currency}${formatAmount(Math.abs(netTaxForGds), data.currency)}`);
-  parts.push(`= ${data.currency}${formatAmount(data.perPax, data.currency)}`);
-  return parts.join(' ');
-}
-
-// `breakdown` (optional): [{ ptc, data }] — when more than one PTC has data, emit one line
-// per PTC followed by a final consolidated total line; otherwise unchanged single-line output.
+// Builds a single consolidated "FARE DIFF ... + CHG FEE ... +/- TAX ... = Total Payable"
+// command string summing all values across all active PTCs and passengers.
 function generateGdsString(data, breakdown = null) {
-  if (breakdown && breakdown.length > 1) {
-    // els.gdsString is a single-line <input>, so PTC lines are pipe-separated rather than
-    // newline-separated (a newline would be silently dropped/garbled in an <input> value).
-    const lines = breakdown.map(({ ptc, data: ptcData }) => `${PTC_LABELS[ptc] || ptc} ${buildGdsLine(ptcData)}`);
-    lines.push(`TOTAL = ${data.currency}${formatAmount(data.subTotal, data.currency)}`);
-    return lines.join('  |  ');
-  }
-  return buildGdsLine(data);
+  const items = (breakdown && breakdown.length > 0)
+    ? breakdown.map(b => b.data)
+    : (data ? [data] : []);
+
+  if (items.length === 0) return '';
+
+  const cur = data.currency || items.find(d => d.currency)?.currency || 'INR';
+  const diffCur = data.diffCurrency || items.find(d => d.diffCurrency)?.diffCurrency || cur;
+  const feeCur = data.feeCurrency || items.find(d => d.feeCurrency)?.feeCurrency || cur;
+
+  const totalDiff = items.reduce((sum, d) => sum + ((d.diff || 0) * (d.pax || 1)), 0);
+  const totalBaseFee = items.reduce((sum, d) => sum + ((d.fee || 0) * (d.pax || 1)), 0);
+  const totalK3Fee = items.reduce((sum, d) => sum + ((d.k3Fee || 0) * (d.pax || 1)), 0);
+  const totalTaxAdj = items.reduce((sum, d) => sum + ((d.taxAdj || 0) * (d.pax || 1)), 0);
+  const totalSubTotal = items.reduce((sum, d) => sum + (d.subTotal || 0), 0);
+
+  const feeWithK3 = totalBaseFee + totalK3Fee;
+  const netTaxForGds = totalTaxAdj - totalK3Fee;
+
+  const parts = [];
+  parts.push(`FARE DIFF ${diffCur}${formatAmount(totalDiff, diffCur)}`);
+  parts.push(`+ CHG FEE ${feeCur}${formatAmount(feeWithK3, feeCur)}`);
+  const taxPrefix = netTaxForGds >= 0 ? '+' : '-';
+  parts.push(`${taxPrefix} TAX ${cur}${formatAmount(Math.abs(netTaxForGds), cur)}`);
+  parts.push(`= ${cur}${formatAmount(totalSubTotal, cur)}`);
+
+  return parts.join(' ');
 }
 
 function copyGdsString() {
