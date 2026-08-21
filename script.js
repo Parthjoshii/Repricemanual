@@ -2104,10 +2104,9 @@ function calculateTaxes() {
   // Update fare calculator fields with recalculated values (without rendering summary)
   const netTaxOnly = result.netTax;
   const fareK3State = getCurrentFareK3State(result.currency);
-  // Change-fee K3 is excluded here; it is added separately via k3FeeAmount below and belongs
-  // to the Change Fee field, not the tax adjustment / Add Taxes total.
   const k3FromFare = (result.currency === fareK3State.currency) ? fareK3State.k3Fare : 0;
-  const totalK3 = k3FromFare + k3OnYQ;
+  const k3FromFee = (result.currency === fareK3State.currency) ? fareK3State.k3Fee : 0;
+  const totalK3 = k3FromFare + k3OnYQ + k3FromFee;
   const netTaxWithK3 = netTaxOnly + totalK3;
 
   els.taxAdj.value = result.currency ? `${result.currency}${formatAmount(netTaxWithK3, result.currency)}` : '';
@@ -2124,9 +2123,8 @@ function calculateTaxes() {
   if (activeSummary) {
     const diff = activeSummary.diff;
     const feeAmount = activeSummary.fee;
-    const k3FeeAmount = fareK3State.k3Fee;
     const passengerCount = activeSummary.pax;
-    const perPax = diff + feeAmount + k3FeeAmount + netTaxWithK3;
+    const perPax = diff + feeAmount + netTaxWithK3;
     const subTotal = perPax * passengerCount;
 
     const fareCur = activeSummary.currency || fareK3State.currency || result.currency;
@@ -2139,6 +2137,7 @@ function calculateTaxes() {
     activeSummary.subTotal = subTotal;
     activeSummary.addTaxes = els.addTaxes.value;
     activeSummary.k3OnYQ = k3OnYQ;
+    activeSummary.k3Fee = k3FromFee;
     clearActiveTabDirty();
   }
 
@@ -2168,9 +2167,9 @@ function buildCurrentSummaryData() {
   const passengerCount = Math.max(1, parseInt(els.pax.value, 10) ?? 1);
 
   const taxAdj = state.lastTaxResult
-    ? state.lastTaxResult.netTax + k3FareAmount + k3OnYQ
-    : k3FareAmount + k3OnYQ;
-  const perPax = diff + feeAmount + k3FeeAmount + taxAdj;
+    ? state.lastTaxResult.netTax + k3FareAmount + k3OnYQ + k3FeeAmount
+    : k3FareAmount + k3OnYQ + k3FeeAmount;
+  const perPax = diff + feeAmount + taxAdj;
   const subTotal = perPax * passengerCount;
 
   return {
@@ -2232,12 +2231,12 @@ function renderTaxResult(result) {
   els.taxResult.innerHTML = '';
   els.taxResult.appendChild(fragment);
 
-  // Calculate total K3 (fare diff K3 + YQ K3). Change-fee K3 is excluded here since it is
-  // already reflected in the Change Fee field, not the Add Taxes field.
+  // Calculate total K3 (fare diff K3 + YQ K3 + change fee K3)
   const fareK3State = getCurrentFareK3State();
   const k3FromFare = (result.currency === fareK3State.currency) ? fareK3State.k3Fare : 0;
+  const k3FromFee = (result.currency === fareK3State.currency) ? fareK3State.k3Fee : 0;
   const k3OnYQ = result.k3OnYQ || 0;
-  const totalK3 = k3FromFare + k3OnYQ;
+  const totalK3 = k3FromFare + k3OnYQ + k3FromFee;
 
   // Add total K3 to add taxes as a single entry
   const positiveTaxStr = result.positiveTaxes.join('/');
@@ -2407,8 +2406,8 @@ function calculateFare() {
   const netTaxOnly = state.lastTaxResult ? state.lastTaxResult.netTax : 0;
   const k3OnYQ = state.lastTaxResult?.k3OnYQ ?? 0;
 
-  // Append combined K3 (fare diff + YQ) to Add Taxes (remove any existing K3 first to prevent duplication)
-  const k3ForAddTaxes = k3Fare + k3OnYQ;
+  // Append combined K3 (fare diff + YQ + change fee) to Add Taxes (remove any existing K3 first to prevent duplication)
+  const k3ForAddTaxes = k3Fare + k3OnYQ + k3Fee;
   if (k3ForAddTaxes > 0) {
     // Remove existing K3 entries first to ensure clean state
     removeK3FFromAddTaxes();
@@ -2420,11 +2419,9 @@ function calculateFare() {
     removeK3FFromAddTaxes();
   }
 
-  const feeWithK3 = feeAmount + k3Fee;
   const k3Total = k3Fare + k3Fee;
-  // Include K3 on fare diff and K3 on YQ in net tax adjustment, not K3 on change fee
-  const netTaxWithK3 = netTaxOnly + k3Fare + k3OnYQ;
-  const perPassenger = diff + feeAmount + k3Fee + netTaxWithK3;
+  const netTaxWithK3 = netTaxOnly + k3Fare + k3OnYQ + k3Fee;
+  const perPassenger = diff + feeAmount + netTaxWithK3;
   const subTotal = perPassenger * passengerCount;
 
   els.taxAdj.value = `${currency}${formatAmount(netTaxWithK3, currency)}`;
@@ -2737,13 +2734,13 @@ function buildGdsLine(data) {
   const parts = [];
   parts.push(`FARE DIFF ${data.diffCurrency || data.currency}${formatAmount(data.diff, data.diffCurrency || data.currency)}`);
   // Include K3 in the displayed change fee, matching the summary table's Change Fee row
-  // (SUMMARY_ROW_DEFS: d.fee + d.k3Fee) — data.perPax already folds k3Fee into the trailing
-  // total below, so leaving it out here made the line items silently not add up to that total.
   const feeCur = data.feeCurrency || data.currency;
   const feeWithK3 = data.fee + (data.k3Fee || 0);
   parts.push(`+ CHG FEE ${feeCur}${formatAmount(feeWithK3, feeCur)}`);
-  const taxPrefix = data.taxAdj > 0 ? '+' : '-';
-  parts.push(`${taxPrefix} TAX ${data.currency}${formatAmount(Math.abs(data.taxAdj), data.currency)}`);
+  // Exclude change fee K3 from the standalone TAX term so the line items sum exactly to perPax
+  const netTaxForGds = data.taxAdj - (data.k3Fee || 0);
+  const taxPrefix = netTaxForGds >= 0 ? '+' : '-';
+  parts.push(`${taxPrefix} TAX ${data.currency}${formatAmount(Math.abs(netTaxForGds), data.currency)}`);
   parts.push(`= ${data.currency}${formatAmount(data.perPax, data.currency)}`);
   return parts.join(' ');
 }

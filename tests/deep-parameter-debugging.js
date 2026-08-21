@@ -161,7 +161,7 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
   testAssert('K3 Tax', 'Economy K3 5% on Diff(4277) + Fee(3000) = INR364', k3Economy === 'INR364', `Got ${k3Economy}`);
 
   let addTaxesWithK3 = await page.inputValue('#addTaxes');
-  testAssert('K3 Tax', 'Add Taxes contains calculated INR214K3', addTaxesWithK3.includes('INR214K3'), `Got ${addTaxesWithK3}`);
+  testAssert('K3 Tax', 'Add Taxes contains calculated INR364K3', addTaxesWithK3.includes('INR364K3'), `Got ${addTaxesWithK3}`);
 
   // 3.2: Business Cabin (18% GST)
   await page.selectOption('#cabin', 'business');

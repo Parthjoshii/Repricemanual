@@ -60,7 +60,7 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
 
   let addTaxesVal = await page.inputValue('#addTaxes');
   console.log('Add Taxes value:', addTaxesVal);
-  assert(addTaxesVal.includes('INR214K3'), 'Add Taxes should contain INR214K3');
+  assert(addTaxesVal.includes('INR364K3'), 'Add Taxes should contain INR364K3');
 
   let perPaxWithK3 = await page.inputValue('#perPax');
   console.log('Per Pax with K3:', perPaxWithK3);
