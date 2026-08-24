@@ -139,6 +139,14 @@ const els = {
   copyGdsButton: byId('copyGdsButton'),
   summariseButton: byId('summariseButton'),
   summaryContent: byId('summaryContent'),
+  summaryStaleNotice: byId('summaryStaleNotice'),
+  // Currency Converter elements
+  currencyConverterCard: byId('currencyConverterCard'),
+  converterToggleBtn: byId('converterToggleBtn'),
+  converterCollapsible: byId('converterCollapsible'),
+  targetCurrency: byId('targetCurrency'),
+  exchangeRate: byId('exchangeRate'),
+  convertedFareDiff: byId('convertedFareDiff'),
   // Parser elements
   fareCalcString: byId('fareCalcString'),
   parseButton: byId('parseButton'),
@@ -953,15 +961,29 @@ els.autoCalcFromAdult.addEventListener('change', () => {
   }
 });
 
+function showSummaryStaleNotice() {
+  if (state.isSummaryGenerated && els.summaryStaleNotice) {
+    els.summaryStaleNotice.style.display = 'inline-flex';
+  }
+}
+
+function hideSummaryStaleNotice() {
+  if (els.summaryStaleNotice) {
+    els.summaryStaleNotice.style.display = 'none';
+  }
+}
+
 // Marks the active tab as having data entered that isn't reflected in its summary yet — cleared
 // again wherever a fresh summaryData actually gets committed (see calculateFare()/calculateTaxes()).
 // Cheap by design (only touches the one affected tab button) since it runs on every keystroke.
 function markActiveTabDirty() {
   const entry = state.ptcData[state.activePtc];
-  if (!entry || entry.dirty) return;
-  entry.dirty = true;
-  const btn = ptcTabButton(state.activePtc);
-  if (btn) btn.classList.add('dirty');
+  if (entry && !entry.dirty) {
+    entry.dirty = true;
+    const btn = ptcTabButton(state.activePtc);
+    if (btn) btn.classList.add('dirty');
+  }
+  showSummaryStaleNotice();
 }
 
 // Clears the dirty flag for the active tab — called wherever a fresh summaryData actually gets
@@ -982,9 +1004,12 @@ function clearActiveTabDirty() {
   'currency', 'cabin', 'oldFare', 'newFare', 'fareDiff', 'changeFee',
   'applyK3OnFareDiff', 'applyK3OnChangeFee', 'applyK3OnYQ',
   'oldTax', 'newTax', 'pax', 'fareCalcString',
+  'targetCurrency', 'exchangeRate',
 ].forEach(id => {
-  els[id].addEventListener('input', markActiveTabDirty);
-  els[id].addEventListener('change', markActiveTabDirty);
+  if (els[id]) {
+    els[id].addEventListener('input', markActiveTabDirty);
+    els[id].addEventListener('change', markActiveTabDirty);
+  }
 });
 
 // Parser functions
@@ -1687,6 +1712,35 @@ function loadTheme() {
 // Theme toggle click event
 els.themeToggle.addEventListener('click', toggleTheme);
 
+// Section toggle listeners
+if (els.taxToggleBtn) {
+  els.taxToggleBtn.addEventListener('click', toggleTaxSection);
+}
+if (els.parserToggleBtn) {
+  els.parserToggleBtn.addEventListener('click', toggleParserSection);
+}
+if (els.converterToggleBtn) {
+  els.converterToggleBtn.addEventListener('click', toggleConverterSection);
+}
+if (els.targetCurrency) {
+  els.targetCurrency.addEventListener('change', () => {
+    updateConverterCalculation();
+    tryCalculateFare();
+  });
+}
+if (els.exchangeRate) {
+  els.exchangeRate.addEventListener('input', () => {
+    updateConverterCalculation();
+    tryCalculateFare();
+  });
+}
+if (els.fareDiff) {
+  els.fareDiff.addEventListener('input', () => {
+    if (els.targetCurrency) els.targetCurrency.value = '';
+    if (els.convertedFareDiff) els.convertedFareDiff.value = '';
+  });
+}
+
 // Enter key to calculate
 els.oldTax.addEventListener('keypress', (e) => { if (e.key === 'Enter') calculateTaxes(); });
 els.newTax.addEventListener('keypress', (e) => { if (e.key === 'Enter') calculateTaxes(); });
@@ -1774,6 +1828,8 @@ function validateK3CabinSelection() {
 function tryCalculateFare() {
   if (!validateK3CabinSelection()) return;
 
+  updateConverterCalculation();
+
   const parsedDiff = parseAmount(els.fareDiff.value);
   const oldFare = parseAmount(els.oldFare.value);
   const newFare = parseAmount(els.newFare.value);
@@ -1802,18 +1858,48 @@ function flushPendingCalculations() {
 }
 
 function toggleTaxSection() {
-  els.taxCollapsible.classList.toggle('collapsed');
-  els.taxToggleBtn.classList.toggle('collapsed', els.taxCollapsible.classList.contains('collapsed'));
-  els.taxToggleBtn.textContent = els.taxCollapsible.classList.contains('collapsed') ? 'Show' : 'Hide';
+  if (!els.taxCollapsible || !els.taxToggleBtn) return;
+  const isCollapsed = els.taxCollapsible.classList.toggle('collapsed');
+  els.taxToggleBtn.classList.toggle('collapsed', isCollapsed);
+  els.taxToggleBtn.textContent = isCollapsed ? 'Show' : 'Hide';
+  els.taxToggleBtn.setAttribute('aria-expanded', !isCollapsed);
+}
+
+function toggleParserSection() {
+  if (!els.parserCollapsible || !els.parserToggleBtn) return;
+  const isCollapsed = els.parserCollapsible.classList.toggle('collapsed');
+  els.parserToggleBtn.classList.toggle('collapsed', isCollapsed);
+  els.parserToggleBtn.textContent = isCollapsed ? 'Show' : 'Hide';
+  els.parserToggleBtn.setAttribute('aria-expanded', !isCollapsed);
 }
 
 function toggleConverterSection() {
-  els.converterCollapsible.classList.toggle('collapsed');
-  const isCollapsed = els.converterCollapsible.classList.contains('collapsed');
+  if (!els.converterCollapsible || !els.converterToggleBtn) return;
+  const isCollapsed = els.converterCollapsible.classList.toggle('collapsed');
   els.converterToggleBtn.classList.toggle('collapsed', isCollapsed);
   els.converterToggleBtn.textContent = isCollapsed ? 'Show' : 'Hide';
-  if (els.converterMarquee) {
-    els.converterMarquee.style.display = isCollapsed ? 'none' : 'flex';
+  els.converterToggleBtn.setAttribute('aria-expanded', !isCollapsed);
+}
+
+function updateConverterCalculation() {
+  if (!els.targetCurrency || !els.exchangeRate || !els.convertedFareDiff) return;
+  const oldFare = parseAmount(els.oldFare.value);
+  const newFare = parseAmount(els.newFare.value);
+  const targetCur = els.targetCurrency.value;
+  const roeVal = parseFloat(els.exchangeRate.value.trim());
+
+  if (oldFare && newFare && targetCur && !isNaN(roeVal) && roeVal > 0) {
+    const baseDiff = newFare.amount - oldFare.amount;
+    const convertedAmount = baseDiff * roeVal;
+    const formatted = `${targetCur}${formatAmount(convertedAmount, targetCur)}`;
+    els.convertedFareDiff.value = formatted;
+    // Auto paste converted fare difference into fareDiff input field
+    els.fareDiff.value = formatted;
+    if (state.ptcData[state.activePtc]) {
+      state.ptcData[state.activePtc].manualFareDiff = true;
+    }
+  } else {
+    els.convertedFareDiff.value = '';
   }
 }
 
@@ -2586,6 +2672,9 @@ function buildSummaryTable(breakdown, amountPayable) {
 // `breakdown`: [{ ptc, data }] for every PTC with data. `data`: the merged/consolidated
 // summaryData (same object as a single PTC's data when only one PTC is active).
 function renderSummary(data, breakdown) {
+  state.isSummaryGenerated = true;
+  hideSummaryStaleNotice();
+
   // Show summary content
   els.summaryContent.style.display = 'block';
 
@@ -2616,6 +2705,9 @@ function clearFare() {
   els.fareDiff.value = '';
   els.k3Tax.value = '';
   els.changeFee.value = '';
+  if (els.targetCurrency) els.targetCurrency.value = '';
+  if (els.exchangeRate) els.exchangeRate.value = '';
+  if (els.convertedFareDiff) els.convertedFareDiff.value = '';
   els.applyK3OnFareDiff.checked = false;
   els.applyK3OnChangeFee.checked = false;
   clearINRMessage();
@@ -2627,6 +2719,8 @@ function clearFare() {
   els.summary.innerHTML = '';
   els.gdsString.value = '';
   els.summaryContent.style.display = 'none';
+  state.isSummaryGenerated = false;
+  hideSummaryStaleNotice();
   // Preserve tax values when clearing fare only
   state.updateFareK3(null, 0, '');
   state.clearFareCache();
