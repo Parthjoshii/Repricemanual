@@ -1,57 +1,57 @@
 :root {
-  --bg-app: #0f172a;
-  --bg-card: #1e293b;
-  --text-primary: #f8fafc;
-  --text-secondary: #94a3b8;
-  --border-color: #334155;
-  --primary-cyan: #06b6d4;
-  --primary-hover: #0891b2;
-  --readonly-bg: #111827;
-  --total-accent: #0f766e;
-  --total-text: #ccfbf1;
+  --bg-app: #101426;
+  --bg-card: #1a1e36;
+  --text-primary: #F5F5DC;
+  --text-secondary: #9fa8da;
+  --border-color: #2c3258;
+  --primary-cyan: #3F51B5;
+  --primary-hover: #303F9F;
+  --readonly-bg: #14172b;
+  --total-accent: #3F51B5;
+  --total-text: #F5F5DC;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--text-primary);
 }
 [data-theme="light"] {
-  --bg-app: #eef2f6;
-  --bg-card: #f8fafc;
-  --text-primary: #1e293b;
-  --text-secondary: #475569;
-  --border-color: #cbd5e1;
-  --primary-cyan: #0284c7;
-  --primary-hover: #0369a1;
-  --readonly-bg: #e2e8f0;
-  --total-accent: #0f766e;
-  --total-text: #ccfbf1;
+  --bg-app: #F5F5DC;
+  --bg-card: #faf9f0;
+  --text-primary: #1a237e;
+  --text-secondary: #3f51b5;
+  --border-color: #dcd7be;
+  --primary-cyan: #3F51B5;
+  --primary-hover: #303F9F;
+  --readonly-bg: #efeccf;
+  --total-accent: #3F51B5;
+  --total-text: #F5F5DC;
 }
 [data-theme="light"] section {
   background: var(--bg-card);
-  border-color: #cbd5e1;
-  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+  border-color: #dcd7be;
+  box-shadow: 0 4px 14px rgba(63, 81, 181, 0.08);
 }
 [data-theme="light"] input,
 [data-theme="light"] textarea,
 [data-theme="light"] select {
   background: #ffffff;
-  color: #1e293b;
-  border: 1px solid #94a3b8;
+  color: #1a237e;
+  border: 1px solid #c5c0a5;
 }
 [data-theme="light"] input:focus,
 [data-theme="light"] textarea:focus,
 [data-theme="light"] select:focus {
-  border-color: #0284c7;
-  box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.18);
+  border-color: #3F51B5;
+  box-shadow: 0 0 0 3px rgba(63, 81, 181, 0.22);
 }
 [data-theme="light"] input[readonly],
 [data-theme="light"] textarea[readonly] {
-  background: #e2e8f0;
-  color: #475569;
-  border-color: #cbd5e1;
+  background: #efeccf;
+  color: #283593;
+  border-color: #dcd7be;
 }
 [data-theme="light"] input[readonly]:focus,
 [data-theme="light"] textarea[readonly]:focus {
   outline: none;
-  border-color: #cbd5e1;
+  border-color: #dcd7be;
   box-shadow: none;
 }
 * { box-sizing: border-box; }
@@ -384,7 +384,7 @@ button {
   font-weight: 700;
   cursor: pointer;
   background: var(--primary-cyan);
-  color: #0f172a;
+  color: #ffffff;
   transition: transform 0.2s ease, background 0.2s ease;
 }
 button:hover {

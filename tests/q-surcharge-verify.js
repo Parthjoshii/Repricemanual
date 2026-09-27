@@ -51,6 +51,21 @@ let browser;
   assert.deepStrictEqual(qSurcharges3, [5.00, 5.00, 5.00, 5.00, 5, 58.47, 470.74, 18.82], 'All previously-documented Q surcharge formats should still parse identically');
   console.log('CHECK4 OK: all previously-supported Q surcharge formats still parse correctly (no regression)');
 
+  // --- Bug report fix: 3-letter airport/city code ending in Q (e.g. YMQ) must NOT be read as a surcharge ---
+  const ymqInput = 'YMQ EK X/YTO EK X/DXB EK KWI352.92TLEIPCA1/NDC2 EK X/DXBEK YMQ 388TLEIPCA1/NDC2 NUC740.92END ROE1.361492';
+  const parsedYmq = await page.evaluate((str) => parseFareCalcStringInternal(str), ymqInput);
+  console.log('Q surcharges for YMQ input:', parsedYmq.qSurcharges);
+  assert.deepStrictEqual(parsedYmq.qSurcharges, [], 'The Q in 3-letter airport/city code YMQ must NOT be read as a surcharge');
+  assert.deepStrictEqual(parsedYmq.fareComponents.map(f => f.amount), [352.92, 388], 'Expected fare components 352.92 and 388');
+  
+  await page.fill('#fareCalcString', ymqInput);
+  await page.click('#parseButton');
+  await page.waitForTimeout(150);
+  const nucValidationYmq = await page.$eval('#nucValidation', el => el.textContent);
+  console.log('NUC validation for YMQ:', nucValidationYmq);
+  assert.ok(nucValidationYmq.includes('PASS'), 'Expected NUC validation to PASS for YMQ string: ' + nucValidationYmq);
+  console.log('CHECK YMQ OK: 3-letter airport code YMQ correctly ignored as Q surcharge');
+
   console.log('CONSOLE_ERRORS:', JSON.stringify(errors));
   assert.strictEqual(errors.length, 0, 'Expected zero console errors');
   console.log('CHECK5 OK: zero console errors');

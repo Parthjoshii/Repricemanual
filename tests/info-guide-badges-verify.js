@@ -25,7 +25,7 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
   console.log('--- 1. VERIFYING SECTION INFORMATION BADGES & TOOLTIPS ---');
   const expectedTooltips = {
     '#taxSectionHeading .info-guide-badge': 'Directly paste tax breakdown from E-ticket — Tax codes are automatically converted to required format',
-    '#parserSectionHeading .info-guide-badge': 'Input fare components and surcharges — total NUC, ROE, and Base Fare are automatically calculated and validated.',
+    '#parserSectionHeading .info-guide-badge': 'Input fare components and surcharges for NEW fare — total NUC, ROE, and Base Fare are automatically calculated and validated.',
     '#fareSectionHeading .info-guide-badge': 'Enter currency as per filed fare. If issuing in a 2nd currency, enter converted settlement amount in Fare Difference / Change Fee.',
     '#summaryHeading .info-guide-badge': 'Click to generate multi-PTC summary and One-line string. Made changes? Click again to update'
   };

@@ -1281,7 +1281,7 @@ function parseFareCalcStringInternal(input) {
   // qNumQ: Q + 6-letter airport pair + number + Q, e.g. Q DUBCOK58.47Q.
   // qAirport / qAirportQ: bare 6-letter airport pair + number, with or without a trailing Q,
   //   e.g. DUBCOK18.82, DUBCOK58.47Q.
-  const qPattern = /Q\s*(?<qDirect>\d+(?:\.\d+)?)|(?<![A-Z0-9])Q\s*[A-Z]{3}(?:[A-Z]{3})?(?<qCoded>\d+(?:\.\d+)?)|Q\s+[A-Z]{3}(?:[A-Z]{3})?(?<qCodedSpaced>\d+(?:\.\d+)?)|(?<qNumFirst>\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(?<qNumQ>\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(?<qAirport>\d+(?:\.\d+)?)(?![A-Z0-9])|[A-Z]{6}(?<qAirportQ>\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
+  const qPattern = /(?<![A-Za-z])Q\s*(?<qDirect>\d+(?:\.\d+)?)|(?<![A-Z0-9])Q\s*[A-Z]{3}(?:[A-Z]{3})?(?<qCoded>\d+(?:\.\d+)?)|(?<![A-Za-z])Q\s+[A-Z]{3}(?:[A-Z]{3})?(?<qCodedSpaced>\d+(?:\.\d+)?)|(?<qNumFirst>\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(?<qNumQ>\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(?<qAirport>\d+(?:\.\d+)?)(?![A-Z0-9])|[A-Z]{6}(?<qAirportQ>\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
   let qMatch;
   while ((qMatch = qPattern.exec(farePart)) !== null) {
     const g = qMatch.groups;
@@ -1344,7 +1344,7 @@ function deriveFareCalcString(adtString, percent, paxSuffix) {
     return `${scaled.toFixed(2)}${fareBasis}${paxSuffix}${trailing}`;
   });
 
-  const qPattern = /Q\s*(?<qDirect>\d+(?:\.\d+)?)|(?<![A-Z0-9])Q\s*[A-Z]{3}(?:[A-Z]{3})?(?<qCoded>\d+(?:\.\d+)?)|Q\s+[A-Z]{3}(?:[A-Z]{3})?(?<qCodedSpaced>\d+(?:\.\d+)?)|(?<qNumFirst>\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(?<qNumQ>\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(?<qAirport>\d+(?:\.\d+)?)(?![A-Z0-9])|[A-Z]{6}(?<qAirportQ>\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
+  const qPattern = /(?<![A-Za-z])Q\s*(?<qDirect>\d+(?:\.\d+)?)|(?<![A-Z0-9])Q\s*[A-Z]{3}(?:[A-Z]{3})?(?<qCoded>\d+(?:\.\d+)?)|(?<![A-Za-z])Q\s+[A-Z]{3}(?:[A-Z]{3})?(?<qCodedSpaced>\d+(?:\.\d+)?)|(?<qNumFirst>\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(?<qNumQ>\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(?<qAirport>\d+(?:\.\d+)?)(?![A-Z0-9])|[A-Z]{6}(?<qAirportQ>\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
   const scaledFarePartWithQ = scaledFarePart.replace(qPattern, (match, ...args) => {
     const g = args[args.length - 1];
     const amountStr = g.qDirect || g.qCoded || g.qCodedSpaced || g.qNumFirst || g.qNumQ || g.qAirport || g.qAirportQ;
@@ -1485,7 +1485,7 @@ function deriveHybridFareCalcString(adtString, ratios, suffixes) {
     });
   }
 
-  const qPattern = /Q\s*(?<qDirect>\d+(?:\.\d+)?)|(?<![A-Z0-9])Q\s*[A-Z]{3}(?:[A-Z]{3})?(?<qCoded>\d+(?:\.\d+)?)|Q\s+[A-Z]{3}(?:[A-Z]{3})?(?<qCodedSpaced>\d+(?:\.\d+)?)|(?<qNumFirst>\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(?<qNumQ>\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(?<qAirport>\d+(?:\.\d+)?)(?![A-Z0-9])|[A-Z]{6}(?<qAirportQ>\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
+  const qPattern = /(?<![A-Za-z])Q\s*(?<qDirect>\d+(?:\.\d+)?)|(?<![A-Z0-9])Q\s*[A-Z]{3}(?:[A-Z]{3})?(?<qCoded>\d+(?:\.\d+)?)|(?<![A-Za-z])Q\s+[A-Z]{3}(?:[A-Z]{3})?(?<qCodedSpaced>\d+(?:\.\d+)?)|(?<qNumFirst>\d+(?:\.\d+)?)Q(?:\s*[A-Z]{3}){0,2}(?![A-Z0-9])|(?<![A-Z0-9])Q\s*[A-Z]{6}(?<qNumQ>\d+(?:\.\d+)?)Q|(?<![A-Z0-9])[A-Z]{6}(?<qAirport>\d+(?:\.\d+)?)(?![A-Z0-9])|[A-Z]{6}(?<qAirportQ>\d+(?:\.\d+)?)Q(?![A-Z0-9])/g;
   let qMatch;
   while ((qMatch = qPattern.exec(farePart)) !== null) {
     const g = qMatch.groups;
