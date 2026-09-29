@@ -1,3 +1,5 @@
 node_modules/
 # Debug screenshots some tests/*.js write out when run from the repo root
 /*.png
+.vercel
+.env*
