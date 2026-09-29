@@ -4,10 +4,19 @@
   --text-primary: #F5F5DC;
   --text-secondary: #9fa8da;
   --border-color: #2c3258;
-  --primary-cyan: #3F51B5;
+  --hero-color: rgb(63, 81, 181);
+  --primary-cyan: rgb(63, 81, 181);
   --primary-hover: #303F9F;
+  --btn-bg: #F5F5DC;
+  --btn-text: #1a237e;
+  --btn-hover-bg: #ececd0;
+  --btn-hover-text: #0f172a;
+  --btn-secondary-bg: transparent;
+  --btn-secondary-border: #F5F5DC;
+  --btn-secondary-text: #F5F5DC;
+  --btn-secondary-hover-bg: rgba(245, 245, 220, 0.12);
   --readonly-bg: #14172b;
-  --total-accent: #3F51B5;
+  --total-accent: rgb(63, 81, 181);
   --total-text: #F5F5DC;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--text-primary);
@@ -18,10 +27,19 @@
   --text-primary: #1a237e;
   --text-secondary: #3f51b5;
   --border-color: #dcd7be;
-  --primary-cyan: #3F51B5;
+  --hero-color: rgb(63, 81, 181);
+  --primary-cyan: rgb(63, 81, 181);
   --primary-hover: #303F9F;
+  --btn-bg: rgb(63, 81, 181);
+  --btn-text: #F5F5DC;
+  --btn-hover-bg: #303F9F;
+  --btn-hover-text: #ffffff;
+  --btn-secondary-bg: transparent;
+  --btn-secondary-border: rgb(63, 81, 181);
+  --btn-secondary-text: rgb(63, 81, 181);
+  --btn-secondary-hover-bg: rgba(63, 81, 181, 0.08);
   --readonly-bg: #efeccf;
-  --total-accent: #3F51B5;
+  --total-accent: rgb(63, 81, 181);
   --total-text: #F5F5DC;
 }
 [data-theme="light"] section {
@@ -67,6 +85,7 @@ h1 {
   margin: 0 0 16px;
   font-size: clamp(1.8rem, 2.2vw, 2.4rem);
   letter-spacing: -0.03em;
+  color: var(--hero-color, var(--primary-cyan));
 }
 .error-display {
   position: sticky;
@@ -206,14 +225,15 @@ h1 {
   color: #86efac;
 }
 .modal-close-btn {
-  background: var(--primary-cyan);
-  color: #0f172a;
+  background: var(--btn-bg);
+  color: var(--btn-text);
   border: none;
   padding: 10px 20px;
   border-radius: 6px;
   font-size: 1rem;
   cursor: pointer;
   font-weight: 700;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 .modal-input {
   width: 100%;
@@ -225,8 +245,8 @@ h1 {
   justify-content: center;
 }
 .modal-close-btn:hover {
-  background: var(--primary-hover);
-  color: white;
+  background: var(--btn-hover-bg);
+  color: var(--btn-hover-text);
 }
 .help-content p {
   margin: 8px 0;
@@ -383,19 +403,24 @@ button {
   font-size: 0.91rem;
   font-weight: 700;
   cursor: pointer;
-  background: var(--primary-cyan);
-  color: #ffffff;
-  transition: transform 0.2s ease, background 0.2s ease;
+  background: var(--btn-bg);
+  color: var(--btn-text);
+  transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
 }
 button:hover {
-  background: var(--primary-hover);
-  color: white;
+  background: var(--btn-hover-bg);
+  color: var(--btn-hover-text);
   transform: translateY(-1px);
 }
 button.secondary {
-  background: transparent;
-  border: 1px solid var(--border-color);
-  color: var(--text-secondary);
+  background: var(--btn-secondary-bg);
+  border: 1px solid var(--btn-secondary-border);
+  color: var(--btn-secondary-text);
+}
+button.secondary:hover {
+  background: var(--btn-secondary-hover-bg);
+  color: var(--btn-secondary-text);
+  transform: translateY(-1px);
 }
 .button-row {
   display: flex;
@@ -1007,17 +1032,17 @@ th {
 }
 .gds-copy-btn {
   padding: 10px 20px;
-  background: var(--primary-cyan);
-  color: #0f172a;
+  background: var(--btn-bg);
+  color: var(--btn-text);
   font-weight: 700;
   border: none;
   border-radius: 8px;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease;
 }
 .gds-copy-btn:hover {
-  background: var(--primary-hover);
-  color: white;
+  background: var(--btn-hover-bg);
+  color: var(--btn-hover-text);
 }
 
 /* Currency Converter Section */

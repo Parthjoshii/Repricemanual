@@ -53,36 +53,56 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
   await page.click('#summariseButton');
   await page.waitForTimeout(300);
 
+  console.log('\n--- 2. VERIFYING THEME TOGGLE & COLORS ---');
+  // Initial theme must be light by default
+  const initialTheme = await page.getAttribute('html', 'data-theme');
+  console.log('Initial HTML data-theme attribute (default):', initialTheme);
+  assert.strictEqual(initialTheme, 'light', 'Default theme must be light');
+
+  // Verify Light Mode button color is rgb(63, 81, 181) with #F5F5DC text
+  const lightBtnBg = await page.evaluate(() => getComputedStyle(document.querySelector('#fareCalcButton')).backgroundColor);
+  const lightBtnColor = await page.evaluate(() => getComputedStyle(document.querySelector('#fareCalcButton')).color);
+  console.log('Light Mode Button BG:', lightBtnBg);
+  console.log('Light Mode Button Color:', lightBtnColor);
+  assert.strictEqual(lightBtnBg, 'rgb(63, 81, 181)', 'Light mode button should be rgb(63, 81, 181)');
+  assert.strictEqual(lightBtnColor, 'rgb(245, 245, 220)', 'Light mode button text should be rgb(245, 245, 220)');
+
+  // Capture Light Mode Overview with Badge Tooltip
+  await page.hover('#taxSectionHeading .info-guide-badge', { force: true });
+  await page.waitForTimeout(250);
+  const lightImgPath = path.join(artifactDir, 'light_mode_soft_slate_overview.png');
+  await page.screenshot({ path: lightImgPath, fullPage: false });
+  console.log('Saved Light Mode screenshot to:', lightImgPath);
+
+  // Switch to Dark Mode
+  await page.click('#themeToggle');
+  await page.waitForTimeout(300);
+
+  const darkThemeAttr = await page.getAttribute('html', 'data-theme');
+  console.log('HTML data-theme attribute after toggle to dark:', darkThemeAttr);
+  assert.strictEqual(darkThemeAttr, 'dark', 'Theme should be dark after toggle');
+
+  // Verify Dark Mode hero color rgb(63, 81, 181) and button color #F5F5DC
+  const darkHeroColor = await page.evaluate(() => getComputedStyle(document.querySelector('h1')).color);
+  const darkBtnBg = await page.evaluate(() => getComputedStyle(document.querySelector('#fareCalcButton')).backgroundColor);
+  console.log('Dark Mode Hero Color:', darkHeroColor);
+  console.log('Dark Mode Button BG:', darkBtnBg);
+  assert.strictEqual(darkHeroColor, 'rgb(63, 81, 181)', 'Dark mode hero color should be rgb(63, 81, 181)');
+  assert.strictEqual(darkBtnBg, 'rgb(245, 245, 220)', 'Dark mode button should be #F5F5DC = rgb(245, 245, 220)');
+
   // Capture Dark Mode Overview with Badges
   const darkImgPath = path.join(artifactDir, 'dark_mode_info_badges_overview.png');
   await page.screenshot({ path: darkImgPath, fullPage: false });
   console.log('Saved Dark Mode screenshot to:', darkImgPath);
 
-  // Switch to Light Mode
+  // Switch back to Light Mode
   await page.click('#themeToggle');
   await page.waitForTimeout(300);
-
-  const themeAttr = await page.getAttribute('html', 'data-theme');
-  console.log('HTML data-theme attribute after toggle:', themeAttr);
-  assert.strictEqual(themeAttr, 'light', 'Theme should be light');
-
-  // Verify computed background colors
-  const bodyBg = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  const cardBg = await page.evaluate(() => getComputedStyle(document.querySelector('section')).backgroundColor);
-  console.log('Light Mode Body BG:', bodyBg); // expected rgb(238, 242, 246) = #eef2f6
-  console.log('Light Mode Card BG:', cardBg); // expected rgb(248, 250, 252) = #f8fafc
-
-  // Hover over Tax Badge in Light Mode
-  await page.hover('#taxSectionHeading .info-guide-badge', { force: true });
-  await page.waitForTimeout(250);
-
-  // Capture Light Mode Overview with Badge Tooltip
-  const lightImgPath = path.join(artifactDir, 'light_mode_soft_slate_overview.png');
-  await page.screenshot({ path: lightImgPath, fullPage: false });
-  console.log('Saved Light Mode screenshot to:', lightImgPath);
+  const backToLight = await page.getAttribute('html', 'data-theme');
+  assert.strictEqual(backToLight, 'light', 'Theme should switch back to light');
 
   console.log('\n========================================================================');
-  console.log('ALL INFORMATION BADGE & SOFT SLATE LIGHT MODE TESTS PASSED 100%');
+  console.log('ALL THEME & INFORMATION BADGE TESTS PASSED 100%');
   console.log('========================================================================');
   assert.strictEqual(errors.length, 0, 'Zero console errors expected');
 

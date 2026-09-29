@@ -79,7 +79,7 @@ let browser;
   await page.waitForTimeout(150);
   const headers = await page.$$eval('#summary thead th', ths => ths.map(th => th.textContent));
   console.log('Summary headers:', headers);
-  assert.deepStrictEqual(headers, ['', 'Adult', 'GRP'], 'Expected headers [\'\', Adult, GRP]');
+  assert.deepStrictEqual(headers, ['Booking class', 'Adult', 'GRP'], 'Expected headers [\'Booking class\', Adult, GRP]');
 
   const fcsLabels = await page.$$eval('#summary tbody tr', trs =>
     trs.filter(tr => tr.cells[0].textContent.includes('Fare Calculation String')).map(tr => tr.cells[0].textContent)

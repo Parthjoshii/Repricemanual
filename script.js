@@ -1704,7 +1704,7 @@ function toggleTheme() {
 
 // Load saved theme preference
 function loadTheme() {
-  const savedTheme = localStorage.getItem('theme') || 'dark';
+  const savedTheme = localStorage.getItem('theme') || 'light';
   document.documentElement.setAttribute('data-theme', savedTheme);
   els.themeToggle.textContent = savedTheme === 'light' ? '🌙' : '☀️';
 }
