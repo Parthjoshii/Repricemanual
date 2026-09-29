@@ -150,6 +150,14 @@ let browser;
   console.log(`Progress status: "${progressStatus}"`);
   assert.ok(progressStatus.includes('All') && progressStatus.includes('loaded'), 'Win+V prep must complete 100%');
 
+  // Verify success modal displayed without error
+  await page.waitForTimeout(200);
+  const modalMsg = await page.textContent('#modalMessage');
+  console.log(`Modal message after Win+V prep: "${modalMsg}"`);
+  assert.ok(modalMsg.includes('Windows Clipboard History ready'), 'Success modal must be displayed without errors');
+  const isSuccessModal = await page.evaluate(() => document.querySelector('#errorModal .modal-box')?.classList.contains('success'));
+  assert.ok(isSuccessModal, 'Modal must have success class');
+
   // In reverse order, top item written last to clipboard is FB1 (QHAMPIE1)
   const lastCopiedItem = await page.evaluate(() => navigator.clipboard.readText());
   console.log(`Top item in clipboard for Win+V: "${lastCopiedItem}"`);

@@ -839,6 +839,14 @@ function closeErrorModal() {
   document.getElementById('errorModal').classList.remove('show');
 }
 
+function showSuccess(message) {
+  showError(message, true);
+}
+
+function showToast(message) {
+  showError(message, true);
+}
+
 function openHelpModal() {
   document.getElementById('helpModal').classList.add('show');
   document.querySelector('#helpModal .modal-close-btn').focus();
