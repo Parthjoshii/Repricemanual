@@ -560,8 +560,136 @@ Changes in V4.6 (Bug Fix Release):
       </div>
       <div class="button-row section-grid-full">
         <button id="copySummaryButton" type="button" aria-label="Copy summary to clipboard">Copy Summary</button>
+        <button id="createTstButton" type="button" class="btn-create-tst" aria-label="Create Transactional Stored Ticket">Create TST</button>
       </div>
       <div id="summary" role="region" aria-live="polite" aria-label="Calculation summary table"></div>
+
+      <!-- TST Creator Section -->
+      <div id="tstSection" class="tst-container" style="display: none;" role="region" aria-labelledby="tstSectionTitle">
+        <div class="tst-card">
+          <div class="tst-header">
+            <div>
+              <h3 id="tstSectionTitle" class="tst-title">TST Creator <span class="tst-badge">Transactional Stored Ticket</span></h3>
+              <p class="tst-subtitle">Flight coupon details and automated fare breakdown synchronized from active calculation.</p>
+            </div>
+            <div class="tst-header-actions">
+              <button id="tstUpdateValuesBtn" type="button" class="secondary tst-btn-small" aria-label="Update TST values from calculation">🔄 Update Values</button>
+              <button id="tstToggleCollapseBtn" type="button" class="toggle-btn collapsed inline-toggle" aria-expanded="true" aria-controls="tstBodyContent">Hide</button>
+            </div>
+          </div>
+
+          <div id="tstBodyContent" class="tst-body">
+            <!-- 1. COUPON TABLE -->
+            <div class="tst-coupon-section">
+              <div class="tst-section-title-bar" style="justify-content: flex-end;">
+                <div class="tst-coupon-actions">
+                  <button id="tstAddCouponBtn" type="button" class="secondary tst-btn-small" aria-label="Add flight coupon row">+ Add Segment</button>
+                  <button id="tstCopyFareBasisBtn" type="button" class="secondary tst-btn-small" aria-label="Copy Fare Basis fields for in-house tool">📋 Copy Fare Basis</button>
+                  <button id="tstCopyCouponsBtn" type="button" class="secondary tst-btn-small" aria-label="Copy coupon segments for in-house tool">📋 Copy Coupons</button>
+                </div>
+              </div>
+              <div class="tst-table-wrapper">
+                <table class="tst-coupon-table" id="tstCouponTable" aria-label="Flight coupons segments">
+                  <thead>
+                    <tr>
+                      <th style="width: 32px;"><input type="checkbox" id="tstSelectAllCoupons" aria-label="Select all coupons" checked></th>
+                      <th style="width: 48px;">CPN</th>
+                      <th>EMD</th>
+                      <th>STOPOVER</th>
+                      <th>FLIGHT # ORG - DES</th>
+                      <th>DATE/TIME</th>
+                      <th style="width: 50px;">CLS</th>
+                      <th>TICKET STATUS</th>
+                      <th>FARE BASIS</th>
+                      <th>VALID FROM - VALID TO</th>
+                      <th>BAGGAGE</th>
+                      <th>FARE BRAND</th>
+                      <th>COUPON STATUS</th>
+                      <th style="width: 40px;"></th>
+                    </tr>
+                  </thead>
+                  <tbody id="tstCouponTableBody">
+                    <!-- Populated dynamically by script.js -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <!-- 2. FARE DETAILS SECTION -->
+            <div class="tst-fare-section">
+              <div class="tst-fare-header" id="tstFareHeader" role="button" tabindex="0" aria-expanded="true" aria-controls="tstFareCollapsible">
+                <h4 class="tst-section-title">FARE</h4>
+                <span class="tst-chevron" id="tstFareChevron">▲</span>
+              </div>
+              <div class="tst-fare-content" id="tstFareCollapsible">
+                <div class="tst-fare-grid">
+                  <div>
+                    <label for="tstBaseFare">BASE FARE <span class="required-star">*</span></label>
+                    <input id="tstBaseFare" placeholder="e.g. BHD350.00" aria-label="Base Fare amount">
+                  </div>
+                  <div>
+                    <label for="tstEquivFare">EQUIVALENT FARE <span class="required-star">*</span></label>
+                    <input id="tstEquivFare" placeholder="e.g. BHD" aria-label="Equivalent Fare amount">
+                  </div>
+                  <div>
+                    <label for="tstRoe">RATE OF EXCHANGE <span class="required-star">(REQUIRED)</span></label>
+                    <input id="tstRoe" placeholder="e.g. 1.000000" aria-label="Rate of Exchange">
+                  </div>
+                  <div>
+                    <label for="tstTotalAmount">TOTAL AMOUNT <span class="required-star">*</span></label>
+                    <input id="tstTotalAmount" placeholder="e.g. BHD350.00" aria-label="Total Amount">
+                  </div>
+                  <div>
+                    <label for="tstTourCode">TOUR CODE</label>
+                    <input id="tstTourCode" placeholder="" value="" aria-label="Tour Code">
+                  </div>
+                  <div>
+                    <label for="tstMilesPoints">MILES / POINTS</label>
+                    <input id="tstMilesPoints" placeholder="Optional" aria-label="Miles or Points">
+                  </div>
+                  <div>
+                    <label for="tstOrgDest">ORG/DEST <span class="required-star">(REQUIRED)</span></label>
+                    <input id="tstOrgDest" placeholder="e.g. BOM/DXB" aria-label="Origin and Destination">
+                  </div>
+                  <div>
+                    <label for="tstTaxes">TAXES (NEW / PAID)</label>
+                    <div style="display: flex; gap: 6px;">
+                      <input id="tstTaxes" placeholder="e.g. PD123YA PD456AE 50ZR" aria-label="TST Taxes">
+                      <button id="tstCopyTaxesBtn" type="button" class="secondary tst-btn-small" style="white-space: nowrap;" aria-label="Copy taxes to clipboard">📋 Copy Taxes</button>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="tst-text-grid">
+                  <div>
+                    <label for="tstFareCalcString">FARE CALCULATION STRING <span class="required-star">(REQUIRED)</span></label>
+                    <textarea id="tstFareCalcString" rows="3" placeholder="Enter or paste fare calculation string" aria-label="Fare Calculation String"></textarea>
+                  </div>
+                  <div>
+                    <label for="tstEndorsements">ENDORSEMENTS</label>
+                    <textarea id="tstEndorsements" rows="3" placeholder="e.g. NON-REF/NON-CHANG/RESTRICTIONS APPLY" aria-label="Endorsements"></textarea>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- 3. ACTIONS & COPY GDS TST -->
+            <div class="tst-action-row">
+              <button id="tstCopyBtn" type="button" class="btn-create-tst" aria-label="Copy TST fields for in-house tool">📋 Copy TST (For Tool)</button>
+              <button id="tstCopyTaxesBtnMain" type="button" class="secondary" aria-label="Copy taxes for TST tax column">📋 Copy Taxes</button>
+              <button id="tstGenerateBtn" type="button" class="secondary" aria-label="Generate formatted TST record">Generate GDS Text</button>
+              <button id="tstClearBtn" type="button" class="secondary" aria-label="Clear TST fields">Clear TST</button>
+            </div>
+
+            <div id="tstOutputWrapper" style="display: none; margin-top: 14px;">
+              <label for="tstOutput">FORMATTED TST RECORD (GDS)</label>
+              <div class="gds-input-wrapper">
+                <textarea id="tstOutput" readonly rows="5" aria-label="Formatted TST record output"></textarea>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 

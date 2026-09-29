@@ -175,6 +175,37 @@ const els = {
   restoreBanner: byId('restoreBanner'),
   restoreSessionButton: byId('restoreSessionButton'),
   dismissRestoreButton: byId('dismissRestoreButton'),
+  // TST Creator elements
+  createTstButton: byId('createTstButton'),
+  tstSection: byId('tstSection'),
+  tstUpdateValuesBtn: byId('tstUpdateValuesBtn'),
+  tstToggleCollapseBtn: byId('tstToggleCollapseBtn'),
+  tstBodyContent: byId('tstBodyContent'),
+  tstAddCouponBtn: byId('tstAddCouponBtn'),
+  tstSelectAllCoupons: byId('tstSelectAllCoupons'),
+  tstCouponTableBody: byId('tstCouponTableBody'),
+  tstFareHeader: byId('tstFareHeader'),
+  tstFareChevron: byId('tstFareChevron'),
+  tstFareCollapsible: byId('tstFareCollapsible'),
+  tstBaseFare: byId('tstBaseFare'),
+  tstEquivFare: byId('tstEquivFare'),
+  tstRoe: byId('tstRoe'),
+  tstTotalAmount: byId('tstTotalAmount'),
+  tstTourCode: byId('tstTourCode'),
+  tstMilesPoints: byId('tstMilesPoints'),
+  tstOrgDest: byId('tstOrgDest'),
+  tstTaxes: byId('tstTaxes'),
+  tstFareCalcString: byId('tstFareCalcString'),
+  tstEndorsements: byId('tstEndorsements'),
+  tstGenerateBtn: byId('tstGenerateBtn'),
+  tstCopyBtn: byId('tstCopyBtn'),
+  tstCopyTaxesBtn: byId('tstCopyTaxesBtn'),
+  tstCopyTaxesBtnMain: byId('tstCopyTaxesBtnMain'),
+  tstCopyCouponsBtn: byId('tstCopyCouponsBtn'),
+  tstCopyFareBasisBtn: byId('tstCopyFareBasisBtn'),
+  tstClearBtn: byId('tstClearBtn'),
+  tstOutputWrapper: byId('tstOutputWrapper'),
+  tstOutput: byId('tstOutput'),
 };
 
 // In-app replacement for window.prompt()/confirm() — some embedded browser previews (e.g.
@@ -753,6 +784,7 @@ const state = {
     this.fareCalculationCache.clear();
   },
 };
+window.state = state;
 
 function showError(message, isSuccess = false) {
   const modal = document.getElementById('errorModal');
@@ -1946,8 +1978,18 @@ function parseAmount(text) {
 function parseTaxToken(token) {
   const trimmed = token.trim();
   if (!trimmed) return null;
-  const isPaid = trimmed.toUpperCase().startsWith('PD');
-  const content = isPaid ? trimmed.slice(2).trim() : trimmed;
+  let isPaid = false;
+  let content = trimmed;
+  if (/^PD/i.test(content)) {
+    isPaid = true;
+    content = content.slice(2).trim();
+  } else if (/^[A-Z]{3}PD/i.test(content)) {
+    isPaid = true;
+    content = content.slice(0, 3) + content.slice(5);
+  } else if (/PD$/i.test(content)) {
+    isPaid = true;
+    content = content.slice(0, -2).trim();
+  }
   // Tax/fee codes are always exactly 2 characters (IATA convention, e.g. YQ, K3, 6A) — anchoring
   // the code group to {2} instead of {1,6} stops a greedy amount match from swallowing the
   // leading digit of a digit+letter code like "6A" (e.g. "10006A" is amount 1000, code 6A,
@@ -1982,22 +2024,24 @@ function formatTaxInput(text) {
 
   // Validate each entry: 3-letter currency + amount + exactly 2-character tax code (letters
   // and/or digits, e.g. YQ, K3, 6A — see parseTaxToken for why this must be exactly 2, not 1-6).
-  const pattern = /^([A-Z]{3})(\d+(?:\.\d+)?)([A-Z0-9]{2})$/i;
-  const paidPattern = /^PD(?:([A-Z]{3}))?(\d+(?:\.\d+)?)([A-Z0-9]{2})$/i;
+  const pattern = /^(?:([A-Z]{3}))?(\d+(?:\.\d+)?)([A-Z0-9]{2})$/i;
+  const paidPattern = /^(?:PD(?:([A-Z]{3}))?|([A-Z]{3})PD)(\d+(?:\.\d+)?)([A-Z0-9]{2})$/i;
 
   entries.forEach(entry => {
     const normalized = entry.trim().toUpperCase();
     const paidMatch = normalized.match(paidPattern);
     if (paidMatch) {
-      const currency = paidMatch[1] ? paidMatch[1].toUpperCase() : '';
-      const formatted = currency ? `PD${currency}${paidMatch[2]}${paidMatch[3].toUpperCase()}` : `PD${paidMatch[2]}${paidMatch[3].toUpperCase()}`;
+      const currency = (paidMatch[1] || paidMatch[2] || '').toUpperCase();
+      const amount = paidMatch[3];
+      const code = paidMatch[4].toUpperCase();
+      const formatted = currency ? `PD${currency}${amount}${code}` : `PD${amount}${code}`;
       validEntries.push(formatted);
       return;
     }
     const match = normalized.match(pattern);
     if (match) {
-      // Format as CurrencyAmountTaxCode (uppercase, no spaces)
-      const formatted = `${match[1].toUpperCase()}${match[2]}${match[3].toUpperCase()}`;
+      const currency = match[1] ? match[1].toUpperCase() : '';
+      const formatted = `${currency}${match[2]}${match[3].toUpperCase()}`;
       validEntries.push(formatted);
     } else {
       invalidEntries.push(entry);
@@ -2886,7 +2930,735 @@ function copyGdsString() {
   });
 }
 
+// ==========================================================================
+// TST Creator (Transactional Stored Ticket) Logic
+// ==========================================================================
+
+let tstCouponCount = 0;
+
+function copyTextToClipboard(text, successMessage) {
+  function fallbackCopy() {
+    const textarea = document.createElement('textarea');
+    textarea.value = text;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      if (successMessage) showError(successMessage, true);
+    } catch (err) {
+      showError('Unable to copy automatically.', false);
+    }
+    document.body.removeChild(textarea);
+  }
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(() => {
+      if (successMessage) showError(successMessage, true);
+    }).catch(() => {
+      fallbackCopy();
+    });
+  } else {
+    fallbackCopy();
+  }
+}
+
+function splitFareBasis(raw) {
+  if (!raw) return { fb1: '', fb2: '', fb3: '', tsv: '' };
+  const trimmed = raw.trim();
+
+  // Pattern: Base code (alphanumeric up to 8 chars), optional PTC suffix (CH|IN), optional /designator (alphanumeric)
+  // Scenario 1: QHAMPIE1/VFN2 -> FB1=QHAMPIE1, FB2=VFN2
+  // Scenario 2: QHAMPIE1CH/VFN2 -> FB1=QHAMPIE1, FB2=CH, FB3=VFN2
+  const m = trimmed.match(/^([A-Z0-9]{1,8}?)(CH|IN)?(?:\/([A-Z0-9]+))?$/i);
+  if (m) {
+    const base = m[1] || '';
+    const ptc = m[2] ? m[2].toUpperCase() : '';
+    const des = m[3] ? m[3].toUpperCase() : '';
+
+    if (ptc) {
+      // Scenario 2: Base in FB1, PTC in FB2, Designator in FB3
+      const parts = [base, ptc];
+      if (des) parts.push(des);
+      return { fb1: base, fb2: ptc, fb3: des, tsv: parts.join('\t') };
+    } else {
+      // Scenario 1: Base in FB1, Designator in FB2
+      const parts = [base];
+      if (des) parts.push(des);
+      return { fb1: base, fb2: des, fb3: '', tsv: parts.join('\t') };
+    }
+  }
+
+  // Fallback if slash present
+  if (trimmed.includes('/')) {
+    const [left, right] = trimmed.split('/');
+    const ptcMatch = left.match(/^(.*?)(CH|IN)$/i);
+    if (ptcMatch) {
+      return {
+        fb1: ptcMatch[1].toUpperCase(),
+        fb2: ptcMatch[2].toUpperCase(),
+        fb3: (right || '').toUpperCase(),
+        tsv: [ptcMatch[1].toUpperCase(), ptcMatch[2].toUpperCase(), (right || '').toUpperCase()].join('\t')
+      };
+    } else {
+      return {
+        fb1: left.toUpperCase(),
+        fb2: (right || '').toUpperCase(),
+        fb3: '',
+        tsv: [left.toUpperCase(), (right || '').toUpperCase()].join('\t')
+      };
+    }
+  }
+
+  // Fallback plain code with CH|IN
+  const ptcOnly = trimmed.match(/^(.*?)(CH|IN)$/i);
+  if (ptcOnly) {
+    return {
+      fb1: ptcOnly[1].toUpperCase(),
+      fb2: ptcOnly[2].toUpperCase(),
+      fb3: '',
+      tsv: [ptcOnly[1].toUpperCase(), ptcOnly[2].toUpperCase()].join('\t')
+    };
+  }
+
+  return { fb1: trimmed.toUpperCase(), fb2: '', fb3: '', tsv: trimmed.toUpperCase() };
+}
+
+function copyCouponFareBasis(row) {
+  const fbInput = row.querySelector('.tst-fare-basis');
+  const rawFb = fbInput ? fbInput.value.trim() : '';
+  if (!rawFb) {
+    showError('No Fare Basis to copy for this coupon.');
+    return;
+  }
+  const split = splitFareBasis(rawFb);
+  const cpnNum = row.querySelector('.tst-cpn-num') ? row.querySelector('.tst-cpn-num').textContent.trim() : '1';
+
+  state.lastCopiedFareBasis = split.tsv;
+  copyTextToClipboard(split.tsv, `Coupon ${cpnNum} Fare Basis copied: ${split.fb1}${split.fb2 ? ' [Tab] ' + split.fb2 : ''}${split.fb3 ? ' [Tab] ' + split.fb3 : ''}`);
+}
+
+function copyAllFareBasis() {
+  const rows = els.tstCouponTableBody.querySelectorAll('.tst-coupon-row');
+  if (rows.length === 0) {
+    showError('No flight coupons available.');
+    return;
+  }
+  const lines = [];
+  rows.forEach(row => {
+    const chk = row.querySelector('.tst-coupon-check');
+    if (!chk || chk.checked) {
+      const fbInput = row.querySelector('.tst-fare-basis');
+      const rawFb = fbInput ? fbInput.value.trim() : '';
+      if (rawFb) {
+        const split = splitFareBasis(rawFb);
+        lines.push(split.tsv);
+      }
+    }
+  });
+  if (lines.length === 0) {
+    showError('No Fare Basis to copy.');
+    return;
+  }
+  const tsvText = lines.join('\n');
+  state.lastCopiedFareBasis = tsvText;
+  copyTextToClipboard(tsvText, `Fare Basis copied for ${lines.length} coupon(s)! (Tab-separated for in-house tool)`);
+}
+
+function createCouponRowData(defaults = {}) {
+  tstCouponCount++;
+  const cpn = defaults.cpn || tstCouponCount;
+  const emd = defaults.emd || '';
+  const stopover = defaults.stopover || (cpn === 1 ? 'YES' : 'NO');
+  const flight = defaults.flight || '';
+  const datetime = defaults.datetime || '';
+  const cls = defaults.cls || '';
+  const status = defaults.status || 'OK';
+  const fareBasis = defaults.fareBasis || '';
+  const validity = defaults.validity || '';
+  const baggage = defaults.baggage || '40K';
+  const brand = defaults.brand || 'SAVER';
+  const couponStatus = defaults.couponStatus || 'OPEN';
+
+  const tr = document.createElement('tr');
+  tr.className = 'tst-coupon-row';
+  tr.innerHTML = `
+    <td><input type="checkbox" class="tst-coupon-check" checked aria-label="Select coupon ${cpn}"></td>
+    <td class="tst-cpn-num" style="font-weight: 700;">${cpn}</td>
+    <td><input type="text" class="tst-emd" value="${emd}" placeholder="EMD" aria-label="EMD for coupon ${cpn}"></td>
+    <td>
+      <select class="tst-stopover" aria-label="Stopover for coupon ${cpn}">
+        <option value="YES" ${stopover === 'YES' ? 'selected' : ''}>YES</option>
+        <option value="NO" ${stopover === 'NO' ? 'selected' : ''}>NO</option>
+      </select>
+    </td>
+    <td><input type="text" class="tst-flight" value="${flight}" placeholder="e.g. EK 0500 DXB-BOM" aria-label="Flight and route for coupon ${cpn}"></td>
+    <td><input type="text" class="tst-datetime" value="${datetime}" placeholder="e.g. 0955 01 MAR" aria-label="Date and time for coupon ${cpn}"></td>
+    <td><input type="text" class="tst-cls" value="${cls}" style="text-transform: uppercase;" maxlength="2" placeholder="Y" aria-label="Booking class for coupon ${cpn}"></td>
+    <td><input type="text" class="tst-status" value="${status}" placeholder="OK" aria-label="Ticket status for coupon ${cpn}"></td>
+    <td style="white-space: nowrap;">
+      <div style="display: flex; gap: 4px; align-items: center;">
+        <input type="text" class="tst-fare-basis" value="${fareBasis}" placeholder="Fare Basis" aria-label="Fare basis for coupon ${cpn}" style="min-width: 100px;">
+        <button type="button" class="secondary tst-btn-small tst-copy-row-fb-btn" title="Copy split Fare Basis (FB1 \t FB2 \t FB3) for in-house tool" aria-label="Copy Fare Basis for coupon ${cpn}" style="padding: 2px 6px; font-size: 11px; white-space: nowrap;">📋 FB</button>
+      </div>
+    </td>
+    <td><input type="text" class="tst-validity" value="${validity}" placeholder="DD MMM - DD MMM" aria-label="Validity dates for coupon ${cpn}"></td>
+    <td><input type="text" class="tst-baggage" value="${baggage}" placeholder="40K" aria-label="Baggage allowance for coupon ${cpn}"></td>
+    <td><input type="text" class="tst-brand" value="${brand}" placeholder="SAVER" aria-label="Fare brand for coupon ${cpn}"></td>
+    <td><input type="text" class="tst-cpn-status" value="${couponStatus}" placeholder="OPEN" aria-label="Coupon status for coupon ${cpn}"></td>
+    <td><button type="button" class="tst-remove-btn" title="Remove coupon" aria-label="Remove coupon ${cpn}">✕</button></td>
+  `;
+
+  tr.querySelector('.tst-copy-row-fb-btn').addEventListener('click', () => {
+    copyCouponFareBasis(tr);
+  });
+
+  tr.querySelector('.tst-remove-btn').addEventListener('click', () => {
+    tr.remove();
+    renumberCoupons();
+  });
+
+  return tr;
+}
+
+function renumberCoupons() {
+  const rows = els.tstCouponTableBody.querySelectorAll('.tst-coupon-row');
+  tstCouponCount = rows.length;
+  rows.forEach((row, idx) => {
+    const num = idx + 1;
+    const cpnCell = row.querySelector('.tst-cpn-num');
+    if (cpnCell) cpnCell.textContent = num;
+  });
+}
+
+function extractRoeFromFcs(fcs) {
+  if (!fcs) return null;
+  const match = fcs.match(/(?:^|\s)ROE\s*(\d+(?:\.\d+)?)/i) || fcs.match(/ROE\s*(\d+(?:\.\d+)?)/i);
+  return match ? match[1] : null;
+}
+
+function populateTstFromCalculations() {
+  if (!els.tstSection) return;
+
+  // Make TST Creator section visible
+  els.tstSection.style.display = 'block';
+
+  // 1. Currency & Base Fare
+  const cur = (els.currency && els.currency.value) ? els.currency.value : 'USD';
+  let baseVal = '';
+  const parsedNewFare = parseAmount(els.newFare ? els.newFare.value : '');
+  const parsedBaseFare = parseAmount(els.baseFare ? els.baseFare.value : '');
+  if (parsedNewFare && !isNaN(parsedNewFare.amount)) {
+    const fCur = parsedNewFare.currency || cur;
+    baseVal = `${fCur}${formatAmount(parsedNewFare.amount, fCur)}`;
+  } else if (parsedBaseFare && !isNaN(parsedBaseFare.amount)) {
+    const fCur = parsedBaseFare.currency || cur;
+    baseVal = `${fCur}${formatAmount(parsedBaseFare.amount, fCur)}`;
+  } else if (state.newFare !== null && state.newFare !== undefined && !isNaN(state.newFare)) {
+    baseVal = `${cur}${formatAmount(state.newFare, cur)}`;
+  }
+  els.tstBaseFare.value = baseVal;
+
+  // 2. Equivalent Fare (if dual currency target is selected or converted fare diff present)
+  if (els.targetCurrency && els.targetCurrency.value && els.convertedFareDiff && els.convertedFareDiff.value) {
+    els.tstEquivFare.value = els.convertedFareDiff.value;
+  } else {
+    els.tstEquivFare.value = baseVal;
+  }
+
+  // 3. Rate of Exchange (ROE) - Must match ROE in Fare Calculation String
+  let roeVal = '1.000000';
+  const fcs = (els.tstFareCalcString && els.tstFareCalcString.value.trim()) ||
+              (els.fareCalcString && els.fareCalcString.value.trim()) || '';
+  const extractedRoe = extractRoeFromFcs(fcs);
+  if (extractedRoe) {
+    roeVal = extractedRoe;
+  } else if (els.roe && els.roe.value) {
+    roeVal = els.roe.value;
+  } else if (els.exchangeRate && els.exchangeRate.value) {
+    roeVal = els.exchangeRate.value;
+  }
+  els.tstRoe.value = roeVal;
+
+  // 4. Total Amount
+  let totalVal = '';
+  const parsedSubTotal = parseAmount(els.subTotal ? els.subTotal.value : '');
+  if (parsedSubTotal && !isNaN(parsedSubTotal.amount)) {
+    const tCur = parsedSubTotal.currency || cur;
+    totalVal = `${tCur}${formatAmount(parsedSubTotal.amount, tCur)}`;
+  } else if (state.totalWithFee !== null && state.totalWithFee !== undefined && !isNaN(state.totalWithFee)) {
+    totalVal = `${cur}${formatAmount(state.totalWithFee, cur)}`;
+  } else if (state.subTotal !== null && state.subTotal !== undefined && !isNaN(state.subTotal)) {
+    totalVal = `${cur}${formatAmount(state.subTotal, cur)}`;
+  } else {
+    totalVal = baseVal;
+  }
+  els.tstTotalAmount.value = totalVal;
+
+  // 5. Tour code - Always blank as required
+  els.tstTourCode.value = '';
+
+  if (!els.tstEndorsements.value) {
+    els.tstEndorsements.value = 'NON-REF/NON-CHANG/VALID ON ISSUING CARRIER ONLY';
+  }
+
+  // 6. Fare Calculation String
+  if (fcs) {
+    els.tstFareCalcString.value = fcs;
+  }
+
+  // 7. Org / Dest extraction from FCS or defaults
+  let orgDest = '';
+  if (fcs) {
+    const nucMatch = fcs.match(/(?:^|\s)NUC\s*(\d+(?:\.\d+)?)/i);
+    const nucIdx = nucMatch ? nucMatch.index : -1;
+    const preNuc = (nucIdx !== -1 ? fcs.slice(0, nucIdx) : fcs).trim();
+    const firstAmtMatch = preNuc.match(/\d+(?:\.\d+)?/);
+    const itinPart = firstAmtMatch ? preNuc.slice(0, firstAmtMatch.index).trim() : preNuc;
+    const airportTokens = itinPart.split(/\s+/).filter(t => /^[A-Z]{3}$/.test(t) || /^[A-Z]{3}\/[A-Z]{3}$/.test(t));
+    if (airportTokens.length >= 2) {
+      orgDest = `${airportTokens[0]}/${airportTokens[airportTokens.length - 1]}`;
+    } else if (airportTokens.length === 1) {
+      orgDest = airportTokens[0];
+    }
+  }
+  if (!orgDest) {
+    orgDest = 'BOM/DXB';
+  }
+  els.tstOrgDest.value = orgDest;
+
+  // 8. Taxes preview population
+  const tstTaxesList = getTstTaxesList();
+  if (els.tstTaxes) {
+    els.tstTaxes.value = tstTaxesList.join(' ');
+  }
+
+  // 9. Booking classes & Fare Basis extraction
+  const obInput = byId('bookingClassOutbound');
+  const ibInput = byId('bookingClassInbound');
+  const outboundCls = (obInput && obInput.value) ? obInput.value.trim() : 'T';
+  const inboundCls = (ibInput && ibInput.value) ? ibInput.value.trim() : 'T';
+
+  let fb1 = 'T1EOPBH1';
+  let fb2 = 'T1EOPBH1';
+  if (fcs) {
+    const parsed = parseFareCalcStringInternal(fcs);
+    if (parsed.fareComponents && parsed.fareComponents.length > 0) {
+      fb1 = parsed.fareComponents[0].fareBasis + (parsed.fareComponents[0].suffix || '') + (parsed.fareComponents[0].designator || '');
+      if (parsed.fareComponents.length > 1) {
+        fb2 = parsed.fareComponents[1].fareBasis + (parsed.fareComponents[1].suffix || '') + (parsed.fareComponents[1].designator || '');
+      } else {
+        fb2 = fb1;
+      }
+    }
+  }
+
+  // 10. Flight Coupons population
+  const existingRows = els.tstCouponTableBody.querySelectorAll('.tst-coupon-row');
+  if (existingRows.length === 0) {
+    tstCouponCount = 0;
+    const [orig, dest] = orgDest.includes('/') ? orgDest.split('/') : ['BOM', 'DXB'];
+
+    // Segment 1 (Outbound)
+    els.tstCouponTableBody.appendChild(createCouponRowData({
+      cpn: 1,
+      stopover: 'YES',
+      flight: `EK 0500 ${orig}-${dest}`,
+      datetime: '0955 01 MAR',
+      cls: outboundCls,
+      status: 'OK',
+      fareBasis: fb1,
+      validity: '01 MAR - 01 MAR',
+      baggage: '40K',
+      brand: 'SAVER',
+      couponStatus: 'OPEN'
+    }));
+
+    // Segment 2 (Inbound)
+    els.tstCouponTableBody.appendChild(createCouponRowData({
+      cpn: 2,
+      stopover: 'NO',
+      flight: `EK 0501 ${dest}-${orig}`,
+      datetime: '1755 10 MAR',
+      cls: inboundCls,
+      status: 'OK',
+      fareBasis: fb2,
+      validity: '10 MAR - 10 MAR',
+      baggage: '40K',
+      brand: 'SAVER',
+      couponStatus: 'OPEN'
+    }));
+  } else {
+    // If table already has rows, refresh fare basis & classes with latest calculation
+    existingRows.forEach((row, i) => {
+      const fbInput = row.querySelector('.tst-fare-basis');
+      const clsInput = row.querySelector('.tst-cls');
+      if (fbInput) {
+        fbInput.value = (i === 0) ? fb1 : fb2;
+      }
+      if (clsInput && !clsInput.value) {
+        clsInput.value = (i === 0) ? outboundCls : inboundCls;
+      }
+    });
+  }
+
+  els.tstSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function getTstTaxesList() {
+  const oldText = els.oldTax ? els.oldTax.value.trim() : '';
+  const newText = els.newTax ? els.newTax.value.trim() : '';
+
+  if (!newText) {
+    return [];
+  }
+
+  // Parse old and new tax tokens
+  const oldTokens = oldText ? oldText.split(/[\s,\/\n\t]+/).map(t => parseTaxToken(t)).filter(Boolean) : [];
+  const newTokens = newText.split(/[\s,\/\n\t]+/).map(t => parseTaxToken(t)).filter(Boolean);
+
+  // Check if old taxes indicate paid taxes (PD prefix in token or 'PD' present in oldText)
+  const oldHasPd = /PD/i.test(oldText) || oldTokens.some(t => t.isPaid);
+
+  // Calculate totals per tax code in old taxes
+  const oldCodeTotals = {};
+  oldTokens.forEach(t => {
+    const code = t.code.toUpperCase();
+    oldCodeTotals[code] = (oldCodeTotals[code] || 0) + t.amount;
+  });
+
+  const tstTaxes = newTokens.map(newTok => {
+    const code = newTok.code.toUpperCase();
+    const newAmt = newTok.amount;
+    const amtStr = (newAmt % 1 === 0) ? newAmt.toFixed(0) : newAmt.toFixed(2);
+
+    // Find matching tax in old taxes
+    const matchingOld = oldTokens.find(oldTok => oldTok.code.toUpperCase() === code);
+    const hasZeroDiff = (matchingOld && Math.abs(matchingOld.amount - newAmt) < 0.0001) ||
+                        (oldCodeTotals[code] !== undefined && Math.abs(oldCodeTotals[code] - newAmt) < 0.0001);
+
+    // If old tax has Paid 'PD' tax values & in new taxes there is no difference in the values:
+    // format as 'PD123YA'
+    if (hasZeroDiff && (matchingOld?.isPaid || oldHasPd)) {
+      return `PD${amtStr}${code}`;
+    }
+
+    if (newTok.isPaid) {
+      return `PD${amtStr}${code}`;
+    }
+
+    return `${amtStr}${code}`;
+  });
+
+  return tstTaxes;
+}
+
+function copyTstTaxes() {
+  const taxesList = getTstTaxesList();
+  if (taxesList.length === 0) {
+    showError('No taxes available to copy.');
+    return;
+  }
+
+  // Newline-separated for pasting down the TST tax column
+  const textToCopy = taxesList.join('\n');
+  if (els.tstTaxes) {
+    els.tstTaxes.value = taxesList.join(' ');
+  }
+  state.lastCopiedTstTaxes = textToCopy;
+
+  function fallbackTaxesCopy() {
+    const textarea = document.createElement('textarea');
+    textarea.value = textToCopy;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      showError('Taxes copied for TST tax column!', true);
+    } catch (err) {
+      showError('Unable to copy automatically.', false);
+    }
+    document.body.removeChild(textarea);
+  }
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(textToCopy).then(() => {
+      showError('Taxes copied for TST tax column!', true);
+    }).catch(() => {
+      fallbackTaxesCopy();
+    });
+  } else {
+    fallbackTaxesCopy();
+  }
+}
+
+function copyTstRecord() {
+  const baseFare = els.tstBaseFare ? els.tstBaseFare.value.trim() : '';
+  const equivFare = els.tstEquivFare ? els.tstEquivFare.value.trim() : '';
+  const fcs = (els.tstFareCalcString && els.tstFareCalcString.value.trim()) ||
+              (els.fareCalcString && els.fareCalcString.value.trim()) || '';
+  const fcsRoe = extractRoeFromFcs(fcs);
+  const roe = fcsRoe || (els.tstRoe ? els.tstRoe.value.trim() : '');
+  if (fcsRoe && els.tstRoe) {
+    els.tstRoe.value = fcsRoe;
+  }
+  const total = els.tstTotalAmount ? els.tstTotalAmount.value.trim() : '';
+  const tourCode = ''; // tourcode is always blank
+  const milesPoints = els.tstMilesPoints ? els.tstMilesPoints.value.trim() : '';
+  const orgDest = els.tstOrgDest ? els.tstOrgDest.value.trim() : '';
+  const fe = els.tstEndorsements ? els.tstEndorsements.value.trim() : '';
+
+  // Hard copy-paste rule: Tab-delimited values in the exact sequence of the in-house tool fields:
+  // BASE FARE \t EQUIVALENT FARE \t RATE OF EXCHANGE \t TOTAL AMOUNT \t TOUR CODE \t MILES/POINTS \t ORG/DEST \t FARE CALCULATION STRING \t ENDORSEMENTS
+  const fareTsv = [baseFare, equivFare, roe, total, tourCode, milesPoints, orgDest, fcs, fe].join('\t');
+  state.lastCopiedTstRecord = fareTsv;
+
+  // Also update formatted GDS display text
+  generateTstRecord();
+
+  function fallbackRecordCopy() {
+    const textarea = document.createElement('textarea');
+    textarea.value = fareTsv;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      showError('TST Fare fields copied! (Tab-separated for in-house tool)', true);
+    } catch (err) {
+      showError('Unable to copy automatically.', false);
+    }
+    document.body.removeChild(textarea);
+  }
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(fareTsv).then(() => {
+      showError('TST Fare fields copied! (Tab-separated for in-house tool)', true);
+    }).catch(() => {
+      fallbackRecordCopy();
+    });
+  } else {
+    fallbackRecordCopy();
+  }
+}
+
+function copyTstCoupons() {
+  const rows = els.tstCouponTableBody.querySelectorAll('.tst-coupon-row');
+  if (rows.length === 0) {
+    showError('No coupons to copy.');
+    return;
+  }
+
+  const couponLines = [];
+  rows.forEach(row => {
+    const chk = row.querySelector('.tst-coupon-check');
+    if (chk && chk.checked) {
+      const cpn = row.querySelector('.tst-cpn-num') ? row.querySelector('.tst-cpn-num').textContent.trim() : '';
+      const emd = row.querySelector('.tst-emd') ? row.querySelector('.tst-emd').value.trim() : '';
+      const stopover = row.querySelector('.tst-stopover') ? row.querySelector('.tst-stopover').value : '';
+      const flight = row.querySelector('.tst-flight') ? row.querySelector('.tst-flight').value.trim() : '';
+      const datetime = row.querySelector('.tst-datetime') ? row.querySelector('.tst-datetime').value.trim() : '';
+      const cls = row.querySelector('.tst-cls') ? row.querySelector('.tst-cls').value.trim() : '';
+      const status = row.querySelector('.tst-status') ? row.querySelector('.tst-status').value.trim() : 'OK';
+      const fareBasis = row.querySelector('.tst-fare-basis') ? row.querySelector('.tst-fare-basis').value.trim() : '';
+      const validity = row.querySelector('.tst-validity') ? row.querySelector('.tst-validity').value.trim() : '';
+      const baggage = row.querySelector('.tst-baggage') ? row.querySelector('.tst-baggage').value.trim() : '';
+      const brand = row.querySelector('.tst-brand') ? row.querySelector('.tst-brand').value.trim() : '';
+      const couponStatus = row.querySelector('.tst-cpn-status') ? row.querySelector('.tst-cpn-status').value.trim() : '';
+
+      couponLines.push([cpn, emd, stopover, flight, datetime, cls, status, fareBasis, validity, baggage, brand, couponStatus].join('\t'));
+    }
+  });
+
+  const couponTsv = couponLines.join('\n');
+  state.lastCopiedTstCoupons = couponTsv;
+
+  function fallbackCouponsCopy() {
+    const textarea = document.createElement('textarea');
+    textarea.value = couponTsv;
+    textarea.style.position = 'fixed';
+    textarea.style.left = '-9999px';
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand('copy');
+      showError('Coupons copied! (Tab-separated for in-house tool)', true);
+    } catch (err) {
+      showError('Unable to copy coupons automatically.', false);
+    }
+    document.body.removeChild(textarea);
+  }
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(couponTsv).then(() => {
+      showError('Coupons copied! (Tab-separated for in-house tool)', true);
+    }).catch(() => {
+      fallbackCouponsCopy();
+    });
+  } else {
+    fallbackCouponsCopy();
+  }
+}
+
+function generateTstRecord() {
+  const rows = els.tstCouponTableBody.querySelectorAll('.tst-coupon-row');
+  const selectedCoupons = [];
+  rows.forEach(row => {
+    const chk = row.querySelector('.tst-coupon-check');
+    if (chk && chk.checked) {
+      const cpn = row.querySelector('.tst-cpn-num') ? row.querySelector('.tst-cpn-num').textContent.trim() : '';
+      const stopover = row.querySelector('.tst-stopover') ? row.querySelector('.tst-stopover').value : '';
+      const flight = row.querySelector('.tst-flight') ? row.querySelector('.tst-flight').value.trim() : '';
+      const datetime = row.querySelector('.tst-datetime') ? row.querySelector('.tst-datetime').value.trim() : '';
+      const cls = row.querySelector('.tst-cls') ? row.querySelector('.tst-cls').value.trim() : '';
+      const status = row.querySelector('.tst-status') ? row.querySelector('.tst-status').value.trim() : 'OK';
+      const fareBasis = row.querySelector('.tst-fare-basis') ? row.querySelector('.tst-fare-basis').value.trim() : '';
+      const baggage = row.querySelector('.tst-baggage') ? row.querySelector('.tst-baggage').value.trim() : '';
+      selectedCoupons.push({ cpn, stopover, flight, datetime, cls, status, fareBasis, baggage });
+    }
+  });
+
+  const baseFare = els.tstBaseFare.value.trim();
+  const equivFare = els.tstEquivFare.value.trim();
+  const roe = els.tstRoe.value.trim();
+  const total = els.tstTotalAmount.value.trim();
+  const tourCode = els.tstTourCode.value.trim();
+  const orgDest = els.tstOrgDest.value.trim();
+  const fcs = els.tstFareCalcString.value.trim();
+  const fe = els.tstEndorsements.value.trim();
+  const tstTaxesList = getTstTaxesList();
+
+  const lines = [];
+  lines.push('--- TRANSACTIONAL STORED TICKET (TST) ---');
+  if (orgDest) lines.push(`OD  : ${orgDest}`);
+  selectedCoupons.forEach(c => {
+    lines.push(`CPN ${c.cpn}: ${c.flight || 'FLIGHT'} | CLS: ${c.cls} | DATE: ${c.datetime} | ST: ${c.status} | FB: ${c.fareBasis} | BG: ${c.baggage}`);
+  });
+  if (baseFare) lines.push(`FARE : ${baseFare}`);
+  if (equivFare && equivFare !== baseFare) lines.push(`EQUIV: ${equivFare}`);
+  if (roe) lines.push(`ROE  : ${roe}`);
+  if (tstTaxesList.length > 0) lines.push(`TAX  : ${tstTaxesList.join(' ')}`);
+  if (total) lines.push(`TOTAL: ${total}`);
+  if (tourCode) lines.push(`TC   : ${tourCode}`);
+  if (fcs) lines.push(`FC   : ${fcs}`);
+  if (fe) lines.push(`FE   : ${fe}`);
+
+  const formattedText = lines.join('\n');
+  els.tstOutput.value = formattedText;
+  els.tstOutputWrapper.style.display = 'block';
+}
+
+function clearTst() {
+  els.tstCouponTableBody.innerHTML = '';
+  tstCouponCount = 0;
+  els.tstBaseFare.value = '';
+  els.tstEquivFare.value = '';
+  els.tstRoe.value = '';
+  els.tstTotalAmount.value = '';
+  els.tstTourCode.value = '';
+  els.tstMilesPoints.value = '';
+  els.tstOrgDest.value = '';
+  els.tstTaxes.value = '';
+  els.tstFareCalcString.value = '';
+  els.tstEndorsements.value = '';
+  els.tstOutput.value = '';
+  els.tstOutputWrapper.style.display = 'none';
+}
+
+function toggleTstCollapse() {
+  const isHidden = els.tstBodyContent.style.display === 'none';
+  els.tstBodyContent.style.display = isHidden ? 'block' : 'none';
+  els.tstToggleCollapseBtn.textContent = isHidden ? 'Hide' : 'Show';
+  els.tstToggleCollapseBtn.setAttribute('aria-expanded', isHidden ? 'true' : 'false');
+}
+
+function toggleTstFareAccordion() {
+  const isCollapsed = els.tstFareCollapsible.style.display === 'none';
+  els.tstFareCollapsible.style.display = isCollapsed ? 'flex' : 'none';
+  els.tstFareChevron.classList.toggle('collapsed', !isCollapsed);
+  els.tstFareHeader.setAttribute('aria-expanded', isCollapsed ? 'true' : 'false');
+}
+
+// Wire up TST Creator event listeners
+if (els.createTstButton) {
+  els.createTstButton.addEventListener('click', populateTstFromCalculations);
+}
+if (els.tstUpdateValuesBtn) {
+  els.tstUpdateValuesBtn.addEventListener('click', populateTstFromCalculations);
+}
+if (els.tstAddCouponBtn) {
+  els.tstAddCouponBtn.addEventListener('click', () => {
+    els.tstCouponTableBody.appendChild(createCouponRowData());
+  });
+}
+if (els.tstCopyCouponsBtn) {
+  els.tstCopyCouponsBtn.addEventListener('click', copyTstCoupons);
+}
+if (els.tstCopyFareBasisBtn) {
+  els.tstCopyFareBasisBtn.addEventListener('click', copyAllFareBasis);
+}
+if (els.tstSelectAllCoupons) {
+  els.tstSelectAllCoupons.addEventListener('change', (e) => {
+    els.tstCouponTableBody.querySelectorAll('.tst-coupon-check').forEach(chk => {
+      chk.checked = e.target.checked;
+    });
+  });
+}
+if (els.tstToggleCollapseBtn) {
+  els.tstToggleCollapseBtn.addEventListener('click', toggleTstCollapse);
+}
+if (els.tstFareHeader) {
+  els.tstFareHeader.addEventListener('click', toggleTstFareAccordion);
+  els.tstFareHeader.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggleTstFareAccordion();
+    }
+  });
+}
+if (els.tstGenerateBtn) {
+  els.tstGenerateBtn.addEventListener('click', generateTstRecord);
+}
+if (els.tstCopyBtn) {
+  els.tstCopyBtn.addEventListener('click', copyTstRecord);
+}
+if (els.tstCopyTaxesBtn) {
+  els.tstCopyTaxesBtn.addEventListener('click', copyTstTaxes);
+}
+if (els.tstCopyTaxesBtnMain) {
+  els.tstCopyTaxesBtnMain.addEventListener('click', copyTstTaxes);
+}
+if (els.tstClearBtn) {
+  els.tstClearBtn.addEventListener('click', clearTst);
+}
+if (els.tstFareCalcString) {
+  els.tstFareCalcString.addEventListener('input', () => {
+    const roe = extractRoeFromFcs(els.tstFareCalcString.value);
+    if (roe) {
+      els.tstRoe.value = roe;
+    }
+  });
+}
+if (els.fareCalcString) {
+  els.fareCalcString.addEventListener('input', () => {
+    const roe = extractRoeFromFcs(els.fareCalcString.value);
+    if (roe && els.tstRoe) {
+      els.tstRoe.value = roe;
+    }
+  });
+}
+if (els.tstTourCode) {
+  els.tstTourCode.addEventListener('input', () => {
+    els.tstTourCode.value = '';
+  });
+}
+
 // Initialize theme, restore any existing session, and sync UI
 loadTheme();
 initSessionRestore();
 updatePtcTabUI();
+
