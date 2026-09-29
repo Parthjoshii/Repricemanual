@@ -186,7 +186,9 @@ let browser;
   console.log('✓ Scenario 2 (QHAMPIE1CH/VFN2) verified');
 
   // Test Row 1 button click
-  await page.fill('.tst-coupon-row:nth-child(1) .tst-fare-basis', 'QHAMPIE1CH/VFN2');
+  await page.fill('.tst-coupon-row:nth-child(1) .tst-fb1', 'QHAMPIE1');
+  await page.fill('.tst-coupon-row:nth-child(1) .tst-fb2', 'CH');
+  await page.fill('.tst-coupon-row:nth-child(1) .tst-fb3', 'VFN2');
   await page.click('.tst-coupon-row:nth-child(1) .tst-copy-row-fb-btn');
   await page.waitForTimeout(100);
   if (await page.isVisible('#errorModal.show')) {
@@ -201,7 +203,8 @@ let browser;
     await page.click('#tstAddCouponBtn');
     await page.waitForTimeout(50);
   }
-  await page.fill('.tst-coupon-row:nth-child(2) .tst-fare-basis', 'QHAMPIE1/VFN2');
+  await page.fill('.tst-coupon-row:nth-child(2) .tst-fb1', 'QHAMPIE1');
+  await page.fill('.tst-coupon-row:nth-child(2) .tst-fb2', 'VFN2');
   await page.click('#tstCopyFareBasisBtn');
   await page.waitForTimeout(100);
   if (await page.isVisible('#errorModal.show')) {

@@ -205,7 +205,30 @@ const els = {
   tstCopyFareBasisBtn: byId('tstCopyFareBasisBtn'),
   tstCopyFb1Btn: byId('tstCopyFb1Btn'),
   tstCopyFb2Btn: byId('tstCopyFb2Btn'),
+  tstCopyFb3Btn: byId('tstCopyFb3Btn'),
   tstCopyFareFieldsBtn: byId('tstCopyFareFieldsBtn'),
+  w1CopyFb1Btn: byId('w1CopyFb1Btn'),
+  w1CopyFb2Btn: byId('w1CopyFb2Btn'),
+  w1CopyFb3Btn: byId('w1CopyFb3Btn'),
+  w1CopyFbTabLineBtn: byId('w1CopyFbTabLineBtn'),
+  w1CopyFareFieldsBtn: byId('w1CopyFareFieldsBtn'),
+  w1CopyTaxesBtn: byId('w1CopyTaxesBtn'),
+  w1CopyCouponsBtn: byId('w1CopyCouponsBtn'),
+  tstPrepWinVBtn: byId('tstPrepWinVBtn'),
+  tstActionPrepWinVBtn: byId('tstActionPrepWinVBtn'),
+  tstWinVHelpBtn: byId('tstWinVHelpBtn'),
+  tstWinVHelp: byId('tstWinVHelp'),
+  tstWinVProgressWrapper: byId('tstWinVProgressWrapper'),
+  tstWinVProgressBar: byId('tstWinVProgressBar'),
+  tstWinVProgressText: byId('tstWinVProgressText'),
+  tstWinVProgressCount: byId('tstWinVProgressCount'),
+  tstWinVPreviewList: byId('tstWinVPreviewList'),
+  w2OrderReverse: byId('w2OrderReverse'),
+  w2IncludeSegments: byId('w2IncludeSegments'),
+  tstResetRapidChipsBtn: byId('tstResetRapidChipsBtn'),
+  tstCopyNextRapidChipBtn: byId('tstCopyNextRapidChipBtn'),
+  tstRapidCouponChips: byId('tstRapidCouponChips'),
+  tstRapidFareChips: byId('tstRapidFareChips'),
   tstBookmarkletLink: byId('tstBookmarkletLink'),
   tstCopyBookmarkletBtn: byId('tstCopyBookmarkletBtn'),
   tstBookmarkletHelpBtn: byId('tstBookmarkletHelpBtn'),
@@ -3033,17 +3056,24 @@ function splitFareBasis(raw) {
 }
 
 function copyCouponFareBasis(row) {
-  const fbInput = row.querySelector('.tst-fare-basis');
-  const rawFb = fbInput ? fbInput.value.trim() : '';
-  if (!rawFb) {
+  const fb1 = row.querySelector('.tst-fb1')?.value.trim() || '';
+  const fb2 = row.querySelector('.tst-fb2')?.value.trim() || '';
+  const fb3 = row.querySelector('.tst-fb3')?.value.trim() || '';
+  let tsv = [fb1, fb2, fb3].filter(Boolean).join('\t');
+  if (!tsv) {
+    const rawFb = row.querySelector('.tst-fare-basis')?.value.trim() || '';
+    if (rawFb) {
+      const split = splitFareBasis(rawFb);
+      tsv = split.tsv;
+    }
+  }
+  if (!tsv) {
     showError('No Fare Basis to copy for this coupon.');
     return;
   }
-  const split = splitFareBasis(rawFb);
   const cpnNum = row.querySelector('.tst-cpn-num') ? row.querySelector('.tst-cpn-num').textContent.trim() : '1';
-
-  state.lastCopiedFareBasis = split.tsv;
-  copyTextToClipboard(split.tsv, `Coupon ${cpnNum} Fare Basis copied: ${split.fb1}${split.fb2 ? ' [Tab] ' + split.fb2 : ''}${split.fb3 ? ' [Tab] ' + split.fb3 : ''}`);
+  state.lastCopiedFareBasis = tsv;
+  copyTextToClipboard(tsv, `Coupon ${cpnNum} Fare Basis copied: ${tsv.replace(/\t/g, ' [Tab] ')}`);
 }
 
 function copyAllFareBasis() {
@@ -3056,11 +3086,17 @@ function copyAllFareBasis() {
   rows.forEach(row => {
     const chk = row.querySelector('.tst-coupon-check');
     if (!chk || chk.checked) {
-      const fbInput = row.querySelector('.tst-fare-basis');
-      const rawFb = fbInput ? fbInput.value.trim() : '';
-      if (rawFb) {
-        const split = splitFareBasis(rawFb);
-        lines.push(split.tsv);
+      const fb1 = row.querySelector('.tst-fb1')?.value.trim() || '';
+      const fb2 = row.querySelector('.tst-fb2')?.value.trim() || '';
+      const fb3 = row.querySelector('.tst-fb3')?.value.trim() || '';
+      if (fb1 || fb2 || fb3) {
+        lines.push([fb1, fb2, fb3].filter(Boolean).join('\t'));
+      } else {
+        const rawFb = row.querySelector('.tst-fare-basis')?.value.trim() || '';
+        if (rawFb) {
+          const split = splitFareBasis(rawFb);
+          lines.push(split.tsv);
+        }
       }
     }
   });
@@ -3083,9 +3119,11 @@ function copyFb1Column() {
   rows.forEach(row => {
     const chk = row.querySelector('.tst-coupon-check');
     if (!chk || chk.checked) {
-      const fbInput = row.querySelector('.tst-fare-basis');
-      const rawFb = fbInput ? fbInput.value.trim() : '';
-      if (rawFb) {
+      const fb1Input = row.querySelector('.tst-fb1');
+      if (fb1Input && fb1Input.value.trim()) {
+        lines.push(fb1Input.value.trim());
+      } else {
+        const rawFb = row.querySelector('.tst-fare-basis')?.value.trim() || '';
         const split = splitFareBasis(rawFb);
         lines.push(split.fb1 || '');
       }
@@ -3109,9 +3147,11 @@ function copyFb2Column() {
   rows.forEach(row => {
     const chk = row.querySelector('.tst-coupon-check');
     if (!chk || chk.checked) {
-      const fbInput = row.querySelector('.tst-fare-basis');
-      const rawFb = fbInput ? fbInput.value.trim() : '';
-      if (rawFb) {
+      const fb2Input = row.querySelector('.tst-fb2');
+      if (fb2Input && fb2Input.value.trim()) {
+        lines.push(fb2Input.value.trim());
+      } else {
+        const rawFb = row.querySelector('.tst-fare-basis')?.value.trim() || '';
         const split = splitFareBasis(rawFb);
         lines.push(split.fb2 || '');
       }
@@ -3123,6 +3163,34 @@ function copyFb2Column() {
   }
   const text = lines.join('\n');
   copyTextToClipboard(text, `Fare Basis 2 Column copied (${lines.length} rows)!`);
+}
+
+function copyFb3Column() {
+  const rows = els.tstCouponTableBody.querySelectorAll('.tst-coupon-row');
+  if (rows.length === 0) {
+    showError('No flight coupons available.');
+    return;
+  }
+  const lines = [];
+  rows.forEach(row => {
+    const chk = row.querySelector('.tst-coupon-check');
+    if (!chk || chk.checked) {
+      const fb3Input = row.querySelector('.tst-fb3');
+      if (fb3Input && fb3Input.value.trim()) {
+        lines.push(fb3Input.value.trim());
+      } else {
+        const rawFb = row.querySelector('.tst-fare-basis')?.value.trim() || '';
+        const split = splitFareBasis(rawFb);
+        lines.push(split.fb3 || '');
+      }
+    }
+  });
+  if (lines.length === 0) {
+    showError('No Fare Basis 3 values to copy.');
+    return;
+  }
+  const text = lines.join('\n');
+  copyTextToClipboard(text, `Fare Basis 3 Column copied (${lines.length} rows)!`);
 }
 
 function copyTstFareFields() {
@@ -3145,46 +3213,84 @@ function copyTstFareFields() {
 function createCouponRowData(defaults = {}) {
   tstCouponCount++;
   const cpn = defaults.cpn || tstCouponCount;
-  const emd = defaults.emd || '';
+  const flight = defaults.flight || (defaults.routeLabel || `FLIGHT ${cpn}`);
+  const routeLabel = defaults.routeLabel || flight || `Segment ${cpn}`;
   const stopover = defaults.stopover || (cpn === 1 ? 'YES' : 'NO');
-  const flight = defaults.flight || '';
-  const datetime = defaults.datetime || '';
-  const cls = defaults.cls || '';
+  const cls = defaults.cls || 'T';
   const status = defaults.status || 'OK';
-  const fareBasis = defaults.fareBasis || '';
-  const validity = defaults.validity || '';
-  const baggage = defaults.baggage || '40K';
-  const brand = defaults.brand || 'SAVER';
-  const couponStatus = defaults.couponStatus || 'OPEN';
+  const rawFareBasis = defaults.fareBasis || '';
+
+  const split = splitFareBasis(rawFareBasis);
+  const fb1 = defaults.fb1 !== undefined ? defaults.fb1 : (split.fb1 || '');
+  const fb2 = defaults.fb2 !== undefined ? defaults.fb2 : (split.fb2 || '');
+  const fb3 = defaults.fb3 !== undefined ? defaults.fb3 : (split.fb3 || '');
 
   const tr = document.createElement('tr');
   tr.className = 'tst-coupon-row';
   tr.innerHTML = `
     <td><input type="checkbox" class="tst-coupon-check" checked aria-label="Select coupon ${cpn}"></td>
     <td class="tst-cpn-num" style="font-weight: 700;">${cpn}</td>
-    <td><input type="text" class="tst-emd" value="${emd}" placeholder="EMD" aria-label="EMD for coupon ${cpn}"></td>
+    <td class="tst-cpn-route" style="font-weight: 600; font-size: 0.85rem; color: var(--accent-color, #3F51B5); white-space: nowrap;">
+      ${routeLabel}
+      <!-- Hidden inputs for backward compatibility with tests & GDS generator -->
+      <input type="hidden" class="tst-flight" value="${flight}">
+      <input type="hidden" class="tst-stopover" value="${stopover}">
+      <input type="hidden" class="tst-cls" value="${cls}">
+      <input type="hidden" class="tst-status" value="${status}">
+      <input type="hidden" class="tst-fare-basis" value="${rawFareBasis || [fb1, fb2, fb3].filter(Boolean).join('/')}">
+    </td>
     <td>
-      <select class="tst-stopover" aria-label="Stopover for coupon ${cpn}">
-        <option value="YES" ${stopover === 'YES' ? 'selected' : ''}>YES</option>
-        <option value="NO" ${stopover === 'NO' ? 'selected' : ''}>NO</option>
-      </select>
+      <input type="text" class="tst-fb1" value="${fb1}" placeholder="e.g. QHAMPIE1" aria-label="Fare Basis 1 for coupon ${cpn}" style="font-weight: 700;">
     </td>
-    <td><input type="text" class="tst-flight" value="${flight}" placeholder="e.g. EK 0500 DXB-BOM" aria-label="Flight and route for coupon ${cpn}"></td>
-    <td><input type="text" class="tst-datetime" value="${datetime}" placeholder="e.g. 0955 01 MAR" aria-label="Date and time for coupon ${cpn}"></td>
-    <td><input type="text" class="tst-cls" value="${cls}" style="text-transform: uppercase;" maxlength="2" placeholder="Y" aria-label="Booking class for coupon ${cpn}"></td>
-    <td><input type="text" class="tst-status" value="${status}" placeholder="OK" aria-label="Ticket status for coupon ${cpn}"></td>
+    <td>
+      <input type="text" class="tst-fb2" value="${fb2}" placeholder="e.g. VFN2 or CH" aria-label="Fare Basis 2 for coupon ${cpn}">
+    </td>
+    <td>
+      <input type="text" class="tst-fb3" value="${fb3}" placeholder="Optional" aria-label="Fare Basis 3 for coupon ${cpn}">
+    </td>
     <td style="white-space: nowrap;">
-      <div style="display: flex; gap: 4px; align-items: center;">
-        <input type="text" class="tst-fare-basis" value="${fareBasis}" placeholder="Fare Basis" aria-label="Fare basis for coupon ${cpn}" style="min-width: 100px;">
-        <button type="button" class="secondary tst-btn-small tst-copy-row-fb-btn" title="Copy split Fare Basis (FB1 \t FB2 \t FB3) for in-house tool" aria-label="Copy Fare Basis for coupon ${cpn}" style="padding: 2px 6px; font-size: 11px; white-space: nowrap;">📋 FB</button>
-      </div>
+      <button type="button" class="secondary tst-btn-small tst-copy-row-fb-btn" title="Copy split Fare Basis (FB1 [Tab] FB2 [Tab] FB3) for in-house tool" aria-label="Copy Fare Basis for coupon ${cpn}" style="padding: 4px 8px; font-size: 11px; white-space: nowrap;">📋 FB</button>
     </td>
-    <td><input type="text" class="tst-validity" value="${validity}" placeholder="DD MMM - DD MMM" aria-label="Validity dates for coupon ${cpn}"></td>
-    <td><input type="text" class="tst-baggage" value="${baggage}" placeholder="40K" aria-label="Baggage allowance for coupon ${cpn}"></td>
-    <td><input type="text" class="tst-brand" value="${brand}" placeholder="SAVER" aria-label="Fare brand for coupon ${cpn}"></td>
-    <td><input type="text" class="tst-cpn-status" value="${couponStatus}" placeholder="OPEN" aria-label="Coupon status for coupon ${cpn}"></td>
     <td><button type="button" class="tst-remove-btn" title="Remove coupon" aria-label="Remove coupon ${cpn}">✕</button></td>
   `;
+
+  const fb1Input = tr.querySelector('.tst-fb1');
+  const fb2Input = tr.querySelector('.tst-fb2');
+  const fb3Input = tr.querySelector('.tst-fb3');
+  const hiddenFb = tr.querySelector('.tst-fare-basis');
+
+  function syncFromParts() {
+    const v1 = fb1Input.value.trim().toUpperCase();
+    const v2 = fb2Input.value.trim().toUpperCase();
+    const v3 = fb3Input.value.trim().toUpperCase();
+    fb1Input.value = v1;
+    fb2Input.value = v2;
+    fb3Input.value = v3;
+
+    let combined = v1;
+    if (v2 === 'CH' || v2 === 'IN') {
+      combined = `${v1}${v2}${v3 ? '/' + v3 : ''}`;
+    } else if (v2) {
+      combined = `${v1}/${v2}${v3 ? '/' + v3 : ''}`;
+    }
+    hiddenFb.value = combined;
+
+    renderWinVPreview();
+    renderRapidCopyAssistant();
+  }
+
+  fb1Input.addEventListener('input', syncFromParts);
+  fb2Input.addEventListener('input', syncFromParts);
+  fb3Input.addEventListener('input', syncFromParts);
+
+  hiddenFb.addEventListener('input', () => {
+    const s = splitFareBasis(hiddenFb.value);
+    fb1Input.value = s.fb1;
+    fb2Input.value = s.fb2;
+    fb3Input.value = s.fb3;
+    renderWinVPreview();
+    renderRapidCopyAssistant();
+  });
 
   tr.querySelector('.tst-copy-row-fb-btn').addEventListener('click', () => {
     copyCouponFareBasis(tr);
@@ -3193,6 +3299,8 @@ function createCouponRowData(defaults = {}) {
   tr.querySelector('.tst-remove-btn').addEventListener('click', () => {
     tr.remove();
     renumberCoupons();
+    renderWinVPreview();
+    renderRapidCopyAssistant();
   });
 
   return tr;
@@ -3429,18 +3537,18 @@ function populateTstFromCalculations() {
     parsedSegments.forEach((seg, idx) => {
       const isOutbound = seg.componentIndex === 1;
       const cls = isOutbound ? outboundCls : inboundCls;
+      const split = splitFareBasis(seg.fareBasis);
       els.tstCouponTableBody.appendChild(createCouponRowData({
         cpn: idx + 1,
         stopover: seg.stopover,
         flight: `${seg.carrier} ${seg.origin}-${seg.destination}`,
-        datetime: isOutbound ? '0955 01 MAR' : '1755 10 MAR',
+        routeLabel: `${seg.carrier} ${seg.origin}-${seg.destination}`,
         cls: cls,
         status: 'OK',
         fareBasis: seg.fareBasis,
-        validity: isOutbound ? '01 MAR - 01 MAR' : '10 MAR - 10 MAR',
-        baggage: '40K',
-        brand: 'SAVER',
-        couponStatus: 'OPEN'
+        fb1: split.fb1,
+        fb2: split.fb2,
+        fb3: split.fb3
       }));
     });
   } else {
@@ -3462,20 +3570,21 @@ function populateTstFromCalculations() {
     if (existingRows.length === 0) {
       tstCouponCount = 0;
       const [orig, dest] = orgDest.includes('/') ? orgDest.split('/') : ['BOM', 'DXB'];
+      const split1 = splitFareBasis(fb1);
+      const split2 = splitFareBasis(fb2);
 
       // Segment 1 (Outbound)
       els.tstCouponTableBody.appendChild(createCouponRowData({
         cpn: 1,
         stopover: 'YES',
         flight: `EK 0500 ${orig}-${dest}`,
-        datetime: '0955 01 MAR',
+        routeLabel: `EK ${orig}-${dest}`,
         cls: outboundCls,
         status: 'OK',
         fareBasis: fb1,
-        validity: '01 MAR - 01 MAR',
-        baggage: '40K',
-        brand: 'SAVER',
-        couponStatus: 'OPEN'
+        fb1: split1.fb1,
+        fb2: split1.fb2,
+        fb3: split1.fb3
       }));
 
       // Segment 2 (Inbound)
@@ -3483,28 +3592,32 @@ function populateTstFromCalculations() {
         cpn: 2,
         stopover: 'NO',
         flight: `EK 0501 ${dest}-${orig}`,
-        datetime: '1755 10 MAR',
+        routeLabel: `EK ${dest}-${orig}`,
         cls: inboundCls,
         status: 'OK',
         fareBasis: fb2,
-        validity: '10 MAR - 10 MAR',
-        baggage: '40K',
-        brand: 'SAVER',
-        couponStatus: 'OPEN'
+        fb1: split2.fb1,
+        fb2: split2.fb2,
+        fb3: split2.fb3
       }));
     } else {
       existingRows.forEach((row, i) => {
+        const fullFb = (i === 0) ? fb1 : fb2;
+        const split = splitFareBasis(fullFb);
+        const fb1Input = row.querySelector('.tst-fb1');
+        const fb2Input = row.querySelector('.tst-fb2');
+        const fb3Input = row.querySelector('.tst-fb3');
         const fbInput = row.querySelector('.tst-fare-basis');
-        const clsInput = row.querySelector('.tst-cls');
-        if (fbInput) {
-          fbInput.value = (i === 0) ? fb1 : fb2;
-        }
-        if (clsInput && !clsInput.value) {
-          clsInput.value = (i === 0) ? outboundCls : inboundCls;
-        }
+        if (fb1Input) fb1Input.value = split.fb1;
+        if (fb2Input) fb2Input.value = split.fb2;
+        if (fb3Input) fb3Input.value = split.fb3;
+        if (fbInput) fbInput.value = fullFb;
       });
     }
   }
+
+  renderWinVPreview();
+  renderRapidCopyAssistant();
 
   els.tstSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -3594,11 +3707,15 @@ function copyTstRecord() {
   const coupons = [];
   const fb1List = [];
   const fb2List = [];
+  const fb3List = [];
   rows.forEach((row, i) => {
     const chk = row.querySelector('.tst-coupon-check');
     if (!chk || chk.checked) {
+      const fb1Input = row.querySelector('.tst-fb1');
+      const fb2Input = row.querySelector('.tst-fb2');
+      const fb3Input = row.querySelector('.tst-fb3');
       const fbInput = row.querySelector('.tst-fare-basis');
-      const rawFb = fbInput ? fbInput.value.trim() : '';
+      const rawFb = (fbInput ? fbInput.value.trim() : '') || (fb1Input ? [fb1Input.value, fb2Input?.value, fb3Input?.value].filter(Boolean).join('/') : '');
       const split = splitFareBasis(rawFb);
       const cpn = row.querySelector('.tst-cpn-num') ? row.querySelector('.tst-cpn-num').textContent.trim() : (i + 1);
       const flight = row.querySelector('.tst-flight') ? row.querySelector('.tst-flight').value.trim() : '';
@@ -3606,19 +3723,24 @@ function copyTstRecord() {
       const stopover = row.querySelector('.tst-stopover') ? row.querySelector('.tst-stopover').value : '';
       const status = row.querySelector('.tst-status') ? row.querySelector('.tst-status').value.trim() : 'OK';
 
+      const fb1 = (fb1Input && fb1Input.value.trim()) || split.fb1 || '';
+      const fb2 = (fb2Input && fb2Input.value.trim()) || split.fb2 || '';
+      const fb3 = (fb3Input && fb3Input.value.trim()) || split.fb3 || '';
+
       coupons.push({
         cpn,
         flight,
         cls,
         stopover,
         status,
-        fb1: split.fb1 || '',
-        fb2: split.fb2 || '',
-        fb3: split.fb3 || '',
+        fb1,
+        fb2,
+        fb3,
         fullFb: rawFb
       });
-      fb1List.push(split.fb1 || '');
-      fb2List.push(split.fb2 || '');
+      fb1List.push(fb1);
+      fb2List.push(fb2);
+      if (fb3) fb3List.push(fb3);
     }
   });
 
@@ -3642,7 +3764,8 @@ function copyTstRecord() {
     coupons,
     tsvFare: fareTsv,
     fb1Column: fb1List.join('\n'),
-    fb2Column: fb2List.join('\n')
+    fb2Column: fb2List.join('\n'),
+    fb3Column: fb3List.join('\n')
   };
 
   const payloadStr = JSON.stringify(payload, null, 2);
@@ -3885,6 +4008,310 @@ function initTstBookmarklet() {
   }
 }
 
+// --- WORKAROUND 2: WINDOWS CLIPBOARD HISTORY (WIN + V) AUTO-PREP ---
+function getWinVItemsList() {
+  const items = [];
+  const rows = els.tstCouponTableBody ? els.tstCouponTableBody.querySelectorAll('.tst-coupon-row') : [];
+  const includeSegments = els.w2IncludeSegments ? els.w2IncludeSegments.checked : true;
+
+  const fb1List = [];
+  const fb2List = [];
+  const fb3List = [];
+
+  rows.forEach((row, i) => {
+    const chk = row.querySelector('.tst-coupon-check');
+    if (!chk || chk.checked) {
+      const cpnNum = row.querySelector('.tst-cpn-num') ? row.querySelector('.tst-cpn-num').textContent.trim() : (i + 1);
+      const fb1 = row.querySelector('.tst-fb1')?.value.trim() || '';
+      const fb2 = row.querySelector('.tst-fb2')?.value.trim() || '';
+      const fb3 = row.querySelector('.tst-fb3')?.value.trim() || '';
+
+      if (fb1) fb1List.push(fb1);
+      if (fb2) fb2List.push(fb2);
+      if (fb3) fb3List.push(fb3);
+
+      if (includeSegments) {
+        if (fb1) {
+          items.push({ id: `cpn-${cpnNum}-fb1`, label: `Cpn ${cpnNum} FB1`, value: fb1, preview: fb1 });
+        }
+        if (fb2) {
+          items.push({ id: `cpn-${cpnNum}-fb2`, label: `Cpn ${cpnNum} FB2`, value: fb2, preview: fb2 });
+        }
+        if (fb3) {
+          items.push({ id: `cpn-${cpnNum}-fb3`, label: `Cpn ${cpnNum} FB3`, value: fb3, preview: fb3 });
+        }
+      }
+    }
+  });
+
+  // Column summaries
+  if (fb1List.length > 0) {
+    items.push({ id: 'fb1-col', label: 'FB1 Column', value: fb1List.join('\n'), preview: fb1List.join(', ') });
+  }
+  if (fb2List.length > 0) {
+    items.push({ id: 'fb2-col', label: 'FB2 Column', value: fb2List.join('\n'), preview: fb2List.join(', ') });
+  }
+  if (fb3List.length > 0) {
+    items.push({ id: 'fb3-col', label: 'FB3 Column', value: fb3List.join('\n'), preview: fb3List.join(', ') });
+  }
+
+  // FARE Fields
+  const baseFare = els.tstBaseFare ? els.tstBaseFare.value.trim() : '';
+  const equivFare = els.tstEquivFare ? els.tstEquivFare.value.trim() : '';
+  const fcs = (els.tstFareCalcString && els.tstFareCalcString.value.trim()) ||
+              (els.fareCalcString && els.fareCalcString.value.trim()) || '';
+  const roe = extractRoeFromFcs(fcs) || (els.tstRoe ? els.tstRoe.value.trim() : '');
+  const total = els.tstTotalAmount ? els.tstTotalAmount.value.trim() : '';
+  const orgDest = els.tstOrgDest ? els.tstOrgDest.value.trim() : '';
+  const taxesList = getTstTaxesList();
+  const fe = els.tstEndorsements ? els.tstEndorsements.value.trim() : '';
+
+  if (baseFare) items.push({ id: 'base-fare', label: 'Base Fare', value: baseFare, preview: baseFare });
+  if (equivFare) items.push({ id: 'equiv-fare', label: 'Equiv Fare', value: equivFare, preview: equivFare });
+  if (roe) items.push({ id: 'roe', label: 'ROE', value: roe, preview: roe });
+  if (total) items.push({ id: 'total-amount', label: 'Total Amount', value: total, preview: total });
+  if (orgDest) items.push({ id: 'org-dest', label: 'Org/Dest', value: orgDest, preview: orgDest });
+  if (taxesList.length > 0) items.push({ id: 'taxes', label: 'Taxes', value: taxesList.join('\n'), preview: taxesList.join(' ') });
+  if (fcs) items.push({ id: 'fcs', label: 'Fare Calc String', value: fcs, preview: fcs.length > 25 ? fcs.slice(0, 25) + '...' : fcs });
+  if (fe) items.push({ id: 'endorsements', label: 'Endorsements', value: fe, preview: fe.length > 25 ? fe.slice(0, 25) + '...' : fe });
+
+  return items;
+}
+
+function renderWinVPreview() {
+  if (!els.tstWinVPreviewList) return;
+  const items = getWinVItemsList();
+  els.tstWinVPreviewList.innerHTML = '';
+  if (items.length === 0) {
+    els.tstWinVPreviewList.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-secondary); font-style: italic;">No items currently available. Enter Fare / Coupon values or click "Update Values".</span>';
+    return;
+  }
+  items.forEach((item, idx) => {
+    const badge = document.createElement('span');
+    badge.className = 'tst-winv-item';
+    badge.innerHTML = `<span class="item-num">#${idx + 1}</span> <strong>${item.label}</strong>: <span class="item-val">${item.preview}</span>`;
+    els.tstWinVPreviewList.appendChild(badge);
+  });
+}
+
+async function prepWinVClipboardHistory() {
+  const items = getWinVItemsList();
+  if (items.length === 0) {
+    showError('No TST fields or coupon values available to load into Clipboard History.');
+    return;
+  }
+
+  // Check order: Reverse order means item 1 is at the TOP of the Win + V popup!
+  const isReverse = els.w2OrderReverse ? els.w2OrderReverse.checked : true;
+  const queue = isReverse ? [...items].reverse() : [...items];
+
+  if (els.tstWinVProgressWrapper) {
+    els.tstWinVProgressWrapper.style.display = 'block';
+  }
+
+  try {
+    for (let i = 0; i < queue.length; i++) {
+      const item = queue[i];
+      const pct = Math.round(((i + 1) / queue.length) * 100);
+
+      if (els.tstWinVProgressText) {
+        els.tstWinVProgressText.textContent = `Writing [${i + 1}/${queue.length}] ${item.label}...`;
+      }
+      if (els.tstWinVProgressCount) {
+        els.tstWinVProgressCount.textContent = `${pct}%`;
+      }
+      if (els.tstWinVProgressBar) {
+        els.tstWinVProgressBar.style.width = `${pct}%`;
+      }
+
+      await navigator.clipboard.writeText(item.value);
+      // Delay allows Windows clipboard monitor to register the WM_CLIPBOARDUPDATE event
+      await new Promise(resolve => setTimeout(resolve, 180));
+    }
+
+    if (els.tstWinVProgressText) {
+      els.tstWinVProgressText.textContent = `🎉 All ${queue.length} items loaded into Windows Clipboard History!`;
+    }
+    if (els.tstWinVProgressBar) {
+      els.tstWinVProgressBar.style.width = '100%';
+    }
+
+    showSuccess(`Windows Clipboard History ready! Switch to your Windows app and press Win + V.`);
+  } catch (err) {
+    console.error('Win+V Prep error:', err);
+    showError(`Clipboard history prep error: ${err.message || 'Clipboard access denied'}`);
+  }
+}
+
+// --- WORKAROUND 3: RAPID CLICK-TO-COPY ASSISTANT ---
+function renderRapidCopyAssistant() {
+  if (!els.tstRapidCouponChips || !els.tstRapidFareChips) return;
+
+  els.tstRapidCouponChips.innerHTML = '';
+  els.tstRapidFareChips.innerHTML = '';
+
+  const rows = els.tstCouponTableBody ? els.tstCouponTableBody.querySelectorAll('.tst-coupon-row') : [];
+
+  // 1. Flight coupon chips
+  rows.forEach((row, i) => {
+    const chk = row.querySelector('.tst-coupon-check');
+    if (!chk || chk.checked) {
+      const cpnNum = row.querySelector('.tst-cpn-num') ? row.querySelector('.tst-cpn-num').textContent.trim() : (i + 1);
+      const fb1 = row.querySelector('.tst-fb1')?.value.trim() || '';
+      const fb2 = row.querySelector('.tst-fb2')?.value.trim() || '';
+      const fb3 = row.querySelector('.tst-fb3')?.value.trim() || '';
+      const routeText = row.querySelector('.tst-cpn-route')?.textContent.trim() || `Coupon ${cpnNum}`;
+
+      if (fb1) {
+        els.tstRapidCouponChips.appendChild(createRapidChip(`Cpn ${cpnNum} FB1`, fb1, `${routeText} FB1`));
+      }
+      if (fb2) {
+        els.tstRapidCouponChips.appendChild(createRapidChip(`Cpn ${cpnNum} FB2`, fb2, `${routeText} FB2`));
+      }
+      if (fb3) {
+        els.tstRapidCouponChips.appendChild(createRapidChip(`Cpn ${cpnNum} FB3`, fb3, `${routeText} FB3`));
+      }
+    }
+  });
+
+  if (els.tstRapidCouponChips.children.length === 0) {
+    els.tstRapidCouponChips.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-secondary); font-style: italic;">No coupons available. Click "Update / Re-populate Values" or "+ Add Segment".</span>';
+  }
+
+  // 2. FARE fields chips
+  const baseFare = els.tstBaseFare ? els.tstBaseFare.value.trim() : '';
+  const equivFare = els.tstEquivFare ? els.tstEquivFare.value.trim() : '';
+  const fcs = (els.tstFareCalcString && els.tstFareCalcString.value.trim()) ||
+              (els.fareCalcString && els.fareCalcString.value.trim()) || '';
+  const roe = extractRoeFromFcs(fcs) || (els.tstRoe ? els.tstRoe.value.trim() : '');
+  const total = els.tstTotalAmount ? els.tstTotalAmount.value.trim() : '';
+  const orgDest = els.tstOrgDest ? els.tstOrgDest.value.trim() : '';
+  const taxesList = getTstTaxesList();
+  const fe = els.tstEndorsements ? els.tstEndorsements.value.trim() : '';
+
+  if (baseFare) els.tstRapidFareChips.appendChild(createRapidChip('Base Fare', baseFare));
+  if (equivFare) els.tstRapidFareChips.appendChild(createRapidChip('Equiv Fare', equivFare));
+  if (roe) els.tstRapidFareChips.appendChild(createRapidChip('ROE', roe));
+  if (total) els.tstRapidFareChips.appendChild(createRapidChip('Total Amount', total));
+  if (orgDest) els.tstRapidFareChips.appendChild(createRapidChip('Org/Dest', orgDest));
+  if (taxesList.length > 0) els.tstRapidFareChips.appendChild(createRapidChip('Taxes Column', taxesList.join('\n'), taxesList.join(' ')));
+  if (fcs) els.tstRapidFareChips.appendChild(createRapidChip('Fare Calc String', fcs));
+  if (fe) els.tstRapidFareChips.appendChild(createRapidChip('Endorsements', fe));
+
+  updateRapidNextHighlight();
+}
+
+function createRapidChip(label, val, displayPreview) {
+  const chip = document.createElement('div');
+  chip.className = 'tst-chip';
+  chip.dataset.val = val;
+  chip.dataset.label = label;
+  chip.setAttribute('role', 'button');
+  chip.setAttribute('tabindex', '0');
+  chip.setAttribute('aria-label', `Copy ${label}: ${val}`);
+
+  const preview = displayPreview || val;
+  chip.innerHTML = `
+    <div class="tst-chip-info">
+      <span class="tst-chip-label">${label}</span>
+      <span class="tst-chip-val" title="${val}">${preview}</span>
+    </div>
+    <span class="tst-chip-icon">📋</span>
+  `;
+
+  chip.addEventListener('click', () => {
+    handleRapidChipClick(chip);
+  });
+
+  chip.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleRapidChipClick(chip);
+    }
+  });
+
+  return chip;
+}
+
+function handleRapidChipClick(chip) {
+  const val = chip.dataset.val;
+  const label = chip.dataset.label;
+  if (!val) return;
+
+  copyTextToClipboard(val, `✓ Copied ${label}!`);
+
+  chip.classList.add('copied');
+  const labelEl = chip.querySelector('.tst-chip-label');
+  const iconEl = chip.querySelector('.tst-chip-icon');
+  if (labelEl) labelEl.textContent = `✓ ${label}`;
+  if (iconEl) iconEl.textContent = '✓';
+
+  updateRapidNextHighlight();
+}
+
+function updateRapidNextHighlight() {
+  const allChips = document.querySelectorAll('.tst-chip');
+  allChips.forEach(c => c.classList.remove('next-in-line'));
+
+  for (const c of allChips) {
+    if (!c.classList.contains('copied')) {
+      c.classList.add('next-in-line');
+      break;
+    }
+  }
+}
+
+function resetRapidCopyChips() {
+  const allChips = document.querySelectorAll('.tst-chip');
+  allChips.forEach(c => {
+    c.classList.remove('copied', 'next-in-line');
+    const label = c.dataset.label;
+    const labelEl = c.querySelector('.tst-chip-label');
+    const iconEl = c.querySelector('.tst-chip-icon');
+    if (labelEl) labelEl.textContent = label;
+    if (iconEl) iconEl.textContent = '📋';
+  });
+  updateRapidNextHighlight();
+  showToast('Rapid chips reset. Ready to copy!');
+}
+
+function copyNextRapidChip() {
+  const nextChip = document.querySelector('.tst-chip.next-in-line') ||
+                   document.querySelector('.tst-chip:not(.copied)');
+  if (nextChip) {
+    handleRapidChipClick(nextChip);
+  } else {
+    showToast('All fields have already been copied! Click Reset to start over.');
+  }
+}
+
+// --- WORKAROUND SUITE TABS SETUP ---
+function initWorkaroundSuiteTabs() {
+  const tabs = document.querySelectorAll('.tst-suite-tab');
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const targetId = tab.dataset.target;
+      tabs.forEach(t => {
+        t.classList.remove('active');
+        t.setAttribute('aria-selected', 'false');
+      });
+      tab.classList.add('active');
+      tab.setAttribute('aria-selected', 'true');
+
+      document.querySelectorAll('.tst-suite-panel').forEach(p => {
+        p.style.display = 'none';
+        p.classList.remove('active');
+      });
+
+      const activePanel = byId(targetId);
+      if (activePanel) {
+        activePanel.style.display = 'block';
+        activePanel.classList.add('active');
+      }
+    });
+  });
+}
+
 // Wire up TST Creator event listeners
 if (els.createTstButton) {
   els.createTstButton.addEventListener('click', populateTstFromCalculations);
@@ -3895,6 +4322,8 @@ if (els.tstUpdateValuesBtn) {
 if (els.tstAddCouponBtn) {
   els.tstAddCouponBtn.addEventListener('click', () => {
     els.tstCouponTableBody.appendChild(createCouponRowData());
+    renderWinVPreview();
+    renderRapidCopyAssistant();
   });
 }
 if (els.tstCopyCouponsBtn) {
@@ -3909,14 +4338,74 @@ if (els.tstCopyFb1Btn) {
 if (els.tstCopyFb2Btn) {
   els.tstCopyFb2Btn.addEventListener('click', copyFb2Column);
 }
+if (els.tstCopyFb3Btn) {
+  els.tstCopyFb3Btn.addEventListener('click', copyFb3Column);
+}
 if (els.tstCopyFareFieldsBtn) {
   els.tstCopyFareFieldsBtn.addEventListener('click', copyTstFareFields);
 }
+
+// Workaround 1 Panel Buttons
+if (els.w1CopyFb1Btn) {
+  els.w1CopyFb1Btn.addEventListener('click', copyFb1Column);
+}
+if (els.w1CopyFb2Btn) {
+  els.w1CopyFb2Btn.addEventListener('click', copyFb2Column);
+}
+if (els.w1CopyFb3Btn) {
+  els.w1CopyFb3Btn.addEventListener('click', copyFb3Column);
+}
+if (els.w1CopyFbTabLineBtn) {
+  els.w1CopyFbTabLineBtn.addEventListener('click', copyAllFareBasis);
+}
+if (els.w1CopyFareFieldsBtn) {
+  els.w1CopyFareFieldsBtn.addEventListener('click', copyTstFareFields);
+}
+if (els.w1CopyTaxesBtn) {
+  els.w1CopyTaxesBtn.addEventListener('click', copyTstTaxes);
+}
+if (els.w1CopyCouponsBtn) {
+  els.w1CopyCouponsBtn.addEventListener('click', copyTstCoupons);
+}
+
+// Workaround 2 Win+V Controls
+if (els.tstPrepWinVBtn) {
+  els.tstPrepWinVBtn.addEventListener('click', prepWinVClipboardHistory);
+}
+if (els.tstActionPrepWinVBtn) {
+  els.tstActionPrepWinVBtn.addEventListener('click', prepWinVClipboardHistory);
+}
+if (els.tstWinVHelpBtn && els.tstWinVHelp) {
+  els.tstWinVHelpBtn.addEventListener('click', () => {
+    const isHidden = els.tstWinVHelp.style.display === 'none';
+    els.tstWinVHelp.style.display = isHidden ? 'block' : 'none';
+  });
+}
+if (els.w2OrderReverse) {
+  els.w2OrderReverse.addEventListener('change', renderWinVPreview);
+}
+if (byId('w2OrderDirect')) {
+  byId('w2OrderDirect').addEventListener('change', renderWinVPreview);
+}
+if (els.w2IncludeSegments) {
+  els.w2IncludeSegments.addEventListener('change', renderWinVPreview);
+}
+
+// Workaround 3 Rapid Chips Controls
+if (els.tstResetRapidChipsBtn) {
+  els.tstResetRapidChipsBtn.addEventListener('click', resetRapidCopyChips);
+}
+if (els.tstCopyNextRapidChipBtn) {
+  els.tstCopyNextRapidChipBtn.addEventListener('click', copyNextRapidChip);
+}
+
 if (els.tstSelectAllCoupons) {
   els.tstSelectAllCoupons.addEventListener('change', (e) => {
     els.tstCouponTableBody.querySelectorAll('.tst-coupon-check').forEach(chk => {
       chk.checked = e.target.checked;
     });
+    renderWinVPreview();
+    renderRapidCopyAssistant();
   });
 }
 if (els.tstToggleCollapseBtn) {
@@ -3952,6 +4441,8 @@ if (els.tstFareCalcString) {
     if (roe) {
       els.tstRoe.value = roe;
     }
+    renderWinVPreview();
+    renderRapidCopyAssistant();
   });
 }
 if (els.fareCalcString) {
@@ -3960,6 +4451,26 @@ if (els.fareCalcString) {
     if (roe && els.tstRoe) {
       els.tstRoe.value = roe;
     }
+    renderWinVPreview();
+    renderRapidCopyAssistant();
+  });
+}
+if (els.tstBaseFare) {
+  els.tstBaseFare.addEventListener('input', () => {
+    renderWinVPreview();
+    renderRapidCopyAssistant();
+  });
+}
+if (els.tstTotalAmount) {
+  els.tstTotalAmount.addEventListener('input', () => {
+    renderWinVPreview();
+    renderRapidCopyAssistant();
+  });
+}
+if (els.tstRoe) {
+  els.tstRoe.addEventListener('input', () => {
+    renderWinVPreview();
+    renderRapidCopyAssistant();
   });
 }
 if (els.tstTourCode) {
@@ -3969,6 +4480,7 @@ if (els.tstTourCode) {
 }
 
 initTstBookmarklet();
+initWorkaroundSuiteTabs();
 
 // Initialize theme, restore any existing session, and sync UI
 loadTheme();

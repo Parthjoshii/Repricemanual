@@ -1470,6 +1470,431 @@ th {
   border-color: #e2e8f0;
 }
 
+/* In-House Tool Workarounds Suite */
+.tst-workaround-suite {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  background: rgba(15, 23, 42, 0.35);
+  margin-bottom: 20px;
+  overflow: hidden;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+}
+
+.tst-suite-header {
+  padding: 14px 18px;
+  background: rgba(63, 81, 181, 0.15);
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tst-suite-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(63, 81, 181, 0.25);
+  color: var(--accent-color, #818cf8);
+  border: 1px solid rgba(129, 140, 248, 0.3);
+  margin-bottom: 4px;
+}
+
+.tst-suite-title {
+  margin: 0 0 4px 0;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.tst-suite-desc {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.tst-suite-tabs {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.tst-suite-tab {
+  padding: 8px 14px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  transition: all 0.2s ease;
+}
+
+.tst-suite-tab:hover {
+  color: var(--text-primary);
+  border-color: var(--accent-color, #3f51b5);
+  transform: translateY(-1px);
+}
+
+.tst-suite-tab.active {
+  background: var(--accent-color, #3f51b5);
+  color: #ffffff;
+  border-color: var(--accent-color, #3f51b5);
+  box-shadow: 0 2px 8px rgba(63, 81, 181, 0.4);
+}
+
+.tst-suite-panel {
+  padding: 16px;
+  animation: fadeInPanel 0.2s ease-in-out;
+}
+
+@keyframes fadeInPanel {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.tst-w-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+
+.tst-panel-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.tst-w-intro strong {
+  font-size: 0.92rem;
+  color: var(--text-primary);
+}
+
+.tst-w-intro p {
+  margin: 4px 0 0 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Workaround 1 Button Grid */
+.tst-w1-btn-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.tst-w-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  padding: 10px 14px;
+  border-radius: 8px;
+  gap: 4px;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tst-w-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(63, 81, 181, 0.2);
+}
+
+.tst-w-btn .btn-title {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: var(--text-primary);
+}
+
+.tst-w-btn .btn-desc {
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  line-height: 1.25;
+}
+
+/* Workaround 2 Controls */
+.tst-w2-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: rgba(15, 23, 42, 0.25);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.tst-w2-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+
+.tst-radio-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  color: var(--text-secondary);
+}
+
+.tst-radio-label strong {
+  color: var(--text-primary);
+}
+
+.tst-w2-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
+/* Progress bar for Win + V loading */
+.tst-progress-wrapper {
+  margin-top: 14px;
+  padding: 12px;
+  border-radius: 8px;
+  background: rgba(63, 81, 181, 0.12);
+  border: 1px solid var(--accent-color, #3f51b5);
+}
+
+.tst-progress-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  font-weight: 700;
+  margin-bottom: 6px;
+  color: var(--text-primary);
+}
+
+.tst-progress-bar-bg {
+  width: 100%;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.tst-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #3f51b5, #10b981);
+  border-radius: 4px;
+  transition: width 0.15s ease-out;
+}
+
+.tst-w2-preview-box {
+  margin-top: 14px;
+}
+
+.tst-w2-preview-title {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+  display: block;
+}
+
+.tst-winv-preview-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tst-winv-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  font-size: 0.78rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 14px;
+  color: var(--text-primary);
+}
+
+.tst-winv-item .item-num {
+  font-weight: 800;
+  color: var(--accent-color, #3f51b5);
+}
+
+.tst-winv-item .item-val {
+  font-family: monospace;
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+}
+
+/* Workaround 3: Rapid Click-to-Copy Chips */
+.tst-rapid-chips-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tst-rapid-group {
+  background: rgba(15, 23, 42, 0.2);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.tst-rapid-group-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.8rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 10px;
+  letter-spacing: 0.03em;
+}
+
+.tst-rapid-hint {
+  font-size: 0.74rem;
+  font-weight: normal;
+  color: var(--text-secondary);
+}
+
+.tst-chips-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 8px;
+}
+
+.tst-chip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 7px 12px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  user-select: none;
+  text-align: left;
+}
+
+.tst-chip:hover {
+  border-color: var(--accent-color, #3f51b5);
+  background: rgba(63, 81, 181, 0.15);
+  transform: translateY(-1px);
+}
+
+.tst-chip-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+}
+
+.tst-chip-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.tst-chip-val {
+  font-size: 0.85rem;
+  font-weight: 700;
+  font-family: monospace;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.tst-chip-icon {
+  font-size: 0.9rem;
+  opacity: 0.7;
+}
+
+.tst-chip.copied {
+  border-color: #10b981 !important;
+  background: rgba(16, 185, 129, 0.15) !important;
+}
+
+.tst-chip.copied .tst-chip-label {
+  color: #10b981;
+}
+
+.tst-chip.copied .tst-chip-icon {
+  opacity: 1;
+}
+
+.tst-chip.next-in-line {
+  border-color: var(--accent-color, #3f51b5);
+  box-shadow: 0 0 0 2px var(--accent-color, #3f51b5), 0 0 10px rgba(63, 81, 181, 0.4);
+  animation: pulseChip 1.5s infinite;
+}
+
+@keyframes pulseChip {
+  0% { box-shadow: 0 0 0 2px var(--accent-color, #3f51b5), 0 0 6px rgba(63, 81, 181, 0.3); }
+  50% { box-shadow: 0 0 0 3px var(--accent-color, #3f51b5), 0 0 12px rgba(63, 81, 181, 0.6); }
+  100% { box-shadow: 0 0 0 2px var(--accent-color, #3f51b5), 0 0 6px rgba(63, 81, 181, 0.3); }
+}
+
+/* Coupon table fare basis inputs */
+.tst-fb1, .tst-fb2, .tst-fb3 {
+  font-weight: 600;
+  font-family: monospace;
+  text-transform: uppercase;
+}
+
+/* Light Theme Overrides */
+[data-theme="light"] .tst-workaround-suite {
+  background: #faf9f0;
+  border-color: #dcd7be;
+}
+
+[data-theme="light"] .tst-suite-header {
+  background: #e8eaf6;
+  border-color: #dcd7be;
+}
+
+[data-theme="light"] .tst-suite-badge {
+  background: #ede7f6;
+  color: #1a237e;
+  border-color: #3f51b5;
+}
+
+[data-theme="light"] .tst-suite-tab {
+  background: #ffffff;
+  border-color: #dcd7be;
+  color: #334155;
+}
+
+[data-theme="light"] .tst-suite-tab.active {
+  background: #3f51b5;
+  color: #ffffff;
+}
+
+[data-theme="light"] .tst-w2-controls,
+[data-theme="light"] .tst-rapid-group {
+  background: #ffffff;
+  border-color: #dcd7be;
+}
+
+[data-theme="light"] .tst-chip {
+  background: #ffffff;
+  border-color: #dcd7be;
+}
+
+[data-theme="light"] .tst-winv-item {
+  background: #ffffff;
+  border-color: #dcd7be;
+}
+
+
 
 
 
