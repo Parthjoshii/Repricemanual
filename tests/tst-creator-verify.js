@@ -197,6 +197,10 @@ let browser;
   console.log('✓ Per-coupon row Copy Fare Basis button verified');
 
   // Test Copy All Fare Basis button
+  if (await page.locator('.tst-coupon-row').count() < 2) {
+    await page.click('#tstAddCouponBtn');
+    await page.waitForTimeout(50);
+  }
   await page.fill('.tst-coupon-row:nth-child(2) .tst-fare-basis', 'QHAMPIE1/VFN2');
   await page.click('#tstCopyFareBasisBtn');
   await page.waitForTimeout(100);

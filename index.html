@@ -579,12 +579,38 @@ Changes in V4.6 (Bug Fix Release):
           </div>
 
           <div id="tstBodyContent" class="tst-body">
+            <!-- 1-Click Bookmarklet Auto-Fill Bar -->
+            <div class="tst-bookmarklet-bar">
+              <div class="tst-bookmarklet-left">
+                <span class="tst-bookmarklet-icon">⚡</span>
+                <div>
+                  <span class="tst-bookmarklet-title">In-House Tool 1-Click Auto-Fill:</span>
+                  <span class="tst-bookmarklet-desc">Drag this bookmarklet to your browser Bookmarks Bar:</span>
+                </div>
+              </div>
+              <div class="tst-bookmarklet-actions">
+                <a id="tstBookmarkletLink" class="tst-bookmarklet-badge" href="#" title="Drag me to your Bookmarks Bar">⚡ Fill In-House TST</a>
+                <button id="tstCopyBookmarkletBtn" type="button" class="secondary tst-btn-small" aria-label="Copy bookmarklet javascript code">📋 Copy Script</button>
+                <button id="tstBookmarkletHelpBtn" type="button" class="secondary tst-btn-small" aria-label="How to use bookmarklet">❓ Instructions</button>
+              </div>
+            </div>
+            <div id="tstBookmarkletHelp" class="tst-bookmarklet-help" style="display: none;">
+              <ol>
+                <li>Drag <strong>⚡ Fill In-House TST</strong> to your browser bookmarks bar (one-time setup).</li>
+                <li>In this calculator, click <strong>📋 Copy TST (For Tool & Bookmarklet)</strong> below.</li>
+                <li>Switch to your in-house tool tab and click <strong>⚡ Fill In-House TST</strong> on your bookmarks bar.</li>
+                <li>Every flight segment's Fare Basis (FB1 &amp; FB2) and all FARE section fields (Base Fare, Equiv Fare, ROE, Total, Org/Dest, etc.) are filled instantly without paste errors!</li>
+              </ol>
+            </div>
+
             <!-- 1. COUPON TABLE -->
             <div class="tst-coupon-section">
               <div class="tst-section-title-bar" style="justify-content: flex-end;">
                 <div class="tst-coupon-actions">
                   <button id="tstAddCouponBtn" type="button" class="secondary tst-btn-small" aria-label="Add flight coupon row">+ Add Segment</button>
-                  <button id="tstCopyFareBasisBtn" type="button" class="secondary tst-btn-small" aria-label="Copy Fare Basis fields for in-house tool">📋 Copy Fare Basis</button>
+                  <button id="tstCopyFb1Btn" type="button" class="secondary tst-btn-small" aria-label="Copy Fare Basis 1 column for in-house tool">📋 Copy FB1 Column</button>
+                  <button id="tstCopyFb2Btn" type="button" class="secondary tst-btn-small" aria-label="Copy Fare Basis 2 column for in-house tool">📋 Copy FB2 Column</button>
+                  <button id="tstCopyFareBasisBtn" type="button" class="secondary tst-btn-small" aria-label="Copy all Fare Basis tab-separated">📋 Copy FB (Tab+Line)</button>
                   <button id="tstCopyCouponsBtn" type="button" class="secondary tst-btn-small" aria-label="Copy coupon segments for in-house tool">📋 Copy Coupons</button>
                 </div>
               </div>
@@ -675,7 +701,8 @@ Changes in V4.6 (Bug Fix Release):
 
             <!-- 3. ACTIONS & COPY GDS TST -->
             <div class="tst-action-row">
-              <button id="tstCopyBtn" type="button" class="btn-create-tst" aria-label="Copy TST fields for in-house tool">📋 Copy TST (For Tool)</button>
+              <button id="tstCopyBtn" type="button" class="btn-create-tst" aria-label="Copy TST fields for in-house tool">📋 Copy TST (For Tool &amp; Bookmarklet)</button>
+              <button id="tstCopyFareFieldsBtn" type="button" class="secondary" aria-label="Copy FARE section fields tab-separated">📋 Copy FARE Fields</button>
               <button id="tstCopyTaxesBtnMain" type="button" class="secondary" aria-label="Copy taxes for TST tax column">📋 Copy Taxes</button>
               <button id="tstGenerateBtn" type="button" class="secondary" aria-label="Generate formatted TST record">Generate GDS Text</button>
               <button id="tstClearBtn" type="button" class="secondary" aria-label="Clear TST fields">Clear TST</button>
