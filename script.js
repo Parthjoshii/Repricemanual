@@ -202,33 +202,6 @@ const els = {
   tstCopyTaxesBtn: byId('tstCopyTaxesBtn'),
   tstCopyTaxesBtnMain: byId('tstCopyTaxesBtnMain'),
   tstCopyCouponsBtn: byId('tstCopyCouponsBtn'),
-  tstCopyFareBasisBtn: byId('tstCopyFareBasisBtn'),
-  tstCopyFb1Btn: byId('tstCopyFb1Btn'),
-  tstCopyFb2Btn: byId('tstCopyFb2Btn'),
-  tstCopyFb3Btn: byId('tstCopyFb3Btn'),
-  tstCopyFareFieldsBtn: byId('tstCopyFareFieldsBtn'),
-  w1CopyFb1Btn: byId('w1CopyFb1Btn'),
-  w1CopyFb2Btn: byId('w1CopyFb2Btn'),
-  w1CopyFb3Btn: byId('w1CopyFb3Btn'),
-  w1CopyFbTabLineBtn: byId('w1CopyFbTabLineBtn'),
-  w1CopyFareFieldsBtn: byId('w1CopyFareFieldsBtn'),
-  w1CopyTaxesBtn: byId('w1CopyTaxesBtn'),
-  w1CopyCouponsBtn: byId('w1CopyCouponsBtn'),
-  tstPrepWinVBtn: byId('tstPrepWinVBtn'),
-  tstActionPrepWinVBtn: byId('tstActionPrepWinVBtn'),
-  tstWinVHelpBtn: byId('tstWinVHelpBtn'),
-  tstWinVHelp: byId('tstWinVHelp'),
-  tstWinVProgressWrapper: byId('tstWinVProgressWrapper'),
-  tstWinVProgressBar: byId('tstWinVProgressBar'),
-  tstWinVProgressText: byId('tstWinVProgressText'),
-  tstWinVProgressCount: byId('tstWinVProgressCount'),
-  tstWinVPreviewList: byId('tstWinVPreviewList'),
-  w2OrderReverse: byId('w2OrderReverse'),
-  w2IncludeSegments: byId('w2IncludeSegments'),
-  tstResetRapidChipsBtn: byId('tstResetRapidChipsBtn'),
-  tstCopyNextRapidChipBtn: byId('tstCopyNextRapidChipBtn'),
-  tstRapidCouponChips: byId('tstRapidCouponChips'),
-  tstRapidFareChips: byId('tstRapidFareChips'),
   tstBookmarkletLink: byId('tstBookmarkletLink'),
   tstCopyBookmarkletBtn: byId('tstCopyBookmarkletBtn'),
   tstBookmarkletHelpBtn: byId('tstBookmarkletHelpBtn'),
@@ -236,8 +209,6 @@ const els = {
   tstClearBtn: byId('tstClearBtn'),
   tstOutputWrapper: byId('tstOutputWrapper'),
   tstOutput: byId('tstOutput'),
-  tabWorkaround4: byId('tabWorkaround4'),
-  panelWorkaround4: byId('panelWorkaround4'),
   ftaOpenReviewModalBtn: byId('ftaOpenReviewModalBtn'),
   tstFtaReviewBtn: byId('tstFtaReviewBtn'),
   ftaReviewModal: byId('ftaReviewModal'),
@@ -3131,140 +3102,6 @@ function copyCouponFareBasis(row) {
   copyTextToClipboard(tsv, `Coupon ${cpnNum} Fare Basis copied: ${tsv.replace(/\t/g, ' [Tab] ')}`);
 }
 
-function copyAllFareBasis() {
-  const rows = els.tstCouponTableBody.querySelectorAll('.tst-coupon-row');
-  if (rows.length === 0) {
-    showError('No flight coupons available.');
-    return;
-  }
-  const lines = [];
-  rows.forEach(row => {
-    const chk = row.querySelector('.tst-coupon-check');
-    if (!chk || chk.checked) {
-      const fb1 = row.querySelector('.tst-fb1')?.value.trim() || '';
-      const fb2 = row.querySelector('.tst-fb2')?.value.trim() || '';
-      const fb3 = row.querySelector('.tst-fb3')?.value.trim() || '';
-      if (fb1 || fb2 || fb3) {
-        lines.push([fb1, fb2, fb3].filter(Boolean).join('\t'));
-      } else {
-        const rawFb = row.querySelector('.tst-fare-basis')?.value.trim() || '';
-        if (rawFb) {
-          const split = splitFareBasis(rawFb);
-          lines.push(split.tsv);
-        }
-      }
-    }
-  });
-  if (lines.length === 0) {
-    showError('No Fare Basis to copy.');
-    return;
-  }
-  const tsvText = lines.join('\n');
-  state.lastCopiedFareBasis = tsvText;
-  copyTextToClipboard(tsvText, `Fare Basis copied for ${lines.length} coupon(s)! (Tab-separated for in-house tool)`);
-}
-
-function copyFb1Column() {
-  const rows = els.tstCouponTableBody.querySelectorAll('.tst-coupon-row');
-  if (rows.length === 0) {
-    showError('No flight coupons available.');
-    return;
-  }
-  const lines = [];
-  rows.forEach(row => {
-    const chk = row.querySelector('.tst-coupon-check');
-    if (!chk || chk.checked) {
-      const fb1Input = row.querySelector('.tst-fb1');
-      if (fb1Input && fb1Input.value.trim()) {
-        lines.push(fb1Input.value.trim());
-      } else {
-        const rawFb = row.querySelector('.tst-fare-basis')?.value.trim() || '';
-        const split = splitFareBasis(rawFb);
-        lines.push(split.fb1 || '');
-      }
-    }
-  });
-  if (lines.length === 0) {
-    showError('No Fare Basis 1 values to copy.');
-    return;
-  }
-  const text = lines.join('\n');
-  copyTextToClipboard(text, `Fare Basis 1 Column copied (${lines.length} rows)!`);
-}
-
-function copyFb2Column() {
-  const rows = els.tstCouponTableBody.querySelectorAll('.tst-coupon-row');
-  if (rows.length === 0) {
-    showError('No flight coupons available.');
-    return;
-  }
-  const lines = [];
-  rows.forEach(row => {
-    const chk = row.querySelector('.tst-coupon-check');
-    if (!chk || chk.checked) {
-      const fb2Input = row.querySelector('.tst-fb2');
-      if (fb2Input && fb2Input.value.trim()) {
-        lines.push(fb2Input.value.trim());
-      } else {
-        const rawFb = row.querySelector('.tst-fare-basis')?.value.trim() || '';
-        const split = splitFareBasis(rawFb);
-        lines.push(split.fb2 || '');
-      }
-    }
-  });
-  if (lines.length === 0) {
-    showError('No Fare Basis 2 values to copy.');
-    return;
-  }
-  const text = lines.join('\n');
-  copyTextToClipboard(text, `Fare Basis 2 Column copied (${lines.length} rows)!`);
-}
-
-function copyFb3Column() {
-  const rows = els.tstCouponTableBody.querySelectorAll('.tst-coupon-row');
-  if (rows.length === 0) {
-    showError('No flight coupons available.');
-    return;
-  }
-  const lines = [];
-  rows.forEach(row => {
-    const chk = row.querySelector('.tst-coupon-check');
-    if (!chk || chk.checked) {
-      const fb3Input = row.querySelector('.tst-fb3');
-      if (fb3Input && fb3Input.value.trim()) {
-        lines.push(fb3Input.value.trim());
-      } else {
-        const rawFb = row.querySelector('.tst-fare-basis')?.value.trim() || '';
-        const split = splitFareBasis(rawFb);
-        lines.push(split.fb3 || '');
-      }
-    }
-  });
-  if (lines.length === 0) {
-    showError('No Fare Basis 3 values to copy.');
-    return;
-  }
-  const text = lines.join('\n');
-  copyTextToClipboard(text, `Fare Basis 3 Column copied (${lines.length} rows)!`);
-}
-
-function copyTstFareFields() {
-  const baseFare = els.tstBaseFare ? els.tstBaseFare.value.trim() : '';
-  const equivFare = els.tstEquivFare ? els.tstEquivFare.value.trim() : '';
-  const fcs = (els.tstFareCalcString && els.tstFareCalcString.value.trim()) ||
-              (els.fareCalcString && els.fareCalcString.value.trim()) || '';
-  const fcsRoe = extractRoeFromFcs(fcs);
-  const roe = fcsRoe || (els.tstRoe ? els.tstRoe.value.trim() : '');
-  const total = els.tstTotalAmount ? els.tstTotalAmount.value.trim() : '';
-  const tourCode = '';
-  const milesPoints = els.tstMilesPoints ? els.tstMilesPoints.value.trim() : '';
-  const orgDest = els.tstOrgDest ? els.tstOrgDest.value.trim() : '';
-  const fe = els.tstEndorsements ? els.tstEndorsements.value.trim() : '';
-
-  const fareTsv = [baseFare, equivFare, roe, total, tourCode, milesPoints, orgDest, fcs, fe].join('\t');
-  copyTextToClipboard(fareTsv, 'FARE section fields copied (Tab-separated)!');
-}
-
 function createCouponRowData(defaults = {}) {
   tstCouponCount++;
   const cpn = defaults.cpn || tstCouponCount;
@@ -3330,8 +3167,7 @@ function createCouponRowData(defaults = {}) {
     }
     hiddenFb.value = combined;
 
-    renderWinVPreview();
-    renderRapidCopyAssistant();
+    renderFtaSummary();
   }
 
   fb1Input.addEventListener('input', syncFromParts);
@@ -3343,8 +3179,7 @@ function createCouponRowData(defaults = {}) {
     fb1Input.value = s.fb1;
     fb2Input.value = s.fb2;
     fb3Input.value = s.fb3;
-    renderWinVPreview();
-    renderRapidCopyAssistant();
+    renderFtaSummary();
   });
 
   tr.querySelector('.tst-copy-row-fb-btn').addEventListener('click', () => {
@@ -3354,8 +3189,7 @@ function createCouponRowData(defaults = {}) {
   tr.querySelector('.tst-remove-btn').addEventListener('click', () => {
     tr.remove();
     renumberCoupons();
-    renderWinVPreview();
-    renderRapidCopyAssistant();
+    renderFtaSummary();
   });
 
   return tr;
@@ -3671,8 +3505,6 @@ function populateTstFromCalculations() {
     }
   }
 
-  renderWinVPreview();
-  renderRapidCopyAssistant();
   renderFtaSummary();
 
   els.tstSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -4064,310 +3896,6 @@ function initTstBookmarklet() {
   }
 }
 
-// --- WORKAROUND 2: WINDOWS CLIPBOARD HISTORY (WIN + V) AUTO-PREP ---
-function getWinVItemsList() {
-  const items = [];
-  const rows = els.tstCouponTableBody ? els.tstCouponTableBody.querySelectorAll('.tst-coupon-row') : [];
-  const includeSegments = els.w2IncludeSegments ? els.w2IncludeSegments.checked : true;
-
-  const fb1List = [];
-  const fb2List = [];
-  const fb3List = [];
-
-  rows.forEach((row, i) => {
-    const chk = row.querySelector('.tst-coupon-check');
-    if (!chk || chk.checked) {
-      const cpnNum = row.querySelector('.tst-cpn-num') ? row.querySelector('.tst-cpn-num').textContent.trim() : (i + 1);
-      const fb1 = row.querySelector('.tst-fb1')?.value.trim() || '';
-      const fb2 = row.querySelector('.tst-fb2')?.value.trim() || '';
-      const fb3 = row.querySelector('.tst-fb3')?.value.trim() || '';
-
-      if (fb1) fb1List.push(fb1);
-      if (fb2) fb2List.push(fb2);
-      if (fb3) fb3List.push(fb3);
-
-      if (includeSegments) {
-        if (fb1) {
-          items.push({ id: `cpn-${cpnNum}-fb1`, label: `Cpn ${cpnNum} FB1`, value: fb1, preview: fb1 });
-        }
-        if (fb2) {
-          items.push({ id: `cpn-${cpnNum}-fb2`, label: `Cpn ${cpnNum} FB2`, value: fb2, preview: fb2 });
-        }
-        if (fb3) {
-          items.push({ id: `cpn-${cpnNum}-fb3`, label: `Cpn ${cpnNum} FB3`, value: fb3, preview: fb3 });
-        }
-      }
-    }
-  });
-
-  // Column summaries
-  if (fb1List.length > 0) {
-    items.push({ id: 'fb1-col', label: 'FB1 Column', value: fb1List.join('\n'), preview: fb1List.join(', ') });
-  }
-  if (fb2List.length > 0) {
-    items.push({ id: 'fb2-col', label: 'FB2 Column', value: fb2List.join('\n'), preview: fb2List.join(', ') });
-  }
-  if (fb3List.length > 0) {
-    items.push({ id: 'fb3-col', label: 'FB3 Column', value: fb3List.join('\n'), preview: fb3List.join(', ') });
-  }
-
-  // FARE Fields
-  const baseFare = els.tstBaseFare ? els.tstBaseFare.value.trim() : '';
-  const equivFare = els.tstEquivFare ? els.tstEquivFare.value.trim() : '';
-  const fcs = (els.tstFareCalcString && els.tstFareCalcString.value.trim()) ||
-              (els.fareCalcString && els.fareCalcString.value.trim()) || '';
-  const roe = extractRoeFromFcs(fcs) || (els.tstRoe ? els.tstRoe.value.trim() : '');
-  const total = els.tstTotalAmount ? els.tstTotalAmount.value.trim() : '';
-  const orgDest = els.tstOrgDest ? els.tstOrgDest.value.trim() : '';
-  const taxesList = getTstTaxesList();
-  const fe = els.tstEndorsements ? els.tstEndorsements.value.trim() : '';
-
-  if (baseFare) items.push({ id: 'base-fare', label: 'Base Fare', value: baseFare, preview: baseFare });
-  if (equivFare) items.push({ id: 'equiv-fare', label: 'Equiv Fare', value: equivFare, preview: equivFare });
-  if (roe) items.push({ id: 'roe', label: 'ROE', value: roe, preview: roe });
-  if (total) items.push({ id: 'total-amount', label: 'Total Amount', value: total, preview: total });
-  if (orgDest) items.push({ id: 'org-dest', label: 'Org/Dest', value: orgDest, preview: orgDest });
-  if (taxesList.length > 0) items.push({ id: 'taxes', label: 'Taxes', value: taxesList.join('\n'), preview: taxesList.join(' ') });
-  if (fcs) items.push({ id: 'fcs', label: 'Fare Calc String', value: fcs, preview: fcs.length > 25 ? fcs.slice(0, 25) + '...' : fcs });
-  if (fe) items.push({ id: 'endorsements', label: 'Endorsements', value: fe, preview: fe.length > 25 ? fe.slice(0, 25) + '...' : fe });
-
-  return items;
-}
-
-function renderWinVPreview() {
-  if (!els.tstWinVPreviewList) return;
-  const items = getWinVItemsList();
-  els.tstWinVPreviewList.innerHTML = '';
-  if (items.length === 0) {
-    els.tstWinVPreviewList.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-secondary); font-style: italic;">No items currently available. Enter Fare / Coupon values or click "Update Values".</span>';
-    return;
-  }
-  items.forEach((item, idx) => {
-    const badge = document.createElement('span');
-    badge.className = 'tst-winv-item';
-    badge.innerHTML = `<span class="item-num">#${idx + 1}</span> <strong>${item.label}</strong>: <span class="item-val">${item.preview}</span>`;
-    els.tstWinVPreviewList.appendChild(badge);
-  });
-}
-
-async function prepWinVClipboardHistory() {
-  const items = getWinVItemsList();
-  if (items.length === 0) {
-    showError('No TST fields or coupon values available to load into Clipboard History.');
-    return;
-  }
-
-  // Check order: Reverse order means item 1 is at the TOP of the Win + V popup!
-  const isReverse = els.w2OrderReverse ? els.w2OrderReverse.checked : true;
-  const queue = isReverse ? [...items].reverse() : [...items];
-
-  if (els.tstWinVProgressWrapper) {
-    els.tstWinVProgressWrapper.style.display = 'block';
-  }
-
-  try {
-    for (let i = 0; i < queue.length; i++) {
-      const item = queue[i];
-      const pct = Math.round(((i + 1) / queue.length) * 100);
-
-      if (els.tstWinVProgressText) {
-        els.tstWinVProgressText.textContent = `Writing [${i + 1}/${queue.length}] ${item.label}...`;
-      }
-      if (els.tstWinVProgressCount) {
-        els.tstWinVProgressCount.textContent = `${pct}%`;
-      }
-      if (els.tstWinVProgressBar) {
-        els.tstWinVProgressBar.style.width = `${pct}%`;
-      }
-
-      await navigator.clipboard.writeText(item.value);
-      // Delay allows Windows clipboard monitor to register the WM_CLIPBOARDUPDATE event
-      await new Promise(resolve => setTimeout(resolve, 180));
-    }
-
-    if (els.tstWinVProgressText) {
-      els.tstWinVProgressText.textContent = `🎉 All ${queue.length} items loaded into Windows Clipboard History!`;
-    }
-    if (els.tstWinVProgressBar) {
-      els.tstWinVProgressBar.style.width = '100%';
-    }
-
-    showSuccess(`Windows Clipboard History ready! Switch to your Windows app and press Win + V.`);
-  } catch (err) {
-    console.error('Win+V Prep error:', err);
-    showError(`Clipboard history prep error: ${err.message || 'Clipboard access denied'}`);
-  }
-}
-
-// --- WORKAROUND 3: RAPID CLICK-TO-COPY ASSISTANT ---
-function renderRapidCopyAssistant() {
-  if (!els.tstRapidCouponChips || !els.tstRapidFareChips) return;
-
-  els.tstRapidCouponChips.innerHTML = '';
-  els.tstRapidFareChips.innerHTML = '';
-
-  const rows = els.tstCouponTableBody ? els.tstCouponTableBody.querySelectorAll('.tst-coupon-row') : [];
-
-  // 1. Flight coupon chips
-  rows.forEach((row, i) => {
-    const chk = row.querySelector('.tst-coupon-check');
-    if (!chk || chk.checked) {
-      const cpnNum = row.querySelector('.tst-cpn-num') ? row.querySelector('.tst-cpn-num').textContent.trim() : (i + 1);
-      const fb1 = row.querySelector('.tst-fb1')?.value.trim() || '';
-      const fb2 = row.querySelector('.tst-fb2')?.value.trim() || '';
-      const fb3 = row.querySelector('.tst-fb3')?.value.trim() || '';
-      const routeText = row.querySelector('.tst-cpn-route')?.textContent.trim() || `Coupon ${cpnNum}`;
-
-      if (fb1) {
-        els.tstRapidCouponChips.appendChild(createRapidChip(`Cpn ${cpnNum} FB1`, fb1, `${routeText} FB1`));
-      }
-      if (fb2) {
-        els.tstRapidCouponChips.appendChild(createRapidChip(`Cpn ${cpnNum} FB2`, fb2, `${routeText} FB2`));
-      }
-      if (fb3) {
-        els.tstRapidCouponChips.appendChild(createRapidChip(`Cpn ${cpnNum} FB3`, fb3, `${routeText} FB3`));
-      }
-    }
-  });
-
-  if (els.tstRapidCouponChips.children.length === 0) {
-    els.tstRapidCouponChips.innerHTML = '<span style="font-size: 0.8rem; color: var(--text-secondary); font-style: italic;">No coupons available. Click "Update / Re-populate Values" or "+ Add Segment".</span>';
-  }
-
-  // 2. FARE fields chips
-  const baseFare = els.tstBaseFare ? els.tstBaseFare.value.trim() : '';
-  const equivFare = els.tstEquivFare ? els.tstEquivFare.value.trim() : '';
-  const fcs = (els.tstFareCalcString && els.tstFareCalcString.value.trim()) ||
-              (els.fareCalcString && els.fareCalcString.value.trim()) || '';
-  const roe = extractRoeFromFcs(fcs) || (els.tstRoe ? els.tstRoe.value.trim() : '');
-  const total = els.tstTotalAmount ? els.tstTotalAmount.value.trim() : '';
-  const orgDest = els.tstOrgDest ? els.tstOrgDest.value.trim() : '';
-  const taxesList = getTstTaxesList();
-  const fe = els.tstEndorsements ? els.tstEndorsements.value.trim() : '';
-
-  if (baseFare) els.tstRapidFareChips.appendChild(createRapidChip('Base Fare', baseFare));
-  if (equivFare) els.tstRapidFareChips.appendChild(createRapidChip('Equiv Fare', equivFare));
-  if (roe) els.tstRapidFareChips.appendChild(createRapidChip('ROE', roe));
-  if (total) els.tstRapidFareChips.appendChild(createRapidChip('Total Amount', total));
-  if (orgDest) els.tstRapidFareChips.appendChild(createRapidChip('Org/Dest', orgDest));
-  if (taxesList.length > 0) els.tstRapidFareChips.appendChild(createRapidChip('Taxes Column', taxesList.join('\n'), taxesList.join(' ')));
-  if (fcs) els.tstRapidFareChips.appendChild(createRapidChip('Fare Calc String', fcs));
-  if (fe) els.tstRapidFareChips.appendChild(createRapidChip('Endorsements', fe));
-
-  updateRapidNextHighlight();
-}
-
-function createRapidChip(label, val, displayPreview) {
-  const chip = document.createElement('div');
-  chip.className = 'tst-chip';
-  chip.dataset.val = val;
-  chip.dataset.label = label;
-  chip.setAttribute('role', 'button');
-  chip.setAttribute('tabindex', '0');
-  chip.setAttribute('aria-label', `Copy ${label}: ${val}`);
-
-  const preview = displayPreview || val;
-  chip.innerHTML = `
-    <div class="tst-chip-info">
-      <span class="tst-chip-label">${label}</span>
-      <span class="tst-chip-val" title="${val}">${preview}</span>
-    </div>
-    <span class="tst-chip-icon">📋</span>
-  `;
-
-  chip.addEventListener('click', () => {
-    handleRapidChipClick(chip);
-  });
-
-  chip.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      handleRapidChipClick(chip);
-    }
-  });
-
-  return chip;
-}
-
-function handleRapidChipClick(chip) {
-  const val = chip.dataset.val;
-  const label = chip.dataset.label;
-  if (!val) return;
-
-  copyTextToClipboard(val, `✓ Copied ${label}!`);
-
-  chip.classList.add('copied');
-  const labelEl = chip.querySelector('.tst-chip-label');
-  const iconEl = chip.querySelector('.tst-chip-icon');
-  if (labelEl) labelEl.textContent = `✓ ${label}`;
-  if (iconEl) iconEl.textContent = '✓';
-
-  updateRapidNextHighlight();
-}
-
-function updateRapidNextHighlight() {
-  const allChips = document.querySelectorAll('.tst-chip');
-  allChips.forEach(c => c.classList.remove('next-in-line'));
-
-  for (const c of allChips) {
-    if (!c.classList.contains('copied')) {
-      c.classList.add('next-in-line');
-      break;
-    }
-  }
-}
-
-function resetRapidCopyChips() {
-  const allChips = document.querySelectorAll('.tst-chip');
-  allChips.forEach(c => {
-    c.classList.remove('copied', 'next-in-line');
-    const label = c.dataset.label;
-    const labelEl = c.querySelector('.tst-chip-label');
-    const iconEl = c.querySelector('.tst-chip-icon');
-    if (labelEl) labelEl.textContent = label;
-    if (iconEl) iconEl.textContent = '📋';
-  });
-  updateRapidNextHighlight();
-  showToast('Rapid chips reset. Ready to copy!');
-}
-
-function copyNextRapidChip() {
-  const nextChip = document.querySelector('.tst-chip.next-in-line') ||
-                   document.querySelector('.tst-chip:not(.copied)');
-  if (nextChip) {
-    handleRapidChipClick(nextChip);
-  } else {
-    showToast('All fields have already been copied! Click Reset to start over.');
-  }
-}
-
-// --- WORKAROUND SUITE TABS SETUP ---
-function initWorkaroundSuiteTabs() {
-  const tabs = document.querySelectorAll('.tst-suite-tab');
-  tabs.forEach(tab => {
-    tab.addEventListener('click', () => {
-      const targetId = tab.dataset.target;
-      tabs.forEach(t => {
-        t.classList.remove('active');
-        t.setAttribute('aria-selected', 'false');
-      });
-      tab.classList.add('active');
-      tab.setAttribute('aria-selected', 'true');
-
-      document.querySelectorAll('.tst-suite-panel').forEach(p => {
-        p.style.display = 'none';
-        p.classList.remove('active');
-      });
-
-      const activePanel = byId(targetId);
-      if (activePanel) {
-        activePanel.style.display = 'block';
-        activePanel.classList.add('active');
-      }
-    });
-  });
-}
-
 // Wire up TST Creator event listeners
 if (els.createTstButton) {
   els.createTstButton.addEventListener('click', populateTstFromCalculations);
@@ -4378,81 +3906,11 @@ if (els.tstUpdateValuesBtn) {
 if (els.tstAddCouponBtn) {
   els.tstAddCouponBtn.addEventListener('click', () => {
     els.tstCouponTableBody.appendChild(createCouponRowData());
-    renderWinVPreview();
-    renderRapidCopyAssistant();
+    renderFtaSummary();
   });
 }
 if (els.tstCopyCouponsBtn) {
   els.tstCopyCouponsBtn.addEventListener('click', copyTstCoupons);
-}
-if (els.tstCopyFareBasisBtn) {
-  els.tstCopyFareBasisBtn.addEventListener('click', copyAllFareBasis);
-}
-if (els.tstCopyFb1Btn) {
-  els.tstCopyFb1Btn.addEventListener('click', copyFb1Column);
-}
-if (els.tstCopyFb2Btn) {
-  els.tstCopyFb2Btn.addEventListener('click', copyFb2Column);
-}
-if (els.tstCopyFb3Btn) {
-  els.tstCopyFb3Btn.addEventListener('click', copyFb3Column);
-}
-if (els.tstCopyFareFieldsBtn) {
-  els.tstCopyFareFieldsBtn.addEventListener('click', copyTstFareFields);
-}
-
-// Workaround 1 Panel Buttons
-if (els.w1CopyFb1Btn) {
-  els.w1CopyFb1Btn.addEventListener('click', copyFb1Column);
-}
-if (els.w1CopyFb2Btn) {
-  els.w1CopyFb2Btn.addEventListener('click', copyFb2Column);
-}
-if (els.w1CopyFb3Btn) {
-  els.w1CopyFb3Btn.addEventListener('click', copyFb3Column);
-}
-if (els.w1CopyFbTabLineBtn) {
-  els.w1CopyFbTabLineBtn.addEventListener('click', copyAllFareBasis);
-}
-if (els.w1CopyFareFieldsBtn) {
-  els.w1CopyFareFieldsBtn.addEventListener('click', copyTstFareFields);
-}
-if (els.w1CopyTaxesBtn) {
-  els.w1CopyTaxesBtn.addEventListener('click', copyTstTaxes);
-}
-if (els.w1CopyCouponsBtn) {
-  els.w1CopyCouponsBtn.addEventListener('click', copyTstCoupons);
-}
-
-// Workaround 2 Win+V Controls
-if (els.tstPrepWinVBtn) {
-  els.tstPrepWinVBtn.addEventListener('click', prepWinVClipboardHistory);
-}
-if (els.tstActionPrepWinVBtn) {
-  els.tstActionPrepWinVBtn.addEventListener('click', prepWinVClipboardHistory);
-}
-if (els.tstWinVHelpBtn && els.tstWinVHelp) {
-  els.tstWinVHelpBtn.addEventListener('click', () => {
-    const isHidden = els.tstWinVHelp.style.display === 'none';
-    els.tstWinVHelp.style.display = isHidden ? 'block' : 'none';
-  });
-}
-if (els.w2OrderReverse) {
-  els.w2OrderReverse.addEventListener('change', renderWinVPreview);
-}
-if (byId('w2OrderDirect')) {
-  byId('w2OrderDirect').addEventListener('change', renderWinVPreview);
-}
-if (els.w2IncludeSegments) {
-  els.w2IncludeSegments.addEventListener('change', renderWinVPreview);
-}
-
-// Workaround 3 Rapid Chips Controls
-if (els.tstResetRapidChipsBtn) {
-  els.tstResetRapidChipsBtn.addEventListener('click', resetRapidCopyChips);
-}
-if (els.tstCopyNextRapidChipBtn) {
-  els.tstCopyNextRapidChipBtn.addEventListener('click', copyNextRapidChip);
 }
 
 if (els.tstSelectAllCoupons) {
@@ -4460,8 +3918,7 @@ if (els.tstSelectAllCoupons) {
     els.tstCouponTableBody.querySelectorAll('.tst-coupon-check').forEach(chk => {
       chk.checked = e.target.checked;
     });
-    renderWinVPreview();
-    renderRapidCopyAssistant();
+    renderFtaSummary();
   });
 }
 if (els.tstToggleCollapseBtn) {
@@ -4497,8 +3954,6 @@ if (els.tstFareCalcString) {
     if (roe) {
       els.tstRoe.value = roe;
     }
-    renderWinVPreview();
-    renderRapidCopyAssistant();
     renderFtaSummary();
   });
 }
@@ -4508,29 +3963,21 @@ if (els.fareCalcString) {
     if (roe && els.tstRoe) {
       els.tstRoe.value = roe;
     }
-    renderWinVPreview();
-    renderRapidCopyAssistant();
     renderFtaSummary();
   });
 }
 if (els.tstBaseFare) {
   els.tstBaseFare.addEventListener('input', () => {
-    renderWinVPreview();
-    renderRapidCopyAssistant();
     renderFtaSummary();
   });
 }
 if (els.tstTotalAmount) {
   els.tstTotalAmount.addEventListener('input', () => {
-    renderWinVPreview();
-    renderRapidCopyAssistant();
     renderFtaSummary();
   });
 }
 if (els.tstRoe) {
   els.tstRoe.addEventListener('input', () => {
-    renderWinVPreview();
-    renderRapidCopyAssistant();
     renderFtaSummary();
   });
 }
@@ -4874,7 +4321,6 @@ if (els.ftaQuickTestBridgeBtn) {
 }
 
 initTstBookmarklet();
-initWorkaroundSuiteTabs();
 
 // Initialize theme, restore any existing session, and sync UI
 loadTheme();

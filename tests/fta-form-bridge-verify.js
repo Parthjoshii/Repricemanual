@@ -47,13 +47,11 @@ let browser;
   await page.click('#createTstButton');
   await page.waitForTimeout(250);
 
-  // --- 2. Switch to Workaround 4 Tab ---
-  console.log('\n--- 2. SWITCHING TO WORKAROUND 4: FTA FORM BRIDGE TAB ---');
+  // --- 2. Verify Dedicated Fare Transfer Assistant (FTA) Section ---
+  console.log('\n--- 2. VERIFYING DEDICATED FTA CONTAINER ---');
   await dismissModalIfOpen();
-  await page.click('#tabWorkaround4');
-  await page.waitForTimeout(100);
-  assert.ok(await page.isVisible('#panelWorkaround4'), 'Panel Workaround 4 must be visible');
-  console.log('✓ Tab 4 and Panel 4 displayed successfully');
+  assert.ok(await page.isVisible('#ftaSection'), '#ftaSection container must be visible in TST creator');
+  console.log('✓ Standalone FTA section displayed successfully');
 
   // --- 3. Verify FTA Summary Cards ---
   console.log('\n--- 3. VERIFYING FTA SUMMARY CARDS ---');

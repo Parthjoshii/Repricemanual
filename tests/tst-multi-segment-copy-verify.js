@@ -94,56 +94,38 @@ let browser;
     }
   }
 
-  // --- Step 3: Test 'Copy FB1 Column' Button ---
-  console.log('\n--- 3. TESTING "COPY FB1 COLUMN" BUTTON ---');
+  // --- Step 3: Test 'Copy Coupons' Button ---
+  console.log('\n--- 3. TESTING "COPY COUPONS" BUTTON ---');
   await dismissModalIfOpen();
-  await page.click('#tstCopyFb1Btn');
+  await page.click('#tstCopyCouponsBtn');
   await page.waitForTimeout(100);
-  const fb1Clipboard = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
-  console.log('FB1 Clipboard text:\n' + fb1Clipboard);
-  const expectedFb1 = ['QHAMPIE1', 'QHAMPIE1', 'UHEESIE1', 'UHEESIE1'].join('\n');
-  assert.strictEqual(fb1Clipboard, expectedFb1, `FB1 Column copy should match expected, got:\n${fb1Clipboard}`);
-  console.log('✓ "Copy FB1 Column" produces exact expected newline-separated string');
+  const couponsClipboard = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
+  console.log('Coupons Clipboard text:\n' + couponsClipboard);
+  assert.ok(couponsClipboard.includes('DUB-DXB'), 'Coupons copy should include DUB-DXB');
+  assert.ok(couponsClipboard.includes('DXB-COK'), 'Coupons copy should include DXB-COK');
+  assert.ok(couponsClipboard.includes('COK-DXB'), 'Coupons copy should include COK-DXB');
+  assert.ok(couponsClipboard.includes('DXB-DUB'), 'Coupons copy should include DXB-DUB');
+  console.log('✓ "Copy Coupons" produces complete flight segment matrix');
 
-  // --- Step 4: Test 'Copy FB2 Column' Button ---
-  console.log('\n--- 4. TESTING "COPY FB2 COLUMN" BUTTON ---');
+  // --- Step 4: Test Per-Row Fare Basis Copy Button ---
+  console.log('\n--- 4. TESTING PER-ROW FARE BASIS COPY BUTTON ---');
   await dismissModalIfOpen();
-  await page.click('#tstCopyFb2Btn');
+  const firstRowCopyBtn = page.locator('.tst-coupon-row').nth(0).locator('.tst-copy-row-fb-btn');
+  await firstRowCopyBtn.click();
   await page.waitForTimeout(100);
-  const fb2Clipboard = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
-  console.log('FB2 Clipboard text:\n' + fb2Clipboard);
-  const expectedFb2 = ['VFN2', 'VFN2', 'VFN2', 'VFN2'].join('\n');
-  assert.strictEqual(fb2Clipboard, expectedFb2, `FB2 Column copy should match expected, got:\n${fb2Clipboard}`);
-  console.log('✓ "Copy FB2 Column" produces exact expected newline-separated string');
+  const row1FbClipboard = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
+  console.log('Row 1 FB Clipboard:\n' + row1FbClipboard);
+  assert.strictEqual(row1FbClipboard, 'QHAMPIE1\tVFN2', 'Row 1 copy must be tab-separated QHAMPIE1\\tVFN2');
+  console.log('✓ Per-row Fare Basis copy verified');
 
-  // --- Step 5: Test 'Copy FB (Tab+Line)' Button ---
-  console.log('\n--- 5. TESTING "COPY FB (TAB+LINE)" BUTTON ---');
-  await dismissModalIfOpen();
-  await page.click('#tstCopyFareBasisBtn');
-  await page.waitForTimeout(100);
-  const fbAllClipboard = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
-  console.log('All FB Clipboard text:\n' + fbAllClipboard);
-  const expectedFbAll = [
-    'QHAMPIE1\tVFN2',
-    'QHAMPIE1\tVFN2',
-    'UHEESIE1\tVFN2',
-    'UHEESIE1\tVFN2'
-  ].join('\n');
-  assert.strictEqual(fbAllClipboard, expectedFbAll, `All FB copy should match expected tab-separated rows`);
-  console.log('✓ "Copy FB (Tab+Line)" produces exact tab-separated rows');
-
-  // --- Step 6: Test 'Copy FARE Fields' Button ---
-  console.log('\n--- 6. TESTING "COPY FARE FIELDS" BUTTON ---');
-  await dismissModalIfOpen();
-  await page.click('#tstCopyFareFieldsBtn');
-  await page.waitForTimeout(100);
-  const fareFieldsClipboard = await page.evaluate(() => navigator.clipboard.readText());
-  console.log('FARE Fields Clipboard text:\n' + fareFieldsClipboard);
-  const fareTokens = fareFieldsClipboard.split('\t');
-  assert.strictEqual(fareTokens.length, 9, `Expected 9 tab-separated fields in FARE block, got ${fareTokens.length}`);
-  assert.strictEqual(fareTokens[2], '0.855028', 'ROE in FARE block must match ROE in FCS (0.855028)');
-  assert.strictEqual(fareTokens[4], '', 'Tour code must always be blank');
-  console.log('✓ "Copy FARE Fields" produces 9 tab-separated fields with matching ROE and blank Tour code');
+  // --- Step 5: Test Dedicated Fare Transfer Assistant (FTA) Section ---
+  console.log('\n--- 5. TESTING DEDICATED FARE TRANSFER ASSISTANT (FTA) SECTION ---');
+  assert.ok(await page.isVisible('#ftaSection'), '#ftaSection must be visible');
+  const baseSummary = await page.textContent('#ftaSummaryBase');
+  const roeSummary = await page.textContent('#ftaSummaryRoe');
+  assert.strictEqual(baseSummary, 'USD800.00', 'Base fare should be USD800.00');
+  assert.strictEqual(roeSummary, '0.855028', 'ROE should match FCS ROE 0.855028');
+  console.log('✓ Dedicated FTA Section cards validated');
 
   // --- Step 7: Test 'Copy TST (For Tool & Bookmarklet)' Button ---
   console.log('\n--- 7. TESTING "COPY TST (FOR TOOL & BOOKMARKLET)" BUTTON ---');
@@ -190,16 +172,18 @@ let browser;
   await page.waitForTimeout(200);
 
   await dismissModalIfOpen();
-  await page.click('#tstCopyFb1Btn');
-  await page.waitForTimeout(100);
-  const fb1Child = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
-  assert.strictEqual(fb1Child, ['QHAMPIE1', 'QHAMPIE1', 'UHEESIE1', 'UHEESIE1'].join('\n'));
+  const row1Fb1 = await page.locator('.tst-coupon-row').nth(0).locator('.tst-fb1').inputValue();
+  const row1Fb2 = await page.locator('.tst-coupon-row').nth(0).locator('.tst-fb2').inputValue();
+  const row1Fb3 = await page.locator('.tst-coupon-row').nth(0).locator('.tst-fb3').inputValue();
+  assert.strictEqual(row1Fb1, 'QHAMPIE1', 'Row 1 FB1 should be QHAMPIE1');
+  assert.strictEqual(row1Fb2, 'CH', 'Row 1 FB2 should be CH');
+  assert.strictEqual(row1Fb3, 'VFN2', 'Row 1 FB3 should be VFN2');
 
-  await dismissModalIfOpen();
-  await page.click('#tstCopyFb2Btn');
+  const row1CopyBtn = page.locator('.tst-coupon-row').nth(0).locator('.tst-copy-row-fb-btn');
+  await row1CopyBtn.click();
   await page.waitForTimeout(100);
-  const fb2Child = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
-  assert.strictEqual(fb2Child, ['CH', 'CH', 'CH', 'CH'].join('\n'), `FB2 with CH PTC should be CH, got ${fb2Child}`);
+  const row1FbSplit = (await page.evaluate(() => navigator.clipboard.readText())).replace(/\r\n/g, '\n');
+  assert.strictEqual(row1FbSplit, 'QHAMPIE1\tCH\tVFN2', 'Row 1 split must be QHAMPIE1\\tCH\\tVFN2');
   console.log('✓ Scenario 2 PTC test passed: FB1=QHAMPIE1, FB2=CH, FB3=VFN2');
 
   console.log('\n================================================================');

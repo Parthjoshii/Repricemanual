@@ -672,245 +672,72 @@ Changes in V4.6 (Bug Fix Release):
               </ol>
             </div>
 
-            <!-- In-House Tool Workarounds Suite -->
-            <div class="tst-workaround-suite" id="tstWorkaroundSuite">
-              <div class="tst-suite-header">
-                <div class="tst-suite-title-group">
-                  <span class="tst-suite-badge">IN-HOUSE WINDOWS APP INTEGRATION SUITE</span>
-                  <h4 class="tst-suite-title">In-House Tool Fast-Paste Workarounds</h4>
-                  <p class="tst-suite-desc">100% compliant with corporate IT security (no external scripts or installations). Switch tabs to test different copy/paste strategies:</p>
+            <!-- FARE TRANSFER ASSISTANT (FTA) - UNIVERSAL FORM BRIDGE -->
+            <div class="fta-container" id="ftaSection">
+              <div class="fta-header-bar">
+                <div class="fta-title-group">
+                  <span class="tst-suite-badge">ENTERPRISE WORKFLOW AUTOMATION</span>
+                  <h4 class="tst-suite-title">🚀 Fare Transfer Assistant (Universal Form Bridge &amp; Selective Merge)</h4>
+                  <p class="tst-suite-desc">1-Click transfer into your in-house servicing application with selective merge review and zero typing errors.</p>
                 </div>
-                <div class="tst-suite-tabs" role="tablist" aria-label="In-house tool integration workarounds">
-                  <button type="button" class="tst-suite-tab active" id="tabWorkaround1" data-target="panelWorkaround1" role="tab" aria-selected="true" aria-controls="panelWorkaround1">
-                    📊 Workaround 1: Column Copy
-                  </button>
-                  <button type="button" class="tst-suite-tab" id="tabWorkaround2" data-target="panelWorkaround2" role="tab" aria-selected="false" aria-controls="panelWorkaround2">
-                    ⚡ Workaround 2: Win + V History
-                  </button>
-                  <button type="button" class="tst-suite-tab" id="tabWorkaround3" data-target="panelWorkaround3" role="tab" aria-selected="false" aria-controls="panelWorkaround3">
-                    🎯 Workaround 3: Rapid Click-to-Copy
-                  </button>
-                  <button type="button" class="tst-suite-tab" id="tabWorkaround4" data-target="panelWorkaround4" role="tab" aria-selected="false" aria-controls="panelWorkaround4">
-                    🚀 Workaround 4: FTA Form Bridge
+                <div class="fta-top-actions">
+                  <button type="button" id="ftaOpenReviewModalBtn" class="btn-create-tst tst-btn-small" style="white-space: nowrap;">
+                    🔍 Pre-Transfer Selective Review
                   </button>
                 </div>
               </div>
 
-              <!-- PANEL 1: WORKAROUND 1 (COLUMN & GRID COPY) -->
-              <div class="tst-suite-panel active" id="panelWorkaround1" role="tabpanel" aria-labelledby="tabWorkaround1">
-                <div class="tst-w-intro">
-                  <span class="tst-panel-icon">📊</span>
-                  <div>
-                    <strong>Workaround 1: Vertical Column &amp; Multi-Row Grid Copy</strong>
-                    <p>Designed for in-house tables/grids that support column pasting. Click a button below, then click the top cell in your in-house application grid and press <kbd>Ctrl</kbd> + <kbd>V</kbd>.</p>
+              <!-- Selective Summary Cards Grid -->
+              <div class="fta-cards-grid">
+                <div class="fta-card">
+                  <div class="fta-card-header">
+                    <span class="fta-card-title">💵 Financial Header</span>
+                    <span class="fta-status-badge active" id="ftaBadgeFinancials">Ready</span>
                   </div>
-                </div>
-                <div class="tst-w1-btn-grid">
-                  <button type="button" id="w1CopyFb1Btn" class="secondary tst-w-btn" aria-label="Copy Fare Basis 1 column for in-house tool">
-                    <span class="btn-title">📋 Copy FB1 Column</span>
-                    <span class="btn-desc">Copies Fare Basis 1 down all flight segments</span>
-                  </button>
-                  <button type="button" id="w1CopyFb2Btn" class="secondary tst-w-btn" aria-label="Copy Fare Basis 2 column for in-house tool">
-                    <span class="btn-title">📋 Copy FB2 Column</span>
-                    <span class="btn-desc">Copies Fare Basis 2 down all flight segments</span>
-                  </button>
-                  <button type="button" id="w1CopyFb3Btn" class="secondary tst-w-btn" aria-label="Copy Fare Basis 3 column for in-house tool">
-                    <span class="btn-title">📋 Copy FB3 Column</span>
-                    <span class="btn-desc">Copies Fare Basis 3 (PTC / ticket code) down all flight segments</span>
-                  </button>
-                  <button type="button" id="w1CopyFbTabLineBtn" class="secondary tst-w-btn" aria-label="Copy all Fare Basis tab-separated">
-                    <span class="btn-title">📋 Copy FB (Tab+Line)</span>
-                    <span class="btn-desc">Copies FB1 [Tab] FB2 per segment with newlines</span>
-                  </button>
-                  <button type="button" id="w1CopyFareFieldsBtn" class="secondary tst-w-btn" aria-label="Copy FARE section fields tab-separated">
-                    <span class="btn-title">📋 Copy FARE Fields (TSV)</span>
-                    <span class="btn-desc">9 Tab-separated fields (Base, Equiv, ROE, Total, etc.)</span>
-                  </button>
-                  <button type="button" id="w1CopyTaxesBtn" class="secondary tst-w-btn" aria-label="Copy taxes column">
-                    <span class="btn-title">📋 Copy Taxes Column</span>
-                    <span class="btn-desc">Newline-separated tax amounts &amp; codes</span>
-                  </button>
-                  <button type="button" id="w1CopyCouponsBtn" class="secondary tst-w-btn" aria-label="Copy coupon segments for in-house tool">
-                    <span class="btn-title">📋 Copy Full Coupons Grid</span>
-                    <span class="btn-desc">Complete coupon rows tab-separated</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- PANEL 2: WORKAROUND 2 (WINDOWS CLIPBOARD HISTORY WIN + V) -->
-              <div class="tst-suite-panel" id="panelWorkaround2" role="tabpanel" aria-labelledby="tabWorkaround2" style="display: none;">
-                <div class="tst-w-intro">
-                  <span class="tst-panel-icon">⚡</span>
-                  <div>
-                    <strong>Workaround 2: Windows Native Clipboard History (<kbd>Win</kbd> + <kbd>V</kbd>)</strong>
-                    <p>Loads all required TST fields into your Windows native clipboard history buffer with visual sequencing. In your in-house tool, simply press <kbd>Win</kbd> + <kbd>V</kbd> to see all loaded values and click to paste!</p>
+                  <div class="fta-card-body" id="ftaCardFinancialsBody">
+                    <div><small>Base Fare:</small> <strong id="ftaSummaryBase">--</strong></div>
+                    <div><small>ROE:</small> <span id="ftaSummaryRoe">--</span></div>
+                    <div><small>Total:</small> <strong id="ftaSummaryTotal">--</strong></div>
+                    <div><small>Org/Dest:</small> <span id="ftaSummaryOrgDest">--</span></div>
                   </div>
                 </div>
 
-                <div class="tst-w2-controls">
-                  <div class="tst-w2-options">
-                    <label class="tst-radio-label">
-                      <input type="radio" name="w2Order" value="reverse" checked id="w2OrderReverse">
-                      <span><strong>Top-to-Bottom (<kbd>Win</kbd>+<kbd>V</kbd> Recommended)</strong>: Items appear in top-down form order.</span>
-                    </label>
-                    <label class="tst-radio-label">
-                      <input type="radio" name="w2Order" value="direct" id="w2OrderDirect">
-                      <span><strong>Direct Order</strong>: Items appear in chronological queue order.</span>
-                    </label>
-                    <label class="tst-radio-label">
-                      <input type="checkbox" id="w2IncludeSegments" checked>
-                      <span>Include individual coupon Fare Bases (FB1 &amp; FB2 for each flight row)</span>
-                    </label>
+                <div class="fta-card">
+                  <div class="fta-card-header">
+                    <span class="fta-card-title">🏷️ Taxes Breakdown</span>
+                    <span class="fta-status-badge active" id="ftaBadgeTaxes">Ready</span>
                   </div>
-                  <div class="tst-w2-actions">
-                    <button type="button" id="tstPrepWinVBtn" class="btn-create-tst" style="font-size: 0.9rem; padding: 10px 20px;">
-                      ⚡ Auto-Prep Win + V Clipboard History
-                    </button>
-                    <button type="button" id="tstWinVHelpBtn" class="secondary tst-btn-small">
-                      ❓ How to use Win + V
-                    </button>
+                  <div class="fta-card-body" id="ftaCardTaxesBody">
+                    <div id="ftaSummaryTaxes" style="max-height: 80px; overflow-y: auto; font-family: var(--font-mono, monospace); font-size: 0.8rem;">--</div>
                   </div>
                 </div>
 
-                <!-- Progress indicator for Win + V loading -->
-                <div id="tstWinVProgressWrapper" class="tst-progress-wrapper" style="display: none;">
-                  <div class="tst-progress-header">
-                    <span id="tstWinVProgressText">Writing items to Windows Clipboard History...</span>
-                    <span id="tstWinVProgressCount">0%</span>
+                <div class="fta-card">
+                  <div class="fta-card-header">
+                    <span class="fta-card-title">✈️ Coupon Fare Bases Matrix</span>
+                    <span class="fta-status-badge active" id="ftaBadgeCoupons">Ready</span>
                   </div>
-                  <div class="tst-progress-bar-bg">
-                    <div id="tstWinVProgressBar" class="tst-progress-bar-fill" style="width: 0%;"></div>
-                  </div>
-                </div>
-
-                <div id="tstWinVHelp" class="tst-bookmarklet-help" style="display: none; margin-top: 12px;">
-                  <ol>
-                    <li><strong>One-time Windows check:</strong> Press <kbd>Win</kbd> + <kbd>V</kbd> on your keyboard. If prompted, click <em>"Turn on"</em>.</li>
-                    <li>Click <strong>⚡ Auto-Prep Win + V Clipboard History</strong> above. The calculator will sequence each field into Windows memory.</li>
-                    <li>Switch to your in-house Windows tool.</li>
-                    <li>Click the first field (e.g. Fare Basis 1 or Base Fare), press <kbd>Win</kbd> + <kbd>V</kbd>, and click the matching item from the pop-up list.</li>
-                    <li>Press <kbd>Tab</kbd> to move to the next field, press <kbd>Win</kbd> + <kbd>V</kbd>, and click the next item! Fast, reliable, and zero script permissions needed.</li>
-                  </ol>
-                </div>
-
-                <div class="tst-w2-preview-box">
-                  <span class="tst-w2-preview-title">Items queued for Clipboard History:</span>
-                  <div id="tstWinVPreviewList" class="tst-winv-preview-list">
-                    <!-- Populated dynamically -->
+                  <div class="fta-card-body" id="ftaCardCouponsBody">
+                    <div id="ftaSummaryCoupons" style="max-height: 80px; overflow-y: auto; font-family: var(--font-mono, monospace); font-size: 0.8rem;">--</div>
                   </div>
                 </div>
               </div>
 
-              <!-- PANEL 3: WORKAROUND 3 (RAPID CLICK-TO-COPY ASSISTANT) -->
-              <div class="tst-suite-panel" id="panelWorkaround3" role="tabpanel" aria-labelledby="tabWorkaround3" style="display: none;">
-                <div class="tst-w-intro" style="justify-content: space-between; flex-wrap: wrap;">
-                  <div style="display: flex; gap: 10px; align-items: center;">
-                    <span class="tst-panel-icon">🎯</span>
-                    <div>
-                      <strong>Workaround 3: Rapid Click-to-Copy Assistant (Visual Quick-Paste Strip)</strong>
-                      <p>Click any field chip to copy its exact value with 1 click. The next field chip highlights with a glowing ring to guide your mouse!</p>
-                    </div>
-                  </div>
-                  <div class="tst-w3-top-actions">
-                    <button type="button" id="tstCopyNextRapidChipBtn" class="btn-create-tst tst-btn-small" style="white-space: nowrap;">📋 Copy Next Field</button>
-                    <button type="button" id="tstResetRapidChipsBtn" class="secondary tst-btn-small" style="white-space: nowrap;">🔄 Reset Copied Status</button>
-                  </div>
-                </div>
-
-                <div class="tst-rapid-chips-wrapper">
-                  <!-- Flight Segments Chips -->
-                  <div class="tst-rapid-group">
-                    <div class="tst-rapid-group-header">
-                      <span>✈️ FLIGHT SEGMENTS (FARE BASIS &amp; DETAILS)</span>
-                      <span class="tst-rapid-hint">Click FB1 or FB2 to copy for in-house flight row</span>
-                    </div>
-                    <div id="tstRapidCouponChips" class="tst-chips-grid">
-                      <!-- Rendered dynamically -->
-                    </div>
-                  </div>
-
-                  <!-- Fare Details Chips -->
-                  <div class="tst-rapid-group">
-                    <div class="tst-rapid-group-header">
-                      <span>💵 FARE &amp; FINANCIAL FIELDS</span>
-                      <span class="tst-rapid-hint">Click any field to copy value</span>
-                    </div>
-                    <div id="tstRapidFareChips" class="tst-chips-grid">
-                      <!-- Rendered dynamically -->
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- PANEL 4: WORKAROUND 4 (FARE TRANSFER ASSISTANT BRIDGE & SELECTIVE REVIEW) -->
-              <div class="tst-suite-panel" id="panelWorkaround4" role="tabpanel" aria-labelledby="tabWorkaround4" style="display: none;">
-                <div class="tst-w-intro" style="justify-content: space-between; flex-wrap: wrap;">
-                  <div style="display: flex; gap: 10px; align-items: center;">
-                    <span class="tst-panel-icon">🚀</span>
-                    <div>
-                      <strong>Workaround 4: Fare Transfer Assistant (Universal Form Bridge &amp; Selective Merge)</strong>
-                      <p>Replicates the in-house tool's review popup! Selectively review which fields to inject, then trigger the 1-Click Form Bridge to auto-populate the desktop application.</p>
-                    </div>
-                  </div>
-                  <div class="tst-w4-top-actions">
-                    <button type="button" id="ftaOpenReviewModalBtn" class="btn-create-tst tst-btn-small" style="white-space: nowrap;">
-                      🔍 Pre-Transfer Selective Review
-                    </button>
-                  </div>
-                </div>
-
-                <!-- Selective Summary Cards Grid -->
-                <div class="fta-cards-grid">
-                  <div class="fta-card">
-                    <div class="fta-card-header">
-                      <span class="fta-card-title">💵 Financial Header</span>
-                      <span class="fta-status-badge active" id="ftaBadgeFinancials">Ready</span>
-                    </div>
-                    <div class="fta-card-body" id="ftaCardFinancialsBody">
-                      <div><small>Base Fare:</small> <strong id="ftaSummaryBase">--</strong></div>
-                      <div><small>ROE:</small> <span id="ftaSummaryRoe">--</span></div>
-                      <div><small>Total:</small> <strong id="ftaSummaryTotal">--</strong></div>
-                      <div><small>Org/Dest:</small> <span id="ftaSummaryOrgDest">--</span></div>
-                    </div>
-                  </div>
-
-                  <div class="fta-card">
-                    <div class="fta-card-header">
-                      <span class="fta-card-title">🏷️ Taxes Breakdown</span>
-                      <span class="fta-status-badge active" id="ftaBadgeTaxes">Ready</span>
-                    </div>
-                    <div class="fta-card-body" id="ftaCardTaxesBody">
-                      <div id="ftaSummaryTaxes" style="max-height: 80px; overflow-y: auto; font-family: var(--font-mono, monospace); font-size: 0.8rem;">--</div>
-                    </div>
-                  </div>
-
-                  <div class="fta-card">
-                    <div class="fta-card-header">
-                      <span class="fta-card-title">✈️ Coupon Fare Bases Matrix</span>
-                      <span class="fta-status-badge active" id="ftaBadgeCoupons">Ready</span>
-                    </div>
-                    <div class="fta-card-body" id="ftaCardCouponsBody">
-                      <div id="ftaSummaryCoupons" style="max-height: 80px; overflow-y: auto; font-family: var(--font-mono, monospace); font-size: 0.8rem;">--</div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Bridge Actions Row -->
-                <div class="fta-bridge-actions-bar">
-                  <div class="fta-bridge-btns">
-                    <button type="button" id="ftaExportJsonBtn" class="secondary tst-w-btn" aria-label="Copy Structured Fare Package JSON">
-                      <span class="btn-title">📋 Copy Structured Package (JSON)</span>
-                      <span class="btn-desc">Enterprise schema-validated payload</span>
-                    </button>
-                    <button type="button" id="ftaCopyBridgeSnippetBtn" class="secondary tst-w-btn" aria-label="Copy DevTools Form Bridge snippet">
-                      <span class="btn-title">⚡ Copy Form Bridge Snippet</span>
-                      <span class="btn-desc">React/Angular prototype setter script for DevTools</span>
-                    </button>
-                    <button type="button" id="ftaQuickTestBridgeBtn" class="secondary tst-w-btn" aria-label="Simulate Form Bridge in this page">
-                      <span class="btn-title">🧪 Test Bridge Simulation</span>
-                      <span class="btn-desc">Validates payload structure and event dispatch</span>
-                    </button>
-                  </div>
+              <!-- Bridge Actions Row -->
+              <div class="fta-bridge-actions-bar">
+                <div class="fta-bridge-btns">
+                  <button type="button" id="ftaExportJsonBtn" class="secondary tst-w-btn" aria-label="Copy Structured Fare Package JSON">
+                    <span class="btn-title">📋 Copy Structured Package (JSON)</span>
+                    <span class="btn-desc">Enterprise schema-validated payload</span>
+                  </button>
+                  <button type="button" id="ftaCopyBridgeSnippetBtn" class="secondary tst-w-btn" aria-label="Copy DevTools Form Bridge snippet">
+                    <span class="btn-title">⚡ Copy Form Bridge Snippet</span>
+                    <span class="btn-desc">React/Angular prototype setter script for DevTools</span>
+                  </button>
+                  <button type="button" id="ftaQuickTestBridgeBtn" class="secondary tst-w-btn" aria-label="Simulate Form Bridge in this page">
+                    <span class="btn-title">🧪 Test Bridge Simulation</span>
+                    <span class="btn-desc">Validates payload structure and event dispatch</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -920,10 +747,6 @@ Changes in V4.6 (Bug Fix Release):
               <div class="tst-section-title-bar" style="justify-content: flex-end;">
                 <div class="tst-coupon-actions">
                   <button id="tstAddCouponBtn" type="button" class="secondary tst-btn-small" aria-label="Add flight coupon row">+ Add Segment</button>
-                  <button id="tstCopyFb1Btn" type="button" class="secondary tst-btn-small" aria-label="Copy Fare Basis 1 column for in-house tool">📋 Copy FB1 Column</button>
-                  <button id="tstCopyFb2Btn" type="button" class="secondary tst-btn-small" aria-label="Copy Fare Basis 2 column for in-house tool">📋 Copy FB2 Column</button>
-                  <button id="tstCopyFb3Btn" type="button" class="secondary tst-btn-small" aria-label="Copy Fare Basis 3 column for in-house tool">📋 Copy FB3 Column</button>
-                  <button id="tstCopyFareBasisBtn" type="button" class="secondary tst-btn-small" aria-label="Copy all Fare Basis tab-separated">📋 Copy FB (Tab+Line)</button>
                   <button id="tstCopyCouponsBtn" type="button" class="secondary tst-btn-small" aria-label="Copy coupon segments for in-house tool">📋 Copy Coupons</button>
                 </div>
               </div>
@@ -1010,8 +833,6 @@ Changes in V4.6 (Bug Fix Release):
             <div class="tst-action-row">
               <button id="tstCopyBtn" type="button" class="btn-create-tst" aria-label="Copy TST fields for in-house tool">📋 Copy TST (For Tool &amp; Bookmarklet)</button>
               <button id="tstFtaReviewBtn" type="button" class="secondary" aria-label="Open Fare Transfer Assistant Selective Review">🚀 FTA Selective Review</button>
-              <button id="tstActionPrepWinVBtn" type="button" class="secondary" aria-label="Auto-prep Windows Clipboard History">⚡ Auto-Prep Win + V</button>
-              <button id="tstCopyFareFieldsBtn" type="button" class="secondary" aria-label="Copy FARE section fields tab-separated">📋 Copy FARE Fields</button>
               <button id="tstCopyTaxesBtnMain" type="button" class="secondary" aria-label="Copy taxes for TST tax column">📋 Copy Taxes</button>
               <button id="tstGenerateBtn" type="button" class="secondary" aria-label="Generate formatted TST record">Generate GDS Text</button>
               <button id="tstClearBtn" type="button" class="secondary" aria-label="Clear TST fields">Clear TST</button>

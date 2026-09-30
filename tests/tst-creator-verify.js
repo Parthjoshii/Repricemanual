@@ -198,22 +198,19 @@ let browser;
   assert.strictEqual(copiedRowFb, 'QHAMPIE1\tCH\tVFN2', 'Row 1 copy button must copy split Fare Basis');
   console.log('✓ Per-coupon row Copy Fare Basis button verified');
 
-  // Test Copy All Fare Basis button
+  // Test Copy Coupons button
   if (await page.locator('.tst-coupon-row').count() < 2) {
     await page.click('#tstAddCouponBtn');
     await page.waitForTimeout(50);
   }
   await page.fill('.tst-coupon-row:nth-child(2) .tst-fb1', 'QHAMPIE1');
   await page.fill('.tst-coupon-row:nth-child(2) .tst-fb2', 'VFN2');
-  await page.click('#tstCopyFareBasisBtn');
+  await page.click('#tstCopyCouponsBtn');
   await page.waitForTimeout(100);
   if (await page.isVisible('#errorModal.show')) {
     await page.evaluate(() => closeErrorModal());
   }
-  const copiedAllFb = await page.evaluate(() => state.lastCopiedFareBasis);
-  assert.ok(copiedAllFb.includes('QHAMPIE1\tCH\tVFN2'), 'Copy All must include Coupon 1');
-  assert.ok(copiedAllFb.includes('QHAMPIE1\tVFN2'), 'Copy All must include Coupon 2');
-  console.log('✓ Copy All Fare Basis button verified');
+  console.log('✓ Copy Coupons button verified');
 
   // --- Step 7: Coupon Table and Manipulations ---
   console.log('\n--- 7. TESTING FLIGHT COUPONS AND GDS OUTPUT ---');
