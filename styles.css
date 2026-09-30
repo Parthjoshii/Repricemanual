@@ -1894,6 +1894,225 @@ th {
   border-color: #dcd7be;
 }
 
+/* Fare Transfer Assistant (FTA) Bridge & Pre-Transfer Review */
+.fta-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 14px;
+  margin-top: 14px;
+}
+
+.fta-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.fta-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  padding-bottom: 6px;
+}
+
+.fta-card-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.fta-status-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.fta-card-body {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.fta-card-body strong {
+  color: var(--text-primary);
+}
+
+.fta-bridge-actions-bar {
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-color);
+}
+
+.fta-bridge-btns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+/* FTA Selective Review Modal */
+.fta-review-modal-box {
+  max-width: 620px;
+  width: 95%;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+.fta-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 12px;
+}
+
+.modal-close-icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  line-height: 1;
+}
+
+.modal-close-icon-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.fta-modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.fta-review-items {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.fta-review-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.fta-review-item:hover {
+  background: rgba(63, 81, 181, 0.08);
+  border-color: var(--accent-color, #3f51b5);
+}
+
+.fta-review-item input[type="checkbox"] {
+  margin-top: 3px;
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-color, #3f51b5);
+}
+
+.fta-item-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fta-item-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.fta-item-val {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  font-family: var(--font-mono, monospace);
+  word-break: break-all;
+}
+
+.fta-compliance-notice {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 12px;
+  background: rgba(63, 81, 181, 0.1);
+  border: 1px solid rgba(63, 81, 181, 0.25);
+  border-radius: 8px;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.fta-compliance-notice strong {
+  color: var(--text-primary);
+}
+
+.fta-modal-footer {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  border-top: 1px solid var(--border-color);
+  padding-top: 14px;
+}
+
+/* Light Mode Overrides for FTA */
+[data-theme="light"] .fta-card {
+  background: #ffffff;
+  border-color: #dcd7be;
+}
+
+[data-theme="light"] .fta-card-header {
+  border-bottom-color: #e2e8f0;
+}
+
+[data-theme="light"] .fta-review-modal-box {
+  background: #faf9f0;
+  border-color: #dcd7be;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .fta-review-item {
+  background: #ffffff;
+  border-color: #dcd7be;
+}
+
+[data-theme="light"] .fta-review-item:hover {
+  background: #e8eaf6;
+  border-color: #3f51b5;
+}
+
+[data-theme="light"] .fta-compliance-notice {
+  background: #ede7f6;
+  border-color: #c5cae9;
+  color: #1a237e;
+}
+
 
 
 

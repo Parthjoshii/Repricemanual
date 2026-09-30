@@ -72,6 +72,75 @@ Changes in V4.6 (Bug Fix Release):
       </div>
     </div>
   </div>
+  <!-- Fare Transfer Assistant (FTA) Pre-Transfer Selective Review & Merge Modal -->
+  <div id="ftaReviewModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="ftaReviewTitle">
+    <div class="modal-box fta-review-modal-box">
+      <div class="fta-modal-header">
+        <div>
+          <span class="tst-suite-badge">PRE-TRANSFER SELECTIVE MERGE</span>
+          <h3 id="ftaReviewTitle" style="margin: 4px 0 0 0; color: var(--text-primary); font-size: 1.15rem;">Review &amp; Select Fare Components to Transfer</h3>
+          <p style="margin: 4px 0 0 0; font-size: 0.8rem; color: var(--text-secondary);">Select which pricing categories to inject into your in-house servicing application.</p>
+        </div>
+        <button type="button" class="modal-close-icon-btn" onclick="closeFtaReviewModal()" aria-label="Close review modal">✕</button>
+      </div>
+
+      <div class="fta-modal-body">
+        <div class="fta-review-items">
+          <label class="fta-review-item" for="ftaCheckBaseFare">
+            <input type="checkbox" id="ftaCheckBaseFare" checked>
+            <div class="fta-item-content">
+              <span class="fta-item-title">Base Fare &amp; Financials</span>
+              <span class="fta-item-val" id="ftaPreviewBaseFare">USD 800.00 | ROE 0.855028 | Total USD 800.00</span>
+            </div>
+          </label>
+
+          <label class="fta-review-item" for="ftaCheckTaxes">
+            <input type="checkbox" id="ftaCheckTaxes" checked>
+            <div class="fta-item-content">
+              <span class="fta-item-title">Taxes (with Paid 'PD' Rules)</span>
+              <span class="fta-item-val" id="ftaPreviewTaxes">PD123YA PD456AE 50ZR</span>
+            </div>
+          </label>
+
+          <label class="fta-review-item" for="ftaCheckFcs">
+            <input type="checkbox" id="ftaCheckFcs" checked>
+            <div class="fta-item-content">
+              <span class="fta-item-title">Fare Calculation String (FCS)</span>
+              <span class="fta-item-val" id="ftaPreviewFcs">DUB EK X/DXB EK COK...</span>
+            </div>
+          </label>
+
+          <label class="fta-review-item" for="ftaCheckEndorsements">
+            <input type="checkbox" id="ftaCheckEndorsements" checked>
+            <div class="fta-item-content">
+              <span class="fta-item-title">Endorsements</span>
+              <span class="fta-item-val" id="ftaPreviewEndorsements">NON-REF/NON-CHANG/VALID ON ISSUING CARRIER ONLY</span>
+            </div>
+          </label>
+
+          <label class="fta-review-item" for="ftaCheckCoupons">
+            <input type="checkbox" id="ftaCheckCoupons" checked>
+            <div class="fta-item-content">
+              <span class="fta-item-title">Coupon Fare Bases (FB1, FB2, FB3 Grid)</span>
+              <span class="fta-item-val" id="ftaPreviewCoupons">4 Flight Segments (QHAMPIE1/VFN2)</span>
+            </div>
+          </label>
+        </div>
+
+        <div class="fta-compliance-notice">
+          <span style="font-size: 1.1rem;">🛡️</span>
+          <span><strong>Human-in-the-Loop Governance:</strong> Values will be pre-filled into target inputs with synthetic change events. Final ticket submission remains strictly your responsibility.</span>
+        </div>
+      </div>
+
+      <div class="fta-modal-footer">
+        <button type="button" class="secondary tst-btn-small" onclick="closeFtaReviewModal()">Cancel</button>
+        <button type="button" id="ftaCopyJsonPackageBtn" class="secondary tst-btn-small">📋 Copy JSON Package</button>
+        <button type="button" id="ftaCopyTsvPackageBtn" class="secondary tst-btn-small">📋 Copy Dual TSV</button>
+        <button type="button" id="ftaCopyInjectorSnippetBtn" class="btn-create-tst tst-btn-small">⚡ Copy 1-Click Form Bridge Code</button>
+      </div>
+    </div>
+  </div>
   <div id="errorDisplay" class="error-display" role="alert" aria-live="assertive" aria-atomic="true"></div>
   <div id="restoreBanner" class="restore-banner" role="status" aria-live="polite" style="display: none;">
     <span class="restore-banner-text">A previous session was found.</span>
@@ -621,6 +690,9 @@ Changes in V4.6 (Bug Fix Release):
                   <button type="button" class="tst-suite-tab" id="tabWorkaround3" data-target="panelWorkaround3" role="tab" aria-selected="false" aria-controls="panelWorkaround3">
                     🎯 Workaround 3: Rapid Click-to-Copy
                   </button>
+                  <button type="button" class="tst-suite-tab" id="tabWorkaround4" data-target="panelWorkaround4" role="tab" aria-selected="false" aria-controls="panelWorkaround4">
+                    🚀 Workaround 4: FTA Form Bridge
+                  </button>
                 </div>
               </div>
 
@@ -769,6 +841,78 @@ Changes in V4.6 (Bug Fix Release):
                   </div>
                 </div>
               </div>
+
+              <!-- PANEL 4: WORKAROUND 4 (FARE TRANSFER ASSISTANT BRIDGE & SELECTIVE REVIEW) -->
+              <div class="tst-suite-panel" id="panelWorkaround4" role="tabpanel" aria-labelledby="tabWorkaround4" style="display: none;">
+                <div class="tst-w-intro" style="justify-content: space-between; flex-wrap: wrap;">
+                  <div style="display: flex; gap: 10px; align-items: center;">
+                    <span class="tst-panel-icon">🚀</span>
+                    <div>
+                      <strong>Workaround 4: Fare Transfer Assistant (Universal Form Bridge &amp; Selective Merge)</strong>
+                      <p>Replicates the in-house tool's review popup! Selectively review which fields to inject, then trigger the 1-Click Form Bridge to auto-populate the desktop application.</p>
+                    </div>
+                  </div>
+                  <div class="tst-w4-top-actions">
+                    <button type="button" id="ftaOpenReviewModalBtn" class="btn-create-tst tst-btn-small" style="white-space: nowrap;">
+                      🔍 Pre-Transfer Selective Review
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Selective Summary Cards Grid -->
+                <div class="fta-cards-grid">
+                  <div class="fta-card">
+                    <div class="fta-card-header">
+                      <span class="fta-card-title">💵 Financial Header</span>
+                      <span class="fta-status-badge active" id="ftaBadgeFinancials">Ready</span>
+                    </div>
+                    <div class="fta-card-body" id="ftaCardFinancialsBody">
+                      <div><small>Base Fare:</small> <strong id="ftaSummaryBase">--</strong></div>
+                      <div><small>ROE:</small> <span id="ftaSummaryRoe">--</span></div>
+                      <div><small>Total:</small> <strong id="ftaSummaryTotal">--</strong></div>
+                      <div><small>Org/Dest:</small> <span id="ftaSummaryOrgDest">--</span></div>
+                    </div>
+                  </div>
+
+                  <div class="fta-card">
+                    <div class="fta-card-header">
+                      <span class="fta-card-title">🏷️ Taxes Breakdown</span>
+                      <span class="fta-status-badge active" id="ftaBadgeTaxes">Ready</span>
+                    </div>
+                    <div class="fta-card-body" id="ftaCardTaxesBody">
+                      <div id="ftaSummaryTaxes" style="max-height: 80px; overflow-y: auto; font-family: var(--font-mono, monospace); font-size: 0.8rem;">--</div>
+                    </div>
+                  </div>
+
+                  <div class="fta-card">
+                    <div class="fta-card-header">
+                      <span class="fta-card-title">✈️ Coupon Fare Bases Matrix</span>
+                      <span class="fta-status-badge active" id="ftaBadgeCoupons">Ready</span>
+                    </div>
+                    <div class="fta-card-body" id="ftaCardCouponsBody">
+                      <div id="ftaSummaryCoupons" style="max-height: 80px; overflow-y: auto; font-family: var(--font-mono, monospace); font-size: 0.8rem;">--</div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Bridge Actions Row -->
+                <div class="fta-bridge-actions-bar">
+                  <div class="fta-bridge-btns">
+                    <button type="button" id="ftaExportJsonBtn" class="secondary tst-w-btn" aria-label="Copy Structured Fare Package JSON">
+                      <span class="btn-title">📋 Copy Structured Package (JSON)</span>
+                      <span class="btn-desc">Enterprise schema-validated payload</span>
+                    </button>
+                    <button type="button" id="ftaCopyBridgeSnippetBtn" class="secondary tst-w-btn" aria-label="Copy DevTools Form Bridge snippet">
+                      <span class="btn-title">⚡ Copy Form Bridge Snippet</span>
+                      <span class="btn-desc">React/Angular prototype setter script for DevTools</span>
+                    </button>
+                    <button type="button" id="ftaQuickTestBridgeBtn" class="secondary tst-w-btn" aria-label="Simulate Form Bridge in this page">
+                      <span class="btn-title">🧪 Test Bridge Simulation</span>
+                      <span class="btn-desc">Validates payload structure and event dispatch</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
 
             <!-- 1. COUPON TABLE -->
@@ -865,6 +1009,7 @@ Changes in V4.6 (Bug Fix Release):
             <!-- 3. ACTIONS & COPY GDS TST -->
             <div class="tst-action-row">
               <button id="tstCopyBtn" type="button" class="btn-create-tst" aria-label="Copy TST fields for in-house tool">📋 Copy TST (For Tool &amp; Bookmarklet)</button>
+              <button id="tstFtaReviewBtn" type="button" class="secondary" aria-label="Open Fare Transfer Assistant Selective Review">🚀 FTA Selective Review</button>
               <button id="tstActionPrepWinVBtn" type="button" class="secondary" aria-label="Auto-prep Windows Clipboard History">⚡ Auto-Prep Win + V</button>
               <button id="tstCopyFareFieldsBtn" type="button" class="secondary" aria-label="Copy FARE section fields tab-separated">📋 Copy FARE Fields</button>
               <button id="tstCopyTaxesBtnMain" type="button" class="secondary" aria-label="Copy taxes for TST tax column">📋 Copy Taxes</button>

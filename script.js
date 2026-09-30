@@ -236,6 +236,33 @@ const els = {
   tstClearBtn: byId('tstClearBtn'),
   tstOutputWrapper: byId('tstOutputWrapper'),
   tstOutput: byId('tstOutput'),
+  tabWorkaround4: byId('tabWorkaround4'),
+  panelWorkaround4: byId('panelWorkaround4'),
+  ftaOpenReviewModalBtn: byId('ftaOpenReviewModalBtn'),
+  tstFtaReviewBtn: byId('tstFtaReviewBtn'),
+  ftaReviewModal: byId('ftaReviewModal'),
+  ftaCheckBaseFare: byId('ftaCheckBaseFare'),
+  ftaCheckTaxes: byId('ftaCheckTaxes'),
+  ftaCheckFcs: byId('ftaCheckFcs'),
+  ftaCheckEndorsements: byId('ftaCheckEndorsements'),
+  ftaCheckCoupons: byId('ftaCheckCoupons'),
+  ftaPreviewBaseFare: byId('ftaPreviewBaseFare'),
+  ftaPreviewTaxes: byId('ftaPreviewTaxes'),
+  ftaPreviewFcs: byId('ftaPreviewFcs'),
+  ftaPreviewEndorsements: byId('ftaPreviewEndorsements'),
+  ftaPreviewCoupons: byId('ftaPreviewCoupons'),
+  ftaCopyJsonPackageBtn: byId('ftaCopyJsonPackageBtn'),
+  ftaCopyTsvPackageBtn: byId('ftaCopyTsvPackageBtn'),
+  ftaCopyInjectorSnippetBtn: byId('ftaCopyInjectorSnippetBtn'),
+  ftaExportJsonBtn: byId('ftaExportJsonBtn'),
+  ftaCopyBridgeSnippetBtn: byId('ftaCopyBridgeSnippetBtn'),
+  ftaQuickTestBridgeBtn: byId('ftaQuickTestBridgeBtn'),
+  ftaSummaryBase: byId('ftaSummaryBase'),
+  ftaSummaryRoe: byId('ftaSummaryRoe'),
+  ftaSummaryTotal: byId('ftaSummaryTotal'),
+  ftaSummaryOrgDest: byId('ftaSummaryOrgDest'),
+  ftaSummaryTaxes: byId('ftaSummaryTaxes'),
+  ftaSummaryCoupons: byId('ftaSummaryCoupons'),
 };
 
 // In-app replacement for window.prompt()/confirm() — some embedded browser previews (e.g.
@@ -855,6 +882,23 @@ function openHelpModal() {
 function closeHelpModal() {
   document.getElementById('helpModal').classList.remove('show');
 }
+
+function openFtaReviewModal() {
+  renderFtaSummary();
+  const modal = document.getElementById('ftaReviewModal');
+  if (modal) {
+    modal.classList.add('show');
+  }
+}
+
+function closeFtaReviewModal() {
+  const modal = document.getElementById('ftaReviewModal');
+  if (modal) {
+    modal.classList.remove('show');
+  }
+}
+window.openFtaReviewModal = openFtaReviewModal;
+window.closeFtaReviewModal = closeFtaReviewModal;
 
 // Utility function: Debounce
 function debounce(func, wait) {
@@ -1820,15 +1864,18 @@ els.changeFee.addEventListener('keypress', (e) => { if (e.key === 'Enter') calcu
 document.addEventListener('keydown', (e) => {
   const errorModal = document.getElementById('errorModal');
   const helpModal = document.getElementById('helpModal');
+  const ftaReviewModal = document.getElementById('ftaReviewModal');
   const isErrorModalOpen = errorModal?.classList.contains('show');
   const isHelpModalOpen = helpModal?.classList.contains('show');
-  const isAnyModalOpen = isErrorModalOpen || isHelpModalOpen;
+  const isFtaModalOpen = ftaReviewModal?.classList.contains('show');
+  const isAnyModalOpen = isErrorModalOpen || isHelpModalOpen || isFtaModalOpen;
 
   // Handle modal closing
   if (isAnyModalOpen && e.key === 'Escape') {
     e.preventDefault();
     if (isErrorModalOpen) closeErrorModal();
     if (isHelpModalOpen) closeHelpModal();
+    if (isFtaModalOpen) closeFtaReviewModal();
     return;
   }
 
@@ -3626,6 +3673,7 @@ function populateTstFromCalculations() {
 
   renderWinVPreview();
   renderRapidCopyAssistant();
+  renderFtaSummary();
 
   els.tstSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
@@ -4451,6 +4499,7 @@ if (els.tstFareCalcString) {
     }
     renderWinVPreview();
     renderRapidCopyAssistant();
+    renderFtaSummary();
   });
 }
 if (els.fareCalcString) {
@@ -4461,30 +4510,367 @@ if (els.fareCalcString) {
     }
     renderWinVPreview();
     renderRapidCopyAssistant();
+    renderFtaSummary();
   });
 }
 if (els.tstBaseFare) {
   els.tstBaseFare.addEventListener('input', () => {
     renderWinVPreview();
     renderRapidCopyAssistant();
+    renderFtaSummary();
   });
 }
 if (els.tstTotalAmount) {
   els.tstTotalAmount.addEventListener('input', () => {
     renderWinVPreview();
     renderRapidCopyAssistant();
+    renderFtaSummary();
   });
 }
 if (els.tstRoe) {
   els.tstRoe.addEventListener('input', () => {
     renderWinVPreview();
     renderRapidCopyAssistant();
+    renderFtaSummary();
   });
 }
 if (els.tstTourCode) {
   els.tstTourCode.addEventListener('input', () => {
     els.tstTourCode.value = '';
   });
+}
+
+// ============================================================================
+// --- WORKAROUND 4: FARE TRANSFER ASSISTANT (UNIVERSAL FORM BRIDGE & MERGE) ---
+// ============================================================================
+
+function generateStructuredFarePackage(options = {}) {
+  const includeBase = options.includeBase !== false;
+  const includeTaxes = options.includeTaxes !== false;
+  const includeFcs = options.includeFcs !== false;
+  const includeEndorsements = options.includeEndorsements !== false;
+  const includeCoupons = options.includeCoupons !== false;
+
+  const fcs = (els.tstFareCalcString && els.tstFareCalcString.value.trim()) ||
+              (els.fareCalcString && els.fareCalcString.value.trim()) || '';
+  const roe = extractRoeFromFcs(fcs) || (els.tstRoe ? els.tstRoe.value.trim() : '1.000000');
+  const baseFare = els.tstBaseFare ? els.tstBaseFare.value.trim() : '';
+  const equivFare = els.tstEquivFare ? els.tstEquivFare.value.trim() : '';
+  const total = els.tstTotalAmount ? els.tstTotalAmount.value.trim() : '';
+  const orgDest = els.tstOrgDest ? els.tstOrgDest.value.trim() : '';
+  const tourCode = els.tstTourCode ? els.tstTourCode.value.trim() : '';
+  const fe = els.tstEndorsements ? els.tstEndorsements.value.trim() : '';
+  const taxesList = getTstTaxesList();
+
+  const couponRows = els.tstCouponTableBody ? els.tstCouponTableBody.querySelectorAll('.tst-coupon-row') : [];
+  const coupons = [];
+  couponRows.forEach((row, i) => {
+    const chk = row.querySelector('.tst-coupon-check');
+    if (!chk || chk.checked) {
+      const cpnNum = row.querySelector('.tst-cpn-num') ? row.querySelector('.tst-cpn-num').textContent.trim() : (i + 1);
+      const routeText = row.querySelector('.tst-cpn-route')?.textContent.trim() || `Segment ${cpnNum}`;
+      const fb1 = row.querySelector('.tst-fb1')?.value.trim() || '';
+      const fb2 = row.querySelector('.tst-fb2')?.value.trim() || '';
+      const fb3 = row.querySelector('.tst-fb3')?.value.trim() || '';
+      coupons.push({
+        couponNumber: parseInt(cpnNum, 10) || (i + 1),
+        flightSegment: routeText,
+        fareBasis1: fb1,
+        fareBasis2: fb2,
+        fareBasis3: fb3
+      });
+    }
+  });
+
+  return {
+    $schema: "https://parthjoshii.github.io/schemas/structured-fare-package-v1.json",
+    metadata: {
+      packageId: `FTA-${Date.now()}-${Math.random().toString(36).substr(2, 6).toUpperCase()}`,
+      version: "1.0.0",
+      createdAt: new Date().toISOString(),
+      originatingSystem: "FareTransferAssistant"
+    },
+    header: includeBase ? {
+      baseFare,
+      equivFare,
+      rateOfExchange: roe,
+      totalAmount: total,
+      originDestination: orgDest,
+      tourCode
+    } : null,
+    fareCalculation: includeFcs ? {
+      linearString: fcs,
+      endorsements: includeEndorsements ? fe : ""
+    } : null,
+    taxes: includeTaxes ? taxesList : [],
+    couponFareBases: includeCoupons ? coupons : []
+  };
+}
+
+function generateDualTsvPackage(options = {}) {
+  const pkg = generateStructuredFarePackage(options);
+  const lines = [];
+
+  // 1. FARE Header row
+  if (pkg.header) {
+    lines.push(['BASE FARE', 'EQUIV FARE', 'ROE', 'TOTAL AMOUNT', 'TOUR CODE', 'MILES/POINTS', 'ORG/DEST', 'FCS', 'ENDORSEMENTS'].join('\t'));
+    lines.push([
+      pkg.header.baseFare || '',
+      pkg.header.equivFare || '',
+      pkg.header.rateOfExchange || '',
+      pkg.header.totalAmount || '',
+      pkg.header.tourCode || '',
+      '',
+      pkg.header.originDestination || '',
+      pkg.fareCalculation ? pkg.fareCalculation.linearString : '',
+      pkg.fareCalculation ? pkg.fareCalculation.endorsements : ''
+    ].join('\t'));
+    lines.push('');
+  }
+
+  // 2. Coupon Fare Bases rows
+  if (pkg.couponFareBases && pkg.couponFareBases.length > 0) {
+    lines.push(['CPN', 'FLIGHT SEGMENT', 'FARE BASIS 1 (FB1)', 'FARE BASIS 2 (FB2)', 'FARE BASIS 3 (FB3)'].join('\t'));
+    pkg.couponFareBases.forEach(c => {
+      lines.push([c.couponNumber, c.flightSegment, c.fareBasis1, c.fareBasis2, c.fareBasis3].join('\t'));
+    });
+    lines.push('');
+  }
+
+  // 3. Taxes
+  if (pkg.taxes && pkg.taxes.length > 0) {
+    lines.push('TAXES');
+    pkg.taxes.forEach(t => lines.push(t));
+  }
+
+  return lines.join('\n');
+}
+
+function generateFormBridgeSnippet(packageObj) {
+  const payloadJson = JSON.stringify(packageObj, null, 2);
+
+  return `// =====================================================================
+// FARE TRANSFER ASSISTANT (FTA) - UNIVERSAL FORM BRIDGE
+// Run this directly in the In-House Application's DevTools Console or Snippets.
+// =====================================================================
+(async function() {
+  const pkg = ${payloadJson};
+
+  console.log('🚀 FTA Form Bridge: Initiating transfer of package', pkg.metadata?.packageId);
+
+  // 1. Native Property Setter for React, Angular, Vue, and vanilla DOM inputs
+  function setVal(el, val) {
+    if (!el || val === undefined || val === null) return;
+    const proto = (el instanceof HTMLTextAreaElement) ? window.HTMLTextAreaElement.prototype : window.HTMLInputElement.prototype;
+    const desc = Object.getOwnPropertyDescriptor(proto, 'value');
+    if (desc && desc.set) {
+      desc.set.call(el, val);
+    } else {
+      el.value = val;
+    }
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+    el.dispatchEvent(new Event('change', { bubbles: true }));
+    el.dispatchEvent(new Event('blur', { bubbles: true }));
+  }
+
+  // 2. Semantic Proximity & Attribute Matcher
+  function findInput(keywords) {
+    for (const kw of keywords) {
+      // Direct ID or Name attribute matching
+      let el = document.querySelector(\`input[name*="\${kw}" i], input[id*="\${kw}" i], textarea[name*="\${kw}" i], textarea[id*="\${kw}" i], input[placeholder*="\${kw}" i], input[aria-label*="\${kw}" i]\`);
+      if (el) return el;
+
+      // Label text proximity matching
+      const labels = Array.from(document.querySelectorAll('label, th, td, span, div.label'));
+      for (const lbl of labels) {
+        if (lbl.children.length < 3 && lbl.textContent.trim().toLowerCase().includes(kw.toLowerCase())) {
+          if (lbl.htmlFor) {
+            const byFor = document.getElementById(lbl.htmlFor);
+            if (byFor) return byFor;
+          }
+          const nested = lbl.querySelector('input, textarea');
+          if (nested) return nested;
+          if (lbl.nextElementSibling) {
+            const nextInp = lbl.nextElementSibling.matches('input, textarea') ? lbl.nextElementSibling : lbl.nextElementSibling.querySelector('input, textarea');
+            if (nextInp) return nextInp;
+          }
+        }
+      }
+    }
+    return null;
+  }
+
+  // 3. Inject Financial Header Fields
+  if (pkg.header) {
+    const baseInp = findInput(['base fare', 'basefare', 'txtbase', 'base_amount', 'base_fare']);
+    if (baseInp && pkg.header.baseFare) setVal(baseInp, pkg.header.baseFare);
+
+    const equivInp = findInput(['equiv fare', 'equivfare', 'txtequiv', 'equivalent_fare']);
+    if (equivInp && pkg.header.equivFare) setVal(equivInp, pkg.header.equivFare);
+
+    const roeInp = findInput(['rate of exchange', 'roe', 'txtroe', 'exchange rate']);
+    if (roeInp && pkg.header.rateOfExchange) setVal(roeInp, pkg.header.rateOfExchange);
+
+    const totalInp = findInput(['total amount', 'total fare', 'txttotal', 'total_amount', 'total']);
+    if (totalInp && pkg.header.totalAmount) setVal(totalInp, pkg.header.totalAmount);
+
+    const odInp = findInput(['org/dest', 'origin/destination', 'orgdest', 'routing_od']);
+    if (odInp && pkg.header.originDestination) setVal(odInp, pkg.header.originDestination);
+
+    const tourInp = findInput(['tour code', 'tourcode']);
+    if (tourInp) setVal(tourInp, pkg.header.tourCode || '');
+  }
+
+  // 4. Inject Fare Calculation & Endorsements
+  if (pkg.fareCalculation) {
+    const fcsInp = findInput(['fare calc', 'fare calculation', 'fcs', 'fare_calc_string']);
+    if (fcsInp && pkg.fareCalculation.linearString) setVal(fcsInp, pkg.fareCalculation.linearString);
+
+    const feInp = findInput(['endorsement', 'endorsements', 'fe', 'restrictions']);
+    if (feInp && pkg.fareCalculation.endorsements) setVal(feInp, pkg.fareCalculation.endorsements);
+  }
+
+  // 5. Inject Taxes Array
+  if (pkg.taxes && pkg.taxes.length > 0) {
+    const taxInp = findInput(['taxes', 'tax_breakdown', 'taxes_column', 'txttaxes']);
+    if (taxInp) {
+      setVal(taxInp, pkg.taxes.join(' '));
+    }
+  }
+
+  // 6. Inject Coupon Fare Bases into Table Rows
+  if (pkg.couponFareBases && pkg.couponFareBases.length > 0) {
+    const rows = Array.from(document.querySelectorAll('tr.coupon-row, tr.segment-row, tbody tr, div.coupon-row, div.tst-coupon-row')).filter(r => r.querySelectorAll('input').length >= 1);
+    pkg.couponFareBases.forEach((cpn, idx) => {
+      const row = rows[idx];
+      if (row) {
+        const inputs = Array.from(row.querySelectorAll('input:not([type="checkbox"]):not([type="hidden"])'));
+        if (inputs.length >= 1 && cpn.fareBasis1) setVal(inputs[0], cpn.fareBasis1);
+        if (inputs.length >= 2 && cpn.fareBasis2) setVal(inputs[1], cpn.fareBasis2);
+        if (inputs.length >= 3 && cpn.fareBasis3) setVal(inputs[2], cpn.fareBasis3);
+      }
+    });
+  }
+
+  // Visual success notification in client
+  const toast = document.createElement('div');
+  toast.style.cssText = 'position:fixed;top:20px;right:20px;z-index:999999;background:#10b981;color:#ffffff;padding:14px 20px;border-radius:8px;font-weight:700;box-shadow:0 8px 24px rgba(0,0,0,0.3);font-family:sans-serif;font-size:14px;';
+  toast.innerHTML = '🎉 <strong>FTA Form Bridge:</strong> Fare details transferred successfully!';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), 4000);
+
+  console.log('✅ FTA Form Bridge: Injection completed with native change events.');
+})();`;
+}
+
+function renderFtaSummary() {
+  if (!els.ftaSummaryBase) return;
+
+  const fcs = (els.tstFareCalcString && els.tstFareCalcString.value.trim()) ||
+              (els.fareCalcString && els.fareCalcString.value.trim()) || '';
+  const roe = extractRoeFromFcs(fcs) || (els.tstRoe ? els.tstRoe.value.trim() : '1.000000');
+  const baseFare = els.tstBaseFare ? els.tstBaseFare.value.trim() : '--';
+  const total = els.tstTotalAmount ? els.tstTotalAmount.value.trim() : '--';
+  const orgDest = els.tstOrgDest ? els.tstOrgDest.value.trim() : '--';
+  const fe = els.tstEndorsements ? els.tstEndorsements.value.trim() : '--';
+  const taxesList = getTstTaxesList();
+
+  const couponRows = els.tstCouponTableBody ? els.tstCouponTableBody.querySelectorAll('.tst-coupon-row') : [];
+  const couponSummaryList = [];
+  couponRows.forEach((row, i) => {
+    const cpnNum = row.querySelector('.tst-cpn-num') ? row.querySelector('.tst-cpn-num').textContent.trim() : (i + 1);
+    const routeText = row.querySelector('.tst-cpn-route')?.textContent.trim() || `Segment ${cpnNum}`;
+    const fb1 = row.querySelector('.tst-fb1')?.value.trim() || '';
+    const fb2 = row.querySelector('.tst-fb2')?.value.trim() || '';
+    const fb3 = row.querySelector('.tst-fb3')?.value.trim() || '';
+    const fbParts = [fb1, fb2, fb3].filter(Boolean).join(' / ');
+    couponSummaryList.push(`Cpn ${cpnNum} (${routeText}): ${fbParts || '--'}`);
+  });
+
+  // Update card elements
+  if (els.ftaSummaryBase) els.ftaSummaryBase.textContent = baseFare;
+  if (els.ftaSummaryRoe) els.ftaSummaryRoe.textContent = roe;
+  if (els.ftaSummaryTotal) els.ftaSummaryTotal.textContent = total;
+  if (els.ftaSummaryOrgDest) els.ftaSummaryOrgDest.textContent = orgDest;
+  if (els.ftaSummaryTaxes) els.ftaSummaryTaxes.textContent = taxesList.length > 0 ? taxesList.join(' ') : 'No taxes';
+  if (els.ftaSummaryCoupons) els.ftaSummaryCoupons.innerHTML = couponSummaryList.length > 0 ? couponSummaryList.map(s => `<div>${s}</div>`).join('') : 'No coupons';
+
+  // Update review modal preview strings
+  if (els.ftaPreviewBaseFare) els.ftaPreviewBaseFare.textContent = `${baseFare} | ROE ${roe} | Total ${total} | OD ${orgDest}`;
+  if (els.ftaPreviewTaxes) els.ftaPreviewTaxes.textContent = taxesList.length > 0 ? taxesList.join(' ') : 'None';
+  if (els.ftaPreviewFcs) els.ftaPreviewFcs.textContent = fcs || 'None';
+  if (els.ftaPreviewEndorsements) els.ftaPreviewEndorsements.textContent = fe || 'None';
+  if (els.ftaPreviewCoupons) els.ftaPreviewCoupons.textContent = `${couponSummaryList.length} Segment(s) - ${couponSummaryList.join('; ')}`;
+}
+
+function getFtaReviewSelections() {
+  return {
+    includeBase: els.ftaCheckBaseFare ? els.ftaCheckBaseFare.checked : true,
+    includeTaxes: els.ftaCheckTaxes ? els.ftaCheckTaxes.checked : true,
+    includeFcs: els.ftaCheckFcs ? els.ftaCheckFcs.checked : true,
+    includeEndorsements: els.ftaCheckEndorsements ? els.ftaCheckEndorsements.checked : true,
+    includeCoupons: els.ftaCheckCoupons ? els.ftaCheckCoupons.checked : true
+  };
+}
+
+function copyFtaJsonPackage() {
+  const selections = getFtaReviewSelections();
+  const pkg = generateStructuredFarePackage(selections);
+  copyTextToClipboard(JSON.stringify(pkg, null, 2), 'Structured Fare Package (JSON) copied to clipboard!');
+}
+
+function copyFtaTsvPackage() {
+  const selections = getFtaReviewSelections();
+  const tsv = generateDualTsvPackage(selections);
+  copyTextToClipboard(tsv, 'Dual TSV Package copied to clipboard!');
+}
+
+function copyFtaBridgeSnippet() {
+  const selections = getFtaReviewSelections();
+  const pkg = generateStructuredFarePackage(selections);
+  const snippet = generateFormBridgeSnippet(pkg);
+  copyTextToClipboard(snippet, '⚡ 1-Click Form Bridge Code copied! Paste into in-house tool DevTools.');
+}
+
+function testFtaBridgeSimulation() {
+  const pkg = generateStructuredFarePackage();
+  const errs = [];
+  if (!pkg.header || !pkg.header.baseFare) errs.push('Base Fare missing');
+  if (!pkg.header || !pkg.header.rateOfExchange) errs.push('ROE missing');
+  if (!pkg.fareCalculation || !pkg.fareCalculation.linearString) errs.push('FCS missing');
+  if (!pkg.couponFareBases || pkg.couponFareBases.length === 0) errs.push('No flight coupons found');
+
+  if (errs.length === 0) {
+    showSuccess(`🎉 Simulation Passed! Structured Fare Package validated with 0 errors. Ready to transfer ${pkg.couponFareBases.length} coupons & financial fields.`);
+  } else {
+    showError(`Simulation Warning: ${errs.join(', ')}. Please update calculation values.`);
+  }
+}
+
+// Wire FTA Event Listeners
+if (els.ftaOpenReviewModalBtn) {
+  els.ftaOpenReviewModalBtn.addEventListener('click', openFtaReviewModal);
+}
+if (els.tstFtaReviewBtn) {
+  els.tstFtaReviewBtn.addEventListener('click', openFtaReviewModal);
+}
+if (els.ftaCopyJsonPackageBtn) {
+  els.ftaCopyJsonPackageBtn.addEventListener('click', copyFtaJsonPackage);
+}
+if (els.ftaCopyTsvPackageBtn) {
+  els.ftaCopyTsvPackageBtn.addEventListener('click', copyFtaTsvPackage);
+}
+if (els.ftaCopyInjectorSnippetBtn) {
+  els.ftaCopyInjectorSnippetBtn.addEventListener('click', copyFtaBridgeSnippet);
+}
+if (els.ftaExportJsonBtn) {
+  els.ftaExportJsonBtn.addEventListener('click', copyFtaJsonPackage);
+}
+if (els.ftaCopyBridgeSnippetBtn) {
+  els.ftaCopyBridgeSnippetBtn.addEventListener('click', copyFtaBridgeSnippet);
+}
+if (els.ftaQuickTestBridgeBtn) {
+  els.ftaQuickTestBridgeBtn.addEventListener('click', testFtaBridgeSimulation);
 }
 
 initTstBookmarklet();
