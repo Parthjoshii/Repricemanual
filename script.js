@@ -1693,20 +1693,37 @@ function handleSummarise() {
 // Help icon click to show keyboard shortcuts
 els.helpIcon.addEventListener('click', openHelpModal);
 
+let themeAnimationTimer = null;
+
+function updateThemeToggleUI(theme) {
+  if (!els.themeToggle) return;
+  const isDark = theme === 'dark';
+  els.themeToggle.setAttribute('aria-checked', String(isDark));
+  els.themeToggle.setAttribute('aria-label', isDark ? 'Switch to light mode' : 'Switch to dark mode');
+  els.themeToggle.title = isDark ? 'Switch to light mode (Ctrl+M)' : 'Switch to dark mode (Ctrl+M)';
+}
+
 // Theme toggle functionality
 function toggleTheme() {
+  // Trigger smooth full-screen theme transition
+  document.documentElement.classList.add('theme-animating');
   const currentTheme = document.documentElement.getAttribute('data-theme');
   const newTheme = currentTheme === 'light' ? 'dark' : 'light';
   document.documentElement.setAttribute('data-theme', newTheme);
-  els.themeToggle.textContent = newTheme === 'light' ? '🌙' : '☀️';
+  updateThemeToggleUI(newTheme);
   localStorage.setItem('theme', newTheme);
+
+  clearTimeout(themeAnimationTimer);
+  themeAnimationTimer = setTimeout(() => {
+    document.documentElement.classList.remove('theme-animating');
+  }, 420);
 }
 
 // Load saved theme preference
 function loadTheme() {
   const savedTheme = localStorage.getItem('theme') || 'light';
   document.documentElement.setAttribute('data-theme', savedTheme);
-  els.themeToggle.textContent = savedTheme === 'light' ? '🌙' : '☀️';
+  updateThemeToggleUI(savedTheme);
 }
 
 // Theme toggle click event
@@ -2218,12 +2235,15 @@ function calculateTaxes() {
     els.subTotal.value = `${fareCur}${formatAmount(subTotal, fareCur)}`;
 
     // Update stored summary data with new tax adjustment and Add Taxes text (K3 on YQ may have changed)
-    activeSummary.taxAdj = netTaxWithK3;
-    activeSummary.perPax = perPax;
-    activeSummary.subTotal = subTotal;
-    activeSummary.addTaxes = els.addTaxes.value;
-    activeSummary.k3OnYQ = k3OnYQ;
-    activeSummary.k3Fee = k3FromFee;
+    state.ptcData[state.activePtc].summaryData = {
+      ...activeSummary,
+      taxAdj: netTaxWithK3,
+      perPax,
+      subTotal,
+      addTaxes: els.addTaxes.value,
+      k3OnYQ,
+      k3Fee: k3FromFee
+    };
     clearActiveTabDirty();
   }
 
@@ -2350,14 +2370,27 @@ function clearTaxes() {
   els.applyK3OnYQ.checked = false;
   state.lastTaxResult = null;
   state.clearTaxCache();
+  state.clearFareCache();
   // Also hide summary content when taxes are cleared
   els.summaryContent.style.display = 'none';
   els.summary.innerHTML = '';
   els.gdsString.value = '';
   state.lastSummaryData = null;
   state.ptcData[state.activePtc].summaryData = null;
+  state.isSummaryGenerated = false;
+  hideSummaryStaleNotice();
+
+  const hasFare = (els.oldFare.value && els.newFare.value) || els.fareDiff.value.trim() !== '';
+  if (hasFare) {
+    tryCalculateFare();
+  } else {
+    els.perPax.value = '';
+    els.subTotal.value = '';
+  }
+
   clearActiveTabDirty();
   updatePtcTabUI();
+  saveStateToStorage();
 }
 
 function showINRMessage(message) {
@@ -2467,8 +2500,9 @@ function calculateFare() {
     els.perPax.value = `${currency}${formatAmount(cachedResult.perPassenger, currency)}`;
     els.subTotal.value = `${currency}${formatAmount(cachedResult.subTotal, currency)}`;
     // Store summary data for manual summarise button
-    state.lastSummaryData = cachedResult.summaryData;
-    state.ptcData[state.activePtc].summaryData = cachedResult.summaryData;
+    const restoredSummary = { ...cachedResult.summaryData };
+    state.lastSummaryData = restoredSummary;
+    state.ptcData[state.activePtc].summaryData = restoredSummary;
     clearActiveTabDirty();
     updatePtcTabUI();
     state.isCalculatingFare = false;
@@ -2542,7 +2576,7 @@ function calculateFare() {
     k3Label,
     perPassenger,
     subTotal,
-    summaryData
+    summaryData: { ...summaryData }
   });
 
   // Store summary data for manual summarise button

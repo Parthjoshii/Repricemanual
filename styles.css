@@ -4,7 +4,7 @@
   --text-primary: #F5F5DC;
   --text-secondary: #9fa8da;
   --border-color: #2c3258;
-  --hero-color: rgb(63, 81, 181);
+  --hero-color: var(--btn-bg);
   --primary-cyan: rgb(63, 81, 181);
   --primary-hover: #303F9F;
   --btn-bg: #F5F5DC;
@@ -72,6 +72,19 @@
   border-color: #dcd7be;
   box-shadow: none;
 }
+/* Smooth full-screen theme transition animation */
+.theme-animating,
+.theme-animating *,
+.theme-animating *::before,
+.theme-animating *::after {
+  transition: background-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              background 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.4s cubic-bezier(0.4, 0, 0.2, 1),
+              stroke 0.4s cubic-bezier(0.4, 0, 0.2, 1) !important;
+  transition-delay: 0s !important;
+}
 * { box-sizing: border-box; }
 body {
   margin: 0 auto;
@@ -85,7 +98,11 @@ h1 {
   margin: 0 0 16px;
   font-size: clamp(1.8rem, 2.2vw, 2.4rem);
   letter-spacing: -0.03em;
-  color: var(--hero-color, var(--primary-cyan));
+  color: var(--hero-color, var(--btn-bg));
+}
+[data-theme="dark"] h1,
+:root:not([data-theme="light"]) h1 {
+  color: var(--btn-bg);
 }
 .error-display {
   position: sticky;
@@ -908,7 +925,11 @@ th {
   background: transparent;
 }
 .ptc-tab.has-data .ptc-tab-dot {
-  background: var(--primary-cyan);
+  background: var(--btn-bg);
+}
+[data-theme="dark"] .ptc-tab.has-data .ptc-tab-dot,
+:root:not([data-theme="light"]) .ptc-tab.has-data .ptc-tab-dot {
+  background: var(--btn-bg);
 }
 /* Data typed into this tab since its last summarised calculation — takes visual priority over the
    plain has-data dot above (declared after it) since it's the more actionable of the two states. */
@@ -976,39 +997,110 @@ th {
   white-space: nowrap;
   border-width: 0;
 }
-.help-icon {
+.header-actions {
   position: fixed;
   top: 16px;
   right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 1000;
+}
+.help-icon {
   font-size: 24px;
   cursor: pointer;
   background: transparent;
   border: none;
-  z-index: 1000;
-  padding: 8px;
+  padding: 6px;
   border-radius: 50%;
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, transform 0.2s ease;
   color: var(--text-primary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
 }
 .help-icon:hover {
   background: rgba(6, 182, 212, 0.2);
+  transform: translateY(-1px);
 }
-.theme-toggle {
-  position: fixed;
-  top: 16px;
-  right: 60px;
-  font-size: 24px;
-  cursor: pointer;
+.theme-toggle,
+.theme-switch {
   background: transparent;
   border: none;
-  z-index: 1000;
-  padding: 8px;
-  border-radius: 50%;
-  transition: background 0.2s ease;
-  color: var(--text-primary);
+  padding: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  border-radius: 9999px;
+  outline: none;
+  transition: transform 0.2s ease;
 }
-.theme-toggle:hover {
-  background: rgba(6, 182, 212, 0.2);
+.theme-switch:hover {
+  transform: translateY(-1px);
+}
+.theme-switch:focus-visible,
+.help-icon:focus-visible {
+  outline: 2px solid var(--primary-cyan);
+  outline-offset: 3px;
+}
+.switch-track {
+  position: relative;
+  width: 60px;
+  height: 32px;
+  border-radius: 9999px;
+  background: #082845;
+  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.4);
+  transition: background-color 0.35s ease, box-shadow 0.35s ease;
+  user-select: none;
+  display: block;
+}
+[data-theme="light"] .switch-track {
+  background: #fae8a4;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+.switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #1ba0f2;
+  box-shadow: 0 2px 6px rgba(27, 160, 242, 0.45);
+  transform: translateX(28px);
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), background-color 0.35s ease, box-shadow 0.35s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+[data-theme="light"] .switch-thumb {
+  transform: translateX(0);
+  background: #f5b823;
+  box-shadow: 0 2px 6px rgba(245, 184, 35, 0.4);
+}
+.thumb-icon {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  pointer-events: none;
+  transition: opacity 0.3s ease, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.sun-icon {
+  opacity: 0;
+  transform: scale(0.4) rotate(45deg);
+}
+.moon-icon {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+[data-theme="light"] .sun-icon {
+  opacity: 1;
+  transform: scale(1) rotate(0deg);
+}
+[data-theme="light"] .moon-icon {
+  opacity: 0;
+  transform: scale(0.4) rotate(-45deg);
 }
 .gds-section {
   margin-bottom: 20px;

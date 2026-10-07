@@ -40,8 +40,29 @@ Changes in V4.6 (Bug Fix Release):
 
 <body>
   <h1>Manual Reprice - Master Calculator</h1>
-  <button id="helpIcon" class="help-icon" type="button" aria-label="Show keyboard shortcuts">⌨️</button>
-  <button id="themeToggle" class="theme-toggle" type="button" aria-label="Toggle light/dark mode">🌙</button>
+  <div class="header-actions">
+    <button id="themeToggle" class="theme-switch" type="button" role="switch" aria-checked="false" aria-label="Toggle dark mode" title="Toggle theme (Ctrl+M)">
+      <span class="switch-track">
+        <span class="switch-thumb">
+          <svg class="thumb-icon sun-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" fill="white"></circle>
+            <line x1="12" y1="2" x2="12" y2="4.5" stroke="white" stroke-width="2.4" stroke-linecap="round"></line>
+            <line x1="12" y1="19.5" x2="12" y2="22" stroke="white" stroke-width="2.4" stroke-linecap="round"></line>
+            <line x1="2" y1="12" x2="4.5" y2="12" stroke="white" stroke-width="2.4" stroke-linecap="round"></line>
+            <line x1="19.5" y1="12" x2="22" y2="12" stroke="white" stroke-width="2.4" stroke-linecap="round"></line>
+            <line x1="4.93" y1="4.93" x2="6.7" y2="6.7" stroke="white" stroke-width="2.4" stroke-linecap="round"></line>
+            <line x1="17.3" y1="17.3" x2="19.07" y2="19.07" stroke="white" stroke-width="2.4" stroke-linecap="round"></line>
+            <line x1="4.93" y1="19.07" x2="6.7" y2="17.3" stroke="white" stroke-width="2.4" stroke-linecap="round"></line>
+            <line x1="17.3" y1="6.7" x2="19.07" y2="4.93" stroke="white" stroke-width="2.4" stroke-linecap="round"></line>
+          </svg>
+          <svg class="thumb-icon moon-icon" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true">
+            <path d="M12.3 2a10 10 0 0 0 9.7 12.7 10 10 0 1 1-12-12.4 10.2 10.2 0 0 0 2.3-.3z" fill="white"></path>
+          </svg>
+        </span>
+      </span>
+    </button>
+    <button id="helpIcon" class="help-icon" type="button" aria-label="Show keyboard shortcuts">⌨️</button>
+  </div>
   <div id="errorModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalMessage">
     <div class="modal-box error">
       <div class="modal-message" id="modalMessage"></div>
