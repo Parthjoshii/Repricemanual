@@ -127,6 +127,7 @@ const els = {
   subTotal: byId('subTotal'),
   summary: byId('summary'),
   helpIcon: byId('helpIcon'),
+  reloadButton: byId('reloadButton'),
   themeToggle: byId('themeToggle'),
   taxCalcButton: byId('taxCalcButton'),
   taxClearButton: byId('taxClearButton'),
@@ -175,6 +176,8 @@ const els = {
   restoreBanner: byId('restoreBanner'),
   restoreSessionButton: byId('restoreSessionButton'),
   dismissRestoreButton: byId('dismissRestoreButton'),
+  halveFareComponents: byId('halveFareComponents'),
+  halveFareComponentsRow: byId('halveFareComponentsRow'),
 };
 
 // In-app replacement for window.prompt()/confirm() — some embedded browser previews (e.g.
@@ -283,13 +286,14 @@ const PTC_SNAPSHOT_FIELDS = [
   { id: 'subTotal', kind: 'value' },
   { id: 'fareCalcString', kind: 'value' },
   { id: 'autoCalcFromAdult', kind: 'checked' },
+  { id: 'halveFareComponents', kind: 'checked' },
 ];
 
 // JS-level state.* fields that calculateFare()/calculateTaxes()/parseFareCalcString() read and
 // write as "the current working set" — swapped alongside the DOM fields above on tab switch.
 const PTC_STATE_KEYS = [
   'lastTaxResult', 'lastFareK3Total', 'lastFareCurrency', 'lastK3AddTaxes',
-  'lastSummaryData', 'lastConvertedFareCalcString',
+  'lastSummaryData', 'lastConvertedFareCalcString', 'unhalvedFareCalcString',
 ];
 
 function defaultPtcSnapshot() {
@@ -721,6 +725,9 @@ const state = {
   lastK3AddTaxes: '',
   lastSummaryData: null,
   lastConvertedFareCalcString: null,
+  unhalvedFareCalcString: null,
+  k3TaxWarningShown: false,
+  lowerBaseFareWarningShown: false,
   rawChangeFee: null,
   // Last NUC-validated ADT Fare Calculation String, used as the source for CNN/INF auto-calculation.
   // Not part of PTC_STATE_KEYS: it's ADT-specific data that CNN/INF tabs read, not their own per-tab state.
@@ -748,6 +755,7 @@ const state = {
   },
   clearTaxCache() {
     this.taxCalculationCache.clear();
+    this.fareCalculationCache.clear();
   },
   clearFareCache() {
     this.fareCalculationCache.clear();
@@ -839,9 +847,15 @@ function validateTaxInputs() {
 
   // Check for K3 in tax inputs (K3 should only be calculated via Fare Calculator)
   const k3Pattern = /K3/i;
-  if (k3Pattern.test(oldText) || k3Pattern.test(newText)) {
-    showError('K3 tax should not be entered manually in the Tax Adjustment Calculator. K3 is calculated automatically based on Fare Difference and Change Fee in the Fare Calculator.');
+  const hasK3 = k3Pattern.test(oldText) || k3Pattern.test(newText);
+  if (hasK3) {
+    if (!state.k3TaxWarningShown) {
+      state.k3TaxWarningShown = true;
+      showError('K3 tax should not be entered manually in the Tax Adjustment Calculator. K3 is calculated automatically based on Fare Difference and Change Fee in the Fare Calculator.');
+    }
     return false;
+  } else {
+    state.k3TaxWarningShown = false;
   }
 
   return true;
@@ -960,6 +974,9 @@ els.autoCalcFromAdult.addEventListener('change', () => {
     syncAutoCalcUI();
   }
 });
+if (els.halveFareComponents) {
+  els.halveFareComponents.addEventListener('change', handleHalveFareComponentsChange);
+}
 
 function showSummaryStaleNotice() {
   if (state.isSummaryGenerated && els.summaryStaleNotice) {
@@ -1004,6 +1021,7 @@ function clearActiveTabDirty() {
   'currency', 'cabin', 'oldFare', 'newFare', 'fareDiff', 'changeFee',
   'applyK3OnFareDiff', 'applyK3OnChangeFee', 'applyK3OnYQ',
   'oldTax', 'newTax', 'pax', 'fareCalcString',
+  'halveFareComponents',
   'targetCurrency', 'exchangeRate',
 ].forEach(id => {
   if (els[id]) {
@@ -1032,27 +1050,37 @@ function parseFareCalcString() {
     els.fareCalcString.value = input;
   }
 
-  const parsed = parseFareCalcStringInternal(input);
+  const unhalvedParsed = parseFareCalcStringInternal(input);
+
+  // If halveFareComponents is checked on a one-way journey, uncheck and show error
+  if (els.halveFareComponents?.checked && isOneWayJourney(unhalvedParsed, input)) {
+    els.halveFareComponents.checked = false;
+    showError('Halving fare components is not applicable for a one-way journey.');
+  }
 
   // Validation
-  if (parsed.fareComponents.length === 0) {
+  if (unhalvedParsed.fareComponents.length === 0) {
     showError('No fare amounts found in the string. Format: number followed by fare basis (e.g., 102.21TLEEPIN1/NDC2)');
     els.parserResults.style.display = 'none';
     return;
   }
 
-  if (parsed.nuc === null) {
+  if (unhalvedParsed.nuc === null) {
     showError('NUC not found in the string. Format: NUC followed by number (e.g., NUC506.77)');
     els.parserResults.style.display = 'none';
     state.lastConvertedFareCalcString = null;
     return;
   }
 
-  if (parsed.roe === null) {
+  if (unhalvedParsed.roe === null) {
     showError('ROE not found in the string. Format: ROE followed by number (e.g., ROE90.3344456)');
     els.parserResults.style.display = 'none';
     return;
   }
+
+  const isHalveActive = !!(els.halveFareComponents?.checked && !isOneWayJourney(unhalvedParsed, input));
+  const workingString = isHalveActive ? halveFareComponentsInString(input) : input;
+  const parsed = isHalveActive ? parseFareCalcStringInternal(workingString) : unhalvedParsed;
 
   // Calculate NUC
   const fareSum = parsed.fareComponents.reduce((sum, comp) => sum + comp.amount, 0);
@@ -1064,7 +1092,7 @@ function parseFareCalcString() {
   // split the tool chose is visible and checkable at a glance, not hidden.
   const hybridRatios = PTC_HYBRID_RATIOS[state.activePtc];
   if (hybridRatios) {
-    const { boundaryIndex } = findHybridBoundary(input);
+    const { boundaryIndex } = findHybridBoundary(workingString);
     els.fareComponents.innerHTML = parsed.fareComponents
       .map(comp => {
         const phase = boundaryIndex === null || comp.index < boundaryIndex ? 'Outbound' : 'Inbound';
@@ -1098,20 +1126,35 @@ function parseFareCalcString() {
   }
 
   // Display stated NUC
-  els.statedNuc.textContent = parsed.nuc.toFixed(2);
+  const statedNucValue = unhalvedParsed.nuc;
+  els.statedNuc.textContent = statedNucValue.toFixed(2);
 
   // NUC validation
-  const nucDiff = Math.abs(calculatedNuc - parsed.nuc);
-  if (nucDiff < 0.01) {
-    els.nucValidation.innerHTML = '<span class="success">✓ NUC Validation: PASS</span>';
-    // Validation passed: keep the fare calculation string exactly as entered
-    state.lastConvertedFareCalcString = input;
+  if (isHalveActive) {
+    // When halving is enabled: the user entered full fare components and requested halving.
+    // The validator results the halved string (workingString) in the results.
+    const nucDiff = Math.abs(calculatedNuc - statedNucValue);
+    if (nucDiff < 0.01) {
+      els.nucValidation.innerHTML = `<span class="success">✓ NUC Validation: PASS<br><br>Corrected Fare String:<br><span style="font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text-primary);">${escapeHtml(workingString)}</span></span>`;
+    } else {
+      els.nucValidation.innerHTML = `<span class="error">✗ NUC Validation: FAIL<br><br>Corrected Fare String:<br><span style="font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text-primary);">${escapeHtml(workingString)}</span></span>`;
+    }
+    state.lastConvertedFareCalcString = workingString;
   } else {
-    // Generate corrected fare string
-    const correctedString = input.replace(/NUC\d+(?:\.\d+)?/, `NUC${calculatedNuc.toFixed(2)}`);
-    els.nucValidation.innerHTML = `<span class="error">✗ NUC Validation: FAIL<br><br>Corrected Fare String:<br><span style="font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text-primary);">${escapeHtml(correctedString)}</span></span>`;
-    // Validation failed: use the corrected string for summaries
-    state.lastConvertedFareCalcString = correctedString;
+    // If the user has already entered halved fare components (or normal unhalved string without halving requested):
+    // check if NUC is correct and display the result as it was previously doing.
+    const nucDiff = Math.abs(calculatedNuc - parsed.nuc);
+    if (nucDiff < 0.01) {
+      els.nucValidation.innerHTML = '<span class="success">✓ NUC Validation: PASS</span>';
+      // Validation passed: keep the fare calculation string exactly as entered
+      state.lastConvertedFareCalcString = input;
+    } else {
+      // Generate corrected fare string
+      const correctedString = input.replace(/NUC\s*\d+(?:\.\d+)?/, `NUC${calculatedNuc.toFixed(2)}`);
+      els.nucValidation.innerHTML = `<span class="error">✗ NUC Validation: FAIL<br><br>Corrected Fare String:<br><span style="font-family: 'Courier New', monospace; font-size: 0.9rem; color: var(--text-primary);">${escapeHtml(correctedString)}</span></span>`;
+      // Validation failed: use the corrected string for summaries
+      state.lastConvertedFareCalcString = correctedString;
+    }
   }
 
   // ADT is the only source for CNN/INF auto-calculation; capture its validated string whenever
@@ -1147,7 +1190,8 @@ function parseFareCalcString() {
 
   // Calculate and display base fare
   const baseFare = calculatedNuc * parsed.roe;
-  els.baseFare.textContent = baseFare.toFixed(2);
+  const fareCurrency = els.currency.value || '';
+  els.baseFare.textContent = fareCurrency ? formatAmount(baseFare, fareCurrency) : baseFare.toFixed(2);
 
   // Show results
   els.parserResults.style.display = 'block';
@@ -1304,10 +1348,79 @@ function parseFareCalcStringInternal(input) {
   return result;
 }
 
+function isOneWayJourney(parsed, input) {
+  if (!parsed || !parsed.fareComponents || parsed.fareComponents.length === 0) return false;
+  // If only 1 fare component is present, it is a one-way fare
+  if (parsed.fareComponents.length === 1) return true;
+  return false;
+}
+
+function halveFareComponentsInString(input) {
+  function findKeywordMatch(keyword) {
+    const strict = input.match(new RegExp(`(?<=^|\\s)${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+    return strict || input.match(new RegExp(`${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+  }
+
+  const nucKeywordMatch = findKeywordMatch('NUC');
+  const nucIndex = nucKeywordMatch ? nucKeywordMatch.index : -1;
+  const farePart = nucIndex === -1 ? input : input.slice(0, nucIndex);
+  const rest = nucIndex === -1 ? '' : input.slice(nucIndex);
+
+  let newFareSum = 0;
+  const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(\/[A-Z0-9]{1,8})?/g;
+  const halvedFarePart = farePart.replace(farePattern, (match, amountStr, fareBasis, suffix, designator) => {
+    const amount = parseFloat(amountStr);
+    const halved = round2(amount / 2);
+    newFareSum += halved;
+    const trailingSuffix = suffix || '';
+    const trailingDesignator = designator || '';
+    return `${halved.toFixed(2)}${fareBasis}${trailingSuffix}${trailingDesignator}`;
+  });
+
+  const parsedHalved = parseFareCalcStringInternal(halvedFarePart + rest);
+  const qSum = parsedHalved.qSurcharges.reduce((sum, q) => sum + q, 0);
+  const newCalculatedNuc = round2(newFareSum + qSum);
+
+  const updatedRest = rest.replace(/NUC\s*\d+(?:\.\d+)?/, `NUC${newCalculatedNuc.toFixed(2)}`);
+  return halvedFarePart + updatedRest;
+}
+
+function handleHalveFareComponentsChange() {
+  const isChecked = els.halveFareComponents.checked;
+  const rawInput = els.fareCalcString.value.trim();
+
+  if (!rawInput) {
+    return;
+  }
+
+  const input = rawInput.toUpperCase();
+  const parsed = parseFareCalcStringInternal(input);
+
+  if (isChecked) {
+    if (isOneWayJourney(parsed, input)) {
+      els.halveFareComponents.checked = false;
+      showError('Halving fare components is not applicable for a one-way journey.');
+      return;
+    }
+    if (parsed.fareComponents.length === 0) {
+      els.halveFareComponents.checked = false;
+      showError('No fare amounts found in the string to halve.');
+      return;
+    }
+  }
+
+  // Do not mutate els.fareCalcString.value; manually entered string stays intact
+  parseFareCalcString();
+}
+
 function clearParser() {
   els.fareCalcString.value = '';
   els.parserResults.style.display = 'none';
   state.lastConvertedFareCalcString = null;
+  state.unhalvedFareCalcString = null;
+  if (els.halveFareComponents) {
+    els.halveFareComponents.checked = false;
+  }
   if (state.activePtc === 'ADT') {
     state.adtParsedFareCalc = null;
   }
@@ -1729,6 +1842,18 @@ function loadTheme() {
 // Theme toggle click event
 els.themeToggle.addEventListener('click', toggleTheme);
 
+// Reload application button & animated wrapper
+const reloadWrapper = document.querySelector('.reload-wrapper');
+if (reloadWrapper) {
+  reloadWrapper.addEventListener('click', () => {
+    window.location.reload();
+  });
+} else if (els.reloadButton) {
+  els.reloadButton.addEventListener('click', () => {
+    window.location.reload();
+  });
+}
+
 // Section toggle listeners
 if (els.taxToggleBtn) {
   els.taxToggleBtn.addEventListener('click', toggleTaxSection);
@@ -1930,15 +2055,24 @@ function formatAmount(value, currency = '') {
   const unit = rule.unit || (rule.decimals === 0 ? 1 : Math.pow(10, -rule.decimals));
   let rounded;
 
+  const invUnit = Math.round(1 / unit);
+  const isFractionalUnit = unit < 1 && Math.abs(1 / invUnit - unit) < 1e-9;
+
   if (rule.type === 'ceiling' || rule.type === 'UP') {
     // Round up to next multiple of unit
-    rounded = Math.ceil(num / unit) * unit;
+    rounded = isFractionalUnit
+      ? Math.ceil(Math.round(num * invUnit * 1e6) / 1e6) / invUnit
+      : Math.ceil(num / unit) * unit;
   } else if (rule.type === 'floor' || rule.type === 'DOWN') {
     // Round down to multiple of unit
-    rounded = Math.floor(num / unit) * unit;
+    rounded = isFractionalUnit
+      ? Math.floor(Math.round(num * invUnit * 1e6) / 1e6) / invUnit
+      : Math.floor(num / unit) * unit;
   } else {
     // Round to nearest multiple of unit
-    rounded = Math.round(num / unit) * unit;
+    rounded = isFractionalUnit
+      ? Math.round(Math.round(num * invUnit * 1e6) / 1e6) / invUnit
+      : Math.round(num / unit) * unit;
   }
 
   // Format with correct decimal places (no thousand separators for parsing consistency)
@@ -2031,13 +2165,41 @@ function formatTaxInput(text) {
 }
 
 function updateAddTaxesWithK3(baseAddTaxes, k3FareStr) {
-  const cleaned = sanitizeTaxString(
-    (baseAddTaxes || '')
-      .split('/')
-      .filter(entry => !entry.trim().includes('K3'))
-      .join('/')
-  );
-  return [cleaned, k3FareStr].filter(Boolean).join('/');
+  const entries = (baseAddTaxes || '')
+    .split('/')
+    .map(e => e.trim())
+    .filter(Boolean);
+
+  let existingK3 = 0;
+  let currency = null;
+  const nonK3Entries = [];
+
+  entries.forEach(entry => {
+    const match = entry.match(/^([A-Z]{3})?(\d+(?:\.\d+)?)K3$/i);
+    if (match) {
+      if (match[1] && !currency) currency = match[1];
+      existingK3 += parseFloat(match[2]);
+    } else {
+      nonK3Entries.push(entry);
+    }
+  });
+
+  let additionalK3 = 0;
+  if (k3FareStr) {
+    const match = k3FareStr.match(/^([A-Z]{3})?(\d+(?:\.\d+)?)K3$/i);
+    if (match) {
+      if (match[1] && !currency) currency = match[1];
+      additionalK3 += parseFloat(match[2]);
+    }
+  }
+
+  const totalK3 = existingK3 + additionalK3;
+  if (totalK3 > 0) {
+    const cur = currency || els.currency.value || 'INR';
+    nonK3Entries.push(`${cur}${formatAmount(totalK3, cur)}K3`);
+  }
+
+  return sanitizeTaxString(nonK3Entries.join('/'));
 }
 
 // "PD" only marks an entry as already paid for the reader's benefit — it does not change how
@@ -2102,6 +2264,7 @@ function calculateTaxes() {
   // Prevent recursive calls
   if (state.isCalculatingTax) return;
   state.isCalculatingTax = true;
+  state.clearFareCache();
 
   const oldText = els.oldTax.value;
   const newText = els.newTax.value;
@@ -2204,47 +2367,40 @@ function calculateTaxes() {
 
   renderTaxResult(result);
 
-  // Update fare calculator fields with recalculated values (without rendering summary)
-  const netTaxOnly = result.netTax;
-  const fareK3State = getCurrentFareK3State(result.currency);
-  const k3FromFare = (result.currency === fareK3State.currency) ? fareK3State.k3Fare : 0;
-  const k3FromFee = (result.currency === fareK3State.currency) ? fareK3State.k3Fee : 0;
-  const totalK3 = k3FromFare + k3OnYQ + k3FromFee;
-  const netTaxWithK3 = netTaxOnly + totalK3;
+  const hasFare = (els.oldFare.value && els.newFare.value) || els.fareDiff.value.trim() !== '';
+  if (!hasFare) {
+    // Update fare calculator fields with recalculated values for tax-only mode (without fare)
+    const netTaxOnly = result.netTax;
+    const fareK3State = getCurrentFareK3State(result.currency);
+    const k3FromFare = (result.currency === fareK3State.currency) ? fareK3State.k3Fare : 0;
+    const k3FromFee = (result.currency === fareK3State.currency) ? fareK3State.k3Fee : 0;
+    const totalK3 = k3FromFare + k3OnYQ + k3FromFee;
+    const netTaxWithK3 = netTaxOnly + totalK3;
 
-  els.taxAdj.value = result.currency ? `${result.currency}${formatAmount(netTaxWithK3, result.currency)}` : '';
+    els.taxAdj.value = result.currency ? `${result.currency}${formatAmount(netTaxWithK3, result.currency)}` : '';
 
-  // Keep the active tab's stored summary data live-updated with the new tax numbers, whatever
-  // kind of summary it currently is — fare-based (built by calculateFare()) or a tax-only /
-  // fare-calc-only one built by handleSummarise() when Summarise was clicked before any fare was
-  // entered. Targeting state.ptcData directly (rather than state.lastSummaryData, which a
-  // tax-only/fare-calc-only summary is never assigned to) is what makes a recalculation always
-  // reach whichever object is actually canonical for this tab, regardless of how it was created
-  // or in what order fare/tax/Summarise happened — otherwise a Summary built before any fare
-  // existed would silently stop picking up further tax edits.
-  const activeSummary = state.ptcData[state.activePtc].summaryData;
-  if (activeSummary) {
-    const diff = activeSummary.diff;
-    const feeAmount = activeSummary.fee;
-    const passengerCount = activeSummary.pax;
-    const perPax = diff + feeAmount + netTaxWithK3;
-    const subTotal = perPax * passengerCount;
+    const activeSummary = state.ptcData[state.activePtc].summaryData;
+    if (activeSummary) {
+      const passengerCount = activeSummary.pax || 1;
+      const perPax = netTaxWithK3;
+      const roundedPerPax = parseFloat(formatAmount(perPax, result.currency)) || perPax;
+      const subTotal = roundedPerPax * passengerCount;
 
-    const fareCur = activeSummary.currency || fareK3State.currency || result.currency;
-    els.perPax.value = `${fareCur}${formatAmount(perPax, fareCur)}`;
-    els.subTotal.value = `${fareCur}${formatAmount(subTotal, fareCur)}`;
+      els.perPax.value = `${result.currency}${formatAmount(roundedPerPax, result.currency)}`;
+      els.subTotal.value = `${result.currency}${formatAmount(subTotal, result.currency)}`;
 
-    // Update stored summary data with new tax adjustment and Add Taxes text (K3 on YQ may have changed)
-    state.ptcData[state.activePtc].summaryData = {
-      ...activeSummary,
-      taxAdj: netTaxWithK3,
-      perPax,
-      subTotal,
-      addTaxes: els.addTaxes.value,
-      k3OnYQ,
-      k3Fee: k3FromFee
-    };
-    clearActiveTabDirty();
+      // Update stored summary data with new tax adjustment and Add Taxes text (K3 on YQ may have changed)
+      state.ptcData[state.activePtc].summaryData = {
+        ...activeSummary,
+        taxAdj: netTaxWithK3,
+        perPax: roundedPerPax,
+        subTotal,
+        addTaxes: els.addTaxes.value,
+        k3OnYQ,
+        k3Fee: k3FromFee
+      };
+      clearActiveTabDirty();
+    }
   }
 
   state.isCalculatingTax = false;
@@ -2268,15 +2424,15 @@ function buildCurrentSummaryData() {
 
   const fareK3State = getCurrentFareK3State(currency, diff, feeAmount);
   const k3FareAmount = fareK3State.k3Fare;
-  const k3FeeAmount = fareK3State.k3Fee;
-  const k3OnYQ = state.lastTaxResult?.k3OnYQ ?? 0;
+  const isTaxCurrencyMatch = !state.lastTaxResult || !state.lastTaxResult.currency || state.lastTaxResult.currency === currency;
+  const netTaxOnly = (state.lastTaxResult && isTaxCurrencyMatch) ? state.lastTaxResult.netTax : 0;
+  const k3OnYQ = (state.lastTaxResult && isTaxCurrencyMatch) ? (state.lastTaxResult.k3OnYQ ?? 0) : 0;
   const passengerCount = Math.max(1, parseInt(els.pax.value, 10) ?? 1);
 
-  const taxAdj = state.lastTaxResult
-    ? state.lastTaxResult.netTax + k3FareAmount + k3OnYQ + k3FeeAmount
-    : k3FareAmount + k3OnYQ + k3FeeAmount;
+  const taxAdj = netTaxOnly + k3FareAmount + k3OnYQ + k3FeeAmount;
   const perPax = diff + feeAmount + taxAdj;
-  const subTotal = perPax * passengerCount;
+  const roundedPerPax = parseFloat(formatAmount(perPax, currency)) || perPax;
+  const subTotal = roundedPerPax * passengerCount;
 
   return {
     baseCurrency,
@@ -2358,6 +2514,11 @@ function renderTaxResult(result) {
   }
   els.taxAdj.value = result.currency ? `${result.currency}${formatAmount(result.netTax + totalK3, result.currency)}` : '';
   state.lastTaxResult = result;
+
+  const hasFare = (els.oldFare.value && els.newFare.value) || els.fareDiff.value.trim() !== '';
+  if (hasFare && !state.isCalculatingFare) {
+    calculateFare();
+  }
 }
 
 function clearTaxes() {
@@ -2368,6 +2529,7 @@ function clearTaxes() {
   els.refundTaxes.value = '';
   els.taxAdj.value = '';
   els.applyK3OnYQ.checked = false;
+  state.k3TaxWarningShown = false;
   state.lastTaxResult = null;
   state.clearTaxCache();
   state.clearFareCache();
@@ -2428,6 +2590,16 @@ function calculateFare() {
   }
 
   const baseDiff = oldFare && newFare ? newFare.amount - oldFare.amount : (manualDiff ? manualDiff.amount : 0);
+
+  // Notify user if New Base Fare is lower than Old Base Fare (negative fare difference)
+  if (oldFare && newFare && newFare.amount < oldFare.amount) {
+    if (!state.lowerBaseFareWarningShown) {
+      state.lowerBaseFareWarningShown = true;
+      showError('Notice: New Base Fare is lower than Old Base Fare (negative fare difference). Please verify airline refund / residual value policy (EMD-RS or forfeit).');
+    }
+  } else if (oldFare && newFare && newFare.amount >= oldFare.amount) {
+    state.lowerBaseFareWarningShown = false;
+  }
 
   // Update Base Diff Badge
   if (els.baseFareDiffBadge) {
@@ -2490,7 +2662,8 @@ function calculateFare() {
     applyChangeFeeK3,
     cabin: els.cabin.value,
     pax: passengerCount,
-    taxAdj: state.lastTaxResult?.netTax ?? 0
+    taxCurrency: state.lastTaxResult?.currency ?? null,
+    taxAdj: (state.lastTaxResult?.netTax ?? 0) + (state.lastTaxResult?.k3OnYQ ?? 0)
   });
 
   if (state.fareCalculationCache.has(fareCacheKey)) {
@@ -2499,6 +2672,13 @@ function calculateFare() {
     els.k3Tax.value = cachedResult.k3Label;
     els.perPax.value = `${currency}${formatAmount(cachedResult.perPassenger, currency)}`;
     els.subTotal.value = `${currency}${formatAmount(cachedResult.subTotal, currency)}`;
+    if (cachedResult.summaryData) {
+      if (cachedResult.summaryData.addTaxes !== undefined) els.addTaxes.value = cachedResult.summaryData.addTaxes;
+      if (cachedResult.summaryData.refundTaxes !== undefined) els.refundTaxes.value = cachedResult.summaryData.refundTaxes;
+      if (cachedResult.summaryData.taxAdj !== undefined) {
+        els.taxAdj.value = `${currency}${formatAmount(cachedResult.summaryData.taxAdj, currency)}`;
+      }
+    }
     // Store summary data for manual summarise button
     const restoredSummary = { ...cachedResult.summaryData };
     state.lastSummaryData = restoredSummary;
@@ -2523,29 +2703,27 @@ function calculateFare() {
   // Track K3 fare state to preserve it if tax adjustment is recalculated later
   state.updateFareK3(currency, k3Fare + k3Fee, k3Fare > 0 ? `${currency}${formatAmount(k3Fare, currency)}K3` : '');
 
-  const netTaxOnly = state.lastTaxResult ? state.lastTaxResult.netTax : 0;
-  const k3OnYQ = state.lastTaxResult?.k3OnYQ ?? 0;
+  const isTaxCurrencyMatch = !state.lastTaxResult || !state.lastTaxResult.currency || state.lastTaxResult.currency === currency;
+  const netTaxOnly = (state.lastTaxResult && isTaxCurrencyMatch) ? state.lastTaxResult.netTax : 0;
+  const k3OnYQ = (state.lastTaxResult && isTaxCurrencyMatch) ? (state.lastTaxResult.k3OnYQ ?? 0) : 0;
 
-  // Append combined K3 (fare diff + YQ + change fee) to Add Taxes (remove any existing K3 first to prevent duplication)
+  // Append combined K3 (tax difference K3 + fare diff K3 + YQ K3 + change fee K3) to Add Taxes
+  const basePositiveTaxes = (state.lastTaxResult && isTaxCurrencyMatch) ? state.lastTaxResult.positiveTaxes.join('/') : '';
   const k3ForAddTaxes = k3Fare + k3OnYQ + k3Fee;
-  if (k3ForAddTaxes > 0) {
-    // Remove existing K3 entries first to ensure clean state
-    removeK3FFromAddTaxes();
-    // Append new K3
-    const k3FareStr = `${currency}${formatAmount(k3ForAddTaxes, currency)}K3`;
-    els.addTaxes.value = updateAddTaxesWithK3(els.addTaxes.value, k3FareStr);
-  } else {
-    // Remove K3 entries if K3 is not applied (checkboxes deselected)
-    removeK3FFromAddTaxes();
+  const k3FareStr = k3ForAddTaxes > 0 ? `${currency}${formatAmount(k3ForAddTaxes, currency)}K3` : '';
+  els.addTaxes.value = updateAddTaxesWithK3(basePositiveTaxes, k3FareStr);
+  if (!isTaxCurrencyMatch) {
+    els.refundTaxes.value = '';
   }
 
   const k3Total = k3Fare + k3Fee;
   const netTaxWithK3 = netTaxOnly + k3Fare + k3OnYQ + k3Fee;
   const perPassenger = diff + feeAmount + netTaxWithK3;
-  const subTotal = perPassenger * passengerCount;
+  const roundedPerPassenger = parseFloat(formatAmount(perPassenger, currency)) || perPassenger;
+  const subTotal = roundedPerPassenger * passengerCount;
 
   els.taxAdj.value = `${currency}${formatAmount(netTaxWithK3, currency)}`;
-  els.perPax.value = `${currency}${formatAmount(perPassenger, currency)}`;
+  els.perPax.value = `${currency}${formatAmount(roundedPerPassenger, currency)}`;
   els.subTotal.value = `${currency}${formatAmount(subTotal, currency)}`;
 
   const summaryData = {
@@ -2565,7 +2743,7 @@ function calculateFare() {
     addTaxes: els.addTaxes.value,
     refundTaxes: els.refundTaxes.value,
     taxAdj: netTaxWithK3,
-    perPax: perPassenger,
+    perPax: roundedPerPassenger,
     subTotal,
     pax: passengerCount,
     convertedFareCalcString: state.lastConvertedFareCalcString || '',
@@ -2574,7 +2752,7 @@ function calculateFare() {
   // Store in cache
   state.fareCalculationCache.set(fareCacheKey, {
     k3Label,
-    perPassenger,
+    perPassenger: roundedPerPassenger,
     subTotal,
     summaryData: { ...summaryData }
   });
@@ -2758,6 +2936,16 @@ function clearFare() {
   // Preserve tax values when clearing fare only
   state.updateFareK3(null, 0, '');
   state.clearFareCache();
+  state.lowerBaseFareWarningShown = false;
+  const positiveTaxStr = state.lastTaxResult ? state.lastTaxResult.positiveTaxes.join('/') : '';
+  const k3OnYQ = state.lastTaxResult?.k3OnYQ ?? 0;
+  const k3OnYQStr = k3OnYQ > 0 ? `${state.lastTaxResult.currency}${formatAmount(k3OnYQ, state.lastTaxResult.currency)}K3` : '';
+  els.addTaxes.value = updateAddTaxesWithK3(positiveTaxStr, k3OnYQStr);
+  if (state.lastTaxResult) {
+    els.taxAdj.value = `${state.lastTaxResult.currency}${formatAmount(state.lastTaxResult.netTax + k3OnYQ, state.lastTaxResult.currency)}`;
+  } else {
+    els.taxAdj.value = '';
+  }
   if (els.baseFareDiffBadge) els.baseFareDiffBadge.style.display = 'none';
   if (els.fareDiffBulb) els.fareDiffBulb.style.display = 'none';
   if (els.changeFeeBulb) els.changeFeeBulb.style.display = 'none';

@@ -18,6 +18,8 @@
   --readonly-bg: #14172b;
   --total-accent: rgb(63, 81, 181);
   --total-text: #F5F5DC;
+  --tax-pos-color: #86efac;
+  --tax-neg-color: #fca5a5;
   font-family: -apple-system, BlinkMacSystemFont, sans-serif;
   color: var(--text-primary);
 }
@@ -41,6 +43,8 @@
   --readonly-bg: #efeccf;
   --total-accent: rgb(63, 81, 181);
   --total-text: #F5F5DC;
+  --tax-pos-color: #15803d;
+  --tax-neg-color: #b91c1c;
 }
 [data-theme="light"] section {
   background: var(--bg-card);
@@ -499,16 +503,23 @@ th {
   font-weight: 700;
 }
 .pos {
-  color: #86efac;
+  color: var(--tax-pos-color);
+  font-weight: 600;
 }
 .neg {
-  color: #fca5a5;
+  color: var(--tax-neg-color);
+  font-weight: 600;
 }
 .warning {
   color: #fcd34d;
 }
 .error {
-  color: #fca5a5;
+  color: var(--tax-neg-color);
+  font-weight: 600;
+}
+.success {
+  color: var(--tax-pos-color);
+  font-weight: 600;
 }
 .section-header {
   display: flex;
@@ -1024,6 +1035,125 @@ th {
   background: rgba(6, 182, 212, 0.2);
   transform: translateY(-1px);
 }
+/* Reload Button Animated Hover Component */
+.reload-wrapper {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  margin-right: 22px; /* Reserves space for diamond slide-out without colliding with theme toggle */
+  cursor: pointer;
+}
+
+.reload-btn-text {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 92px;
+  height: 32px;
+  line-height: 28px;
+  font-family: inherit;
+  font-size: 0.70rem;
+  font-weight: 700;
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  background: var(--bg-card);
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  padding: 0;
+  box-sizing: border-box;
+  transition: width 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.35s ease,
+              color 0.35s ease,
+              background-color 0.35s ease,
+              box-shadow 0.35s ease;
+  z-index: 2;
+  position: relative;
+  user-select: none;
+}
+
+[data-theme="light"] .reload-btn-text {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+
+/* Rotated square diamond container */
+.reload-icon-diamond {
+  width: 32px;
+  height: 32px;
+  box-sizing: border-box;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  position: absolute;
+  top: 0;
+  right: 0;
+  transform: rotate(45deg);
+  z-index: 1;
+  background: var(--bg-card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: right 0.35s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.35s ease,
+              background-color 0.35s ease,
+              box-shadow 0.35s ease;
+  pointer-events: none;
+  user-select: none;
+}
+
+[data-theme="light"] .reload-icon-diamond {
+  background: #ffffff;
+}
+
+/* Counter-rotated SVG icon */
+.reload-svg {
+  width: 17px;
+  height: 17px;
+  transform: rotate(-45deg);
+  stroke: var(--text-primary);
+  transition: stroke 0.35s ease, transform 0.35s ease;
+}
+
+/* Hover State */
+.reload-wrapper:hover .reload-btn-text,
+.reload-btn-text:focus-visible {
+  width: 78px;
+  border-color: #1ba0f2;
+  color: #1ba0f2;
+  background: var(--bg-card);
+  box-shadow: 0 2px 8px rgba(27, 160, 242, 0.2);
+}
+
+[data-theme="light"] .reload-wrapper:hover .reload-btn-text,
+[data-theme="light"] .reload-btn-text:focus-visible {
+  background: #ffffff;
+}
+
+.reload-wrapper:hover .reload-icon-diamond,
+.reload-btn-text:focus-visible + .reload-icon-diamond {
+  border-color: #1ba0f2;
+  right: -20px;
+  box-shadow: 0 4px 12px rgba(27, 160, 242, 0.25);
+}
+
+.reload-wrapper:hover .reload-svg,
+.reload-btn-text:focus-visible + .reload-icon-diamond .reload-svg {
+  stroke: #1ba0f2;
+  animation: reloadSpinUpright 1s linear infinite;
+}
+
+/* Counter-rotated spin animation */
+@keyframes reloadSpinUpright {
+  from {
+    transform: rotate(-45deg);
+  }
+  to {
+    transform: rotate(315deg);
+  }
+}
+
 .theme-toggle,
 .theme-switch {
   background: transparent;
@@ -1040,6 +1170,7 @@ th {
   transform: translateY(-1px);
 }
 .theme-switch:focus-visible,
+.reload-btn-text:focus-visible,
 .help-icon:focus-visible {
   outline: 2px solid var(--primary-cyan);
   outline-offset: 3px;
@@ -1049,15 +1180,15 @@ th {
   width: 60px;
   height: 32px;
   border-radius: 9999px;
-  background: #082845;
-  box-shadow: inset 0 2px 5px rgba(0, 0, 0, 0.4);
+  background: #fae8a4;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.2);
   transition: background-color 0.35s ease, box-shadow 0.35s ease;
   user-select: none;
   display: block;
 }
 [data-theme="light"] .switch-track {
-  background: #fae8a4;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+  background: #1ba0f2;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.22);
 }
 .switch-thumb {
   position: absolute;

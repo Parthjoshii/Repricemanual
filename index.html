@@ -41,6 +41,17 @@ Changes in V4.6 (Bug Fix Release):
 <body>
   <h1>Manual Reprice - Master Calculator</h1>
   <div class="header-actions">
+    <div class="reload-wrapper" title="Reload tool (Refresh)">
+      <button id="reloadButton" class="reload-btn-text" type="button" aria-label="Reload application">
+        Refresh
+      </button>
+      <div class="reload-icon-diamond" aria-hidden="true">
+        <svg class="reload-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"></path>
+          <polyline points="21 3 21 8 16 8"></polyline>
+        </svg>
+      </div>
+    </div>
     <button id="themeToggle" class="theme-switch" type="button" role="switch" aria-checked="false" aria-label="Toggle dark mode" title="Toggle theme (Ctrl+M)">
       <span class="switch-track">
         <span class="switch-thumb">
@@ -196,6 +207,10 @@ Changes in V4.6 (Bug Fix Release):
               <span id="autoCalcDescription" class="sr-only">Scales the validated Adult fare calculation string by the
                 passenger type percentage (or, on the hybrid tabs, by outbound/inbound leg) and fills this field
                 automatically.</span>
+              <div class="section-grid-full checkbox-cell checkbox-inline" id="halveFareComponentsRow">
+                <input id="halveFareComponents" type="checkbox" aria-label="Halve fare component values for round-trip journey">
+                <label for="halveFareComponents">Halve fare component values (1/2)</label>
+              </div>
               <div class="section-grid-full button-row">
                 <button id="parseButton" type="button" aria-label="Parse fare calculation string">Convert</button>
                 <button id="parserClearButton" type="button" class="secondary"
