@@ -85,12 +85,18 @@ const assert = require('assert');
   const reloadTitle = await page.getAttribute('.reload-wrapper', 'title');
   assert.ok(reloadTitle && reloadTitle.includes('Reload'), 'Reload wrapper title must indicate reload: ' + reloadTitle);
 
-  // Check initial button dimensions
-  const initialWidth = await page.evaluate(() => {
-    return document.getElementById('reloadButton').getBoundingClientRect().width;
-  });
-  console.log('Initial Reload button width:', initialWidth);
-  assert.ok(Math.abs(initialWidth - 92) < 2, `Initial width should be ~92px (got ${initialWidth}px)`);
+  // Check button text
+  const btnText = await page.textContent('#reloadButton');
+  console.log('Reload button text:', btnText.trim());
+  assert.strictEqual(btnText.trim(), 'Reload Calculator', 'Button label must be "Reload Calculator"');
+
+  // Verify that legacy detached diamond element no longer exists (zero background layout leakage)
+  const diamondCount = await page.$$eval('.reload-icon-diamond', els => els.length);
+  assert.strictEqual(diamondCount, 0, 'Detached diamond element must NOT exist in the DOM');
+
+  // Verify inline SVG icon is present inside button
+  const hasInlineSvg = await page.$eval('#reloadButton .reload-svg', el => Boolean(el));
+  assert.strictEqual(hasInlineSvg, true, 'Inline SVG icon must be present inside reload button');
 
   // Hover over the reload wrapper
   await page.hover('.reload-wrapper');
@@ -98,21 +104,20 @@ const assert = require('assert');
 
   const hoverInfo = await page.evaluate(() => {
     const btn = document.getElementById('reloadButton');
-    const diamond = document.querySelector('.reload-icon-diamond');
-    const btnRect = btn.getBoundingClientRect();
-    const diamondRect = diamond.getBoundingClientRect();
-    const diamondStyle = getComputedStyle(diamond);
+    const svg = btn.querySelector('.reload-svg');
+    const btnStyle = getComputedStyle(btn);
+    const svgStyle = getComputedStyle(svg);
     return {
-      btnWidth: btnRect.width,
-      diamondBorderColor: diamondStyle.borderColor,
-      btnColor: getComputedStyle(btn).color,
-      diamondRight: diamondRect.right - btnRect.right
+      borderColor: btnStyle.borderColor,
+      color: btnStyle.color,
+      svgTransform: svgStyle.transform,
+      svgStroke: svgStyle.stroke
     };
   });
   console.log('Hover state info:', hoverInfo);
-  assert.ok(Math.abs(hoverInfo.btnWidth - 78) < 2, `Contracted width should be ~78px on hover (got ${hoverInfo.btnWidth}px)`);
-  assert.strictEqual(hoverInfo.diamondBorderColor, 'rgb(27, 160, 242)', 'Diamond border should turn #1ba0f2 on hover');
-  assert.ok(hoverInfo.diamondRight > 5, 'Diamond should slide out to the right of the button');
+  assert.strictEqual(hoverInfo.borderColor, 'rgb(27, 160, 242)', 'Border should turn #1ba0f2 on hover');
+  assert.strictEqual(hoverInfo.color, 'rgb(27, 160, 242)', 'Text color should turn #1ba0f2 on hover');
+  assert.ok(hoverInfo.svgTransform && hoverInfo.svgTransform !== 'none', 'SVG icon should have rotation transform on hover');
 
   // Screenshot light mode hover
   await page.screenshot({ path: path.resolve(__dirname, '../aligned-light-slider-hover.png'), clip: { x: 1000, y: 0, width: 280, height: 75 } });

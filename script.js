@@ -156,6 +156,8 @@ const els = {
   fareComponents: byId('fareComponents'),
   qSurchargesSection: byId('qSurchargesSection'),
   qSurcharges: byId('qSurcharges'),
+  stopoverChargesSection: byId('stopoverChargesSection'),
+  stopoverCharges: byId('stopoverCharges'),
   calculatedNuc: byId('calculatedNuc'),
   statedNuc: byId('statedNuc'),
   nucValidation: byId('nucValidation'),
@@ -178,6 +180,16 @@ const els = {
   dismissRestoreButton: byId('dismissRestoreButton'),
   halveFareComponents: byId('halveFareComponents'),
   halveFareComponentsRow: byId('halveFareComponentsRow'),
+  halveComponentSelector: byId('halveComponentSelector'),
+  halveComponentOptions: byId('halveComponentOptions'),
+  fareComponentDetectorBadge: byId('fareComponentDetectorBadge'),
+  qCorrectionModal: byId('qCorrectionModal'),
+  qCorrectionTitle: byId('qCorrectionTitle'),
+  qCorrectionCloseBtn: byId('qCorrectionCloseBtn'),
+  qDiffInputted: byId('qDiffInputted'),
+  qDiffStandardized: byId('qDiffStandardized'),
+  qCorrectionAsIsBtn: byId('qCorrectionAsIsBtn'),
+  qCorrectionApplyBtn: byId('qCorrectionApplyBtn'),
 };
 
 // In-app replacement for window.prompt()/confirm() — some embedded browser previews (e.g.
@@ -222,6 +234,123 @@ function showPtcPrompt({ message, defaultValue = '', requireInput = true }) {
     // Attached to the modal (not just the input) so Enter/Escape work regardless of which
     // control currently has focus (input in name/rename mode, OK button in confirm-only mode).
     els.ptcPromptModal.addEventListener('keydown', onKeydown);
+  });
+}
+
+// Pattern matching trailing Q surcharges attached after a fare basis code, PTC suffix, or ticket designator.
+// Matches direct Q (Q12.29, Q 12.29), coded Q (Q COKDUB58.47, QBOM5.00), or bare city-pair surcharges (COKDUB58.47).
+const TRAILING_Q_REGEX = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(\/[A-Z0-9]{1,8}?)?\s*(Q\s*(?:[A-Z]{3}(?:\s*[A-Z]{3})?\s*)?\d+(?:\.\d+)?(?:\s*Q)?|[A-Z]{6}\d+(?:\.\d+)?(?:\s*Q)?)/g;
+
+function normalizeTrailingQSurchargesInMemory(str) {
+  if (!str) return '';
+  const regex = new RegExp(TRAILING_Q_REGEX.source, 'g');
+  return str.replace(regex, (match, fare, basis, suffix, desig, fullQ) => {
+    const sfx = suffix || '';
+    const dsg = desig || '';
+    const cleanQ = fullQ.trim();
+    return `${cleanQ} ${fare}${basis}${sfx}${dsg} `;
+  });
+}
+
+function detectTrailingQSurcharges(str) {
+  if (!str) return null;
+  const regex = new RegExp(TRAILING_Q_REGEX.source, 'g');
+  const matches = [];
+  let m;
+  while ((m = regex.exec(str)) !== null) {
+    matches.push({
+      match: m[0],
+      index: m.index,
+      fare: m[1],
+      basis: m[2],
+      suffix: m[3] || '',
+      designator: m[4] || '',
+      fullQ: m[5],
+    });
+  }
+  if (matches.length === 0) return null;
+
+  const standardized = str.replace(new RegExp(TRAILING_Q_REGEX.source, 'g'), (match, fare, basis, suffix, desig, fullQ) => {
+    const sfx = suffix || '';
+    const dsg = desig || '';
+    const cleanQ = fullQ.trim();
+    return `${cleanQ} ${fare}${basis}${sfx}${dsg} `;
+  }).replace(/\s+/g, ' ').trim();
+
+  const inputtedHtml = escapeHtml(str).replace(new RegExp(TRAILING_Q_REGEX.source, 'g'), (match, fare, basis, suffix, desig, fullQ) => {
+    const sfx = suffix || '';
+    const dsg = desig || '';
+    return `${fare}${basis}${sfx}${dsg}<span class="q-hl-misplaced">${escapeHtml(fullQ)}</span>`;
+  });
+
+  const standardizedHtml = escapeHtml(str).replace(new RegExp(TRAILING_Q_REGEX.source, 'g'), (match, fare, basis, suffix, desig, fullQ) => {
+    const sfx = suffix || '';
+    const dsg = desig || '';
+    const cleanQ = fullQ.trim();
+    return `<span class="q-hl-standard">${escapeHtml(cleanQ)}</span> ${fare}${basis}${sfx}${dsg} `;
+  });
+
+  return {
+    count: matches.length,
+    matches,
+    standardized,
+    inputtedHtml,
+    standardizedHtml,
+  };
+}
+
+function showQCorrectionModal(detection) {
+  return new Promise((resolve) => {
+    if (!els.qCorrectionModal) {
+      resolve('apply');
+      return;
+    }
+    els.qDiffInputted.innerHTML = detection.inputtedHtml;
+    els.qDiffStandardized.innerHTML = detection.standardizedHtml;
+    els.qCorrectionModal.classList.add('show');
+    els.qCorrectionApplyBtn.focus();
+
+    function cleanup(result) {
+      els.qCorrectionModal.classList.remove('show');
+      els.qCorrectionApplyBtn.removeEventListener('click', onApply);
+      els.qCorrectionAsIsBtn.removeEventListener('click', onAsIs);
+      els.qCorrectionCloseBtn.removeEventListener('click', onClose);
+      els.qCorrectionModal.removeEventListener('click', onBackdropClick);
+      els.qCorrectionModal.removeEventListener('keydown', onKeydown);
+      resolve(result);
+    }
+
+    function onApply() { cleanup('apply'); }
+    function onAsIs() { cleanup('as-is'); }
+    function onClose() { cleanup('cancel'); }
+
+    function onBackdropClick(e) {
+      if (e.target === els.qCorrectionModal) {
+        cleanup('cancel');
+      }
+    }
+
+    function onKeydown(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (document.activeElement === els.qCorrectionAsIsBtn) {
+          onAsIs();
+        } else {
+          onApply();
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
+        onClose();
+      }
+    }
+
+    els.qCorrectionApplyBtn.addEventListener('click', onApply);
+    els.qCorrectionAsIsBtn.addEventListener('click', onAsIs);
+    els.qCorrectionCloseBtn.addEventListener('click', onClose);
+    els.qCorrectionModal.addEventListener('click', onBackdropClick);
+    els.qCorrectionModal.addEventListener('keydown', onKeydown);
   });
 }
 
@@ -294,6 +423,7 @@ const PTC_SNAPSHOT_FIELDS = [
 const PTC_STATE_KEYS = [
   'lastTaxResult', 'lastFareK3Total', 'lastFareCurrency', 'lastK3AddTaxes',
   'lastSummaryData', 'lastConvertedFareCalcString', 'unhalvedFareCalcString',
+  'selectedHalveMode',
 ];
 
 function defaultPtcSnapshot() {
@@ -324,8 +454,10 @@ function snapshotPtc() {
     stateValues,
     parserVisible: els.parserResults.style.display === 'block',
     qSurchargesVisible: els.qSurchargesSection.style.display === 'block',
+    stopoverChargesVisible: els.stopoverChargesSection ? els.stopoverChargesSection.style.display === 'block' : false,
     fareComponentsHtml: els.fareComponents.innerHTML,
     qSurchargesHtml: els.qSurcharges.innerHTML,
+    stopoverChargesHtml: els.stopoverCharges ? els.stopoverCharges.innerHTML : '',
     calculatedNucHtml: els.calculatedNuc.innerHTML,
     statedNucText: els.statedNuc.textContent,
     nucValidationHtml: els.nucValidation.innerHTML,
@@ -347,13 +479,20 @@ function restorePtc(snapshot) {
 
   els.parserResults.style.display = snapshot.parserVisible ? 'block' : 'none';
   els.qSurchargesSection.style.display = snapshot.qSurchargesVisible ? 'block' : 'none';
+  if (els.stopoverChargesSection) {
+    els.stopoverChargesSection.style.display = snapshot.stopoverChargesVisible ? 'block' : 'none';
+  }
   els.fareComponents.innerHTML = snapshot.fareComponentsHtml || '';
   els.qSurcharges.innerHTML = snapshot.qSurchargesHtml || '';
+  if (els.stopoverCharges) {
+    els.stopoverCharges.innerHTML = snapshot.stopoverChargesHtml || '';
+  }
   els.calculatedNuc.innerHTML = snapshot.calculatedNucHtml || '';
   els.statedNuc.textContent = snapshot.statedNucText || '';
   els.nucValidation.innerHTML = snapshot.nucValidationHtml || '';
   els.roe.textContent = snapshot.roeText || '';
   els.baseFare.textContent = snapshot.baseFareText || '';
+  updateFareComponentDetector();
   const hasOld = (els.oldFare.value || '').trim() !== '';
   const hasNew = (els.newFare.value || '').trim() !== '';
   const displayStyle = (hasOld && hasNew) ? 'inline-flex' : 'none';
@@ -726,6 +865,7 @@ const state = {
   lastSummaryData: null,
   lastConvertedFareCalcString: null,
   unhalvedFareCalcString: null,
+  selectedHalveMode: 'all',
   k3TaxWarningShown: false,
   lowerBaseFareWarningShown: false,
   rawChangeFee: null,
@@ -738,6 +878,7 @@ const state = {
   isCalculatingFare: false,
   // Fare calculation string state
   lastFareCalcString: null,
+  lastVerifiedMisplacedString: null,
   // Passenger-type-code tabs: which tab is active, and the saved input/output snapshot +
   // last computed summary for each PTC (used by switchPtcTab() and the Summary aggregation).
   activePtc: 'ADT',
@@ -821,7 +962,10 @@ function memoize(func) {
   };
 }
 
-els.taxCalcButton.addEventListener('click', calculateTaxes);
+els.taxCalcButton.addEventListener('click', () => {
+  state.clearTaxCache();
+  calculateTaxes();
+});
 els.taxClearButton.addEventListener('click', clearTaxes);
 els.fareCalcButton.addEventListener('click', calculateFare);
 els.fareClearButton.addEventListener('click', clearFare);
@@ -863,6 +1007,7 @@ function validateTaxInputs() {
 
 ['oldTax', 'newTax'].forEach(id => {
   els[id].addEventListener('input', () => {
+    state.clearTaxCache();
     validateTaxInputs();
     debouncedCalculateTaxes();
   });
@@ -870,6 +1015,8 @@ function validateTaxInputs() {
     const formatted = formatTaxInput(els[id].value);
     if (formatted !== els[id].value) {
       els[id].value = formatted;
+      state.clearTaxCache();
+      debouncedCalculateTaxes();
     }
   });
 });
@@ -965,6 +1112,11 @@ els.fareCalcString.addEventListener('input', () => {
   if (state.activePtc === 'ADT') {
     state.adtParsedFareCalc = null;
   }
+  state.lastVerifiedMisplacedString = null;
+  updateFareComponentDetector();
+});
+els.fareCalcString.addEventListener('change', () => {
+  updateFareComponentDetector();
 });
 els.autoCalcFromAdult.addEventListener('change', () => {
   if (!isAutoCalcEligible(state.activePtc)) return;
@@ -1031,7 +1183,8 @@ function clearActiveTabDirty() {
 });
 
 // Parser functions
-function parseFareCalcString() {
+async function parseFareCalcString(options = {}) {
+  const { bypassPrompt = false } = options;
   const rawInput = els.fareCalcString.value.trim();
 
   if (!rawInput) {
@@ -1048,6 +1201,28 @@ function parseFareCalcString() {
   const input = rawInput.toUpperCase();
   if (input !== els.fareCalcString.value) {
     els.fareCalcString.value = input;
+  }
+
+  // Detect misplaced trailing Q surcharges attached after fare basis/designator
+  if (!bypassPrompt && state.lastVerifiedMisplacedString !== input) {
+    const detection = detectTrailingQSurcharges(input);
+    if (detection) {
+      const userChoice = await showQCorrectionModal(detection);
+      if (userChoice === 'apply') {
+        els.fareCalcString.value = detection.standardized;
+        state.lastVerifiedMisplacedString = null;
+        markActiveTabDirty();
+        updateFareComponentDetector();
+        return parseFareCalcString({ bypassPrompt: true });
+      } else if (userChoice === 'as-is') {
+        state.lastVerifiedMisplacedString = input;
+        return parseFareCalcString({ bypassPrompt: true });
+      } else {
+        // Cancel / edit manually
+        els.fareCalcString.focus();
+        return;
+      }
+    }
   }
 
   const unhalvedParsed = parseFareCalcStringInternal(input);
@@ -1079,32 +1254,38 @@ function parseFareCalcString() {
   }
 
   const isHalveActive = !!(els.halveFareComponents?.checked && !isOneWayJourney(unhalvedParsed, input));
-  const workingString = isHalveActive ? halveFareComponentsInString(input) : input;
+  const halveMode = state.selectedHalveMode || 'all';
+  const workingString = isHalveActive ? halveFareComponentsInString(input, halveMode) : input;
   const parsed = isHalveActive ? parseFareCalcStringInternal(workingString) : unhalvedParsed;
 
-  // Calculate NUC
+  // Calculate NUC including fare components, Q surcharges, and Stopover charges
   const fareSum = parsed.fareComponents.reduce((sum, comp) => sum + comp.amount, 0);
   const qSum = parsed.qSurcharges.reduce((sum, amount) => sum + amount, 0);
-  const calculatedNuc = fareSum + qSum;
+  const stopoverSum = (parsed.stopoverCharges || []).reduce((sum, amount) => sum + amount, 0);
+  const calculatedNuc = round2(fareSum + qSum + stopoverSum);
 
-  // Display fare components. On the hybrid tabs, label each with the outbound/inbound leg it
-  // was matched to (same boundary rule applyAutoCalc()/deriveHybridFareCalcString() use) so the
-  // split the tool chose is visible and checkable at a glance, not hidden.
+  // Keep component detector badge and options up-to-date
+  updateFareComponentDetector();
+
+  // Display fare components with halving badge/details if halved
   const hybridRatios = PTC_HYBRID_RATIOS[state.activePtc];
-  if (hybridRatios) {
-    const { boundaryIndex } = findHybridBoundary(workingString);
-    els.fareComponents.innerHTML = parsed.fareComponents
-      .map(comp => {
+  els.fareComponents.innerHTML = parsed.fareComponents
+    .map((comp, idx) => {
+      const wasHalved = isHalveActive && (halveMode === 'all' || String(halveMode) === String(idx));
+      const origComp = unhalvedParsed.fareComponents[idx];
+      const origAmt = origComp ? origComp.amount.toFixed(2) : comp.amount.toFixed(2);
+      const basis = comp.fareBasis + (comp.suffix || '') + (comp.designator || '');
+      const badge = wasHalved ? `<span class="halved-badge">1/2 Halved</span>` : '';
+      const amtDisplay = wasHalved ? `${origAmt} / 2 = <b>${comp.amount.toFixed(2)}</b>` : `${comp.amount.toFixed(2)}`;
+
+      if (hybridRatios) {
+        const { boundaryIndex } = findHybridBoundary(workingString);
         const phase = boundaryIndex === null || comp.index < boundaryIndex ? 'Outbound' : 'Inbound';
-        const basis = comp.fareBasis + (comp.suffix || '') + (comp.designator || '');
-        return `<li><b>${phase}:</b> ${comp.amount.toFixed(2)} <span style="color: var(--text-secondary);">(${basis})</span></li>`;
-      })
-      .join('');
-  } else {
-    els.fareComponents.innerHTML = parsed.fareComponents
-      .map(comp => `<li>${comp.amount.toFixed(2)}</li>`)
-      .join('');
-  }
+        return `<li><b>${phase}:</b> ${amtDisplay} <span style="color: var(--text-secondary);">(${basis})</span> ${badge}</li>`;
+      }
+      return `<li>${amtDisplay} <span style="color: var(--text-secondary);">(${basis})</span> ${badge}</li>`;
+    })
+    .join('');
 
   // Display Q surcharges
   if (parsed.qSurcharges.length > 0) {
@@ -1116,14 +1297,29 @@ function parseFareCalcString() {
     els.qSurchargesSection.style.display = 'none';
   }
 
-  // Display calculated NUC with breakdown
-  const breakdown = parsed.fareComponents.map(comp => comp.amount.toFixed(2)).join(' + ');
-  if (parsed.qSurcharges.length > 0) {
-    const qBreakdown = parsed.qSurcharges.map(a => a.toFixed(2)).join(' + ');
-    els.calculatedNuc.innerHTML = `${calculatedNuc.toFixed(2)} <span style="font-size: 0.85rem; color: var(--text-secondary);">(${breakdown} + ${qBreakdown})</span>`;
+  // Display Stopover charges
+  if (parsed.stopoverCharges && parsed.stopoverCharges.length > 0) {
+    els.stopoverChargesSection.style.display = 'block';
+    els.stopoverCharges.innerHTML = parsed.stopoverCharges
+      .map(amount => `<li>${amount.toFixed(2)}</li>`)
+      .join('');
   } else {
-    els.calculatedNuc.innerHTML = `${calculatedNuc.toFixed(2)} <span style="font-size: 0.85rem; color: var(--text-secondary);">(${breakdown})</span>`;
+    els.stopoverChargesSection.style.display = 'none';
   }
+
+  // Display calculated NUC with breakdown
+  const breakdownParts = [];
+  if (parsed.fareComponents.length > 0) {
+    breakdownParts.push(parsed.fareComponents.map(comp => comp.amount.toFixed(2)).join(' + '));
+  }
+  if (parsed.qSurcharges.length > 0) {
+    breakdownParts.push(parsed.qSurcharges.map(a => a.toFixed(2)).join(' + '));
+  }
+  if (parsed.stopoverCharges && parsed.stopoverCharges.length > 0) {
+    breakdownParts.push(parsed.stopoverCharges.map(a => a.toFixed(2)).join(' + '));
+  }
+  const breakdownStr = breakdownParts.join(' + ');
+  els.calculatedNuc.innerHTML = `${calculatedNuc.toFixed(2)} <span style="font-size: 0.85rem; color: var(--text-secondary);">(${breakdownStr})</span>`;
 
   // Display stated NUC
   const statedNucValue = unhalvedParsed.nuc;
@@ -1226,10 +1422,15 @@ function parseFareCalcStringInternal(input) {
   const result = {
     fareComponents: [],
     qSurcharges: [],
+    stopoverCharges: [],
     nuc: null,
     roe: null,
     warnings: [],
   };
+
+  // Trailing Q surcharges attached after fare basis/designators (e.g. 563.74KLEESIT1/ITN2Q12.29)
+  // are normalized in-memory so farePattern does not greedily swallow Q into ticket designators.
+  const normalizedInput = normalizeTrailingQSurchargesInMemory(input);
 
   // Fare components and Q surcharges only ever appear before the NUC keyword — NUC/ROE always
   // mark the totals section that follows. Bounding both scans to that region stops any stray or
@@ -1258,13 +1459,13 @@ function parseFareCalcStringInternal(input) {
   // so a keyword that's merely glued to adjacent garbage — not embedded inside another token —
   // still parses.
   function findKeywordMatch(keyword) {
-    const strict = input.match(new RegExp(`(?<=^|\\s)${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
-    return strict || input.match(new RegExp(`${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+    const strict = normalizedInput.match(new RegExp(`(?<=^|\\s)${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+    return strict || normalizedInput.match(new RegExp(`${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
   }
 
   const nucKeywordMatch = findKeywordMatch('NUC');
   const nucIndex = nucKeywordMatch ? nucKeywordMatch.index : -1;
-  const farePart = nucIndex === -1 ? input : input.slice(0, nucIndex);
+  const farePart = nucIndex === -1 ? normalizedInput : normalizedInput.slice(0, nucIndex);
   if (nucKeywordMatch) {
     result.nuc = parseFloat(nucKeywordMatch[1]);
   }
@@ -1335,6 +1536,16 @@ function parseFareCalcStringInternal(input) {
     }
   }
 
+  // Extract Stopover surcharges (1S followed by numeric amount, e.g. 1S57.59, 1S34.00)
+  const stopoverPattern = /(?<![A-Za-z0-9])1S\s*(?:[A-Z]{3}\s*)?(?<sAmount>\d+(?:\.\d+)?)/g;
+  let sMatch;
+  while ((sMatch = stopoverPattern.exec(farePart)) !== null) {
+    const sAmount = sMatch.groups?.sAmount;
+    if (sAmount) {
+      result.stopoverCharges.push(parseFloat(sAmount));
+    }
+  }
+
   // Flag (don't silently act on) shapes that would otherwise mis-parse into a wrong-but-plausible
   // number with no other indication anything is off — the intended value is ambiguous, so the
   // best we can do is calculate a best-effort result and tell the user to double-check it.
@@ -1355,34 +1566,104 @@ function isOneWayJourney(parsed, input) {
   return false;
 }
 
-function halveFareComponentsInString(input) {
+function halveFareComponentsInString(input, selectedMode = 'all') {
+  const normalizedInput = normalizeTrailingQSurchargesInMemory(input);
+
   function findKeywordMatch(keyword) {
-    const strict = input.match(new RegExp(`(?<=^|\\s)${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
-    return strict || input.match(new RegExp(`${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+    const strict = normalizedInput.match(new RegExp(`(?<=^|\\s)${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+    return strict || normalizedInput.match(new RegExp(`${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
   }
 
   const nucKeywordMatch = findKeywordMatch('NUC');
   const nucIndex = nucKeywordMatch ? nucKeywordMatch.index : -1;
-  const farePart = nucIndex === -1 ? input : input.slice(0, nucIndex);
-  const rest = nucIndex === -1 ? '' : input.slice(nucIndex);
+  const farePart = nucIndex === -1 ? normalizedInput : normalizedInput.slice(0, nucIndex);
+  const rest = nucIndex === -1 ? '' : normalizedInput.slice(nucIndex);
 
   let newFareSum = 0;
+  let compIdx = 0;
   const farePattern = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(\/[A-Z0-9]{1,8})?/g;
   const halvedFarePart = farePart.replace(farePattern, (match, amountStr, fareBasis, suffix, designator) => {
     const amount = parseFloat(amountStr);
-    const halved = round2(amount / 2);
-    newFareSum += halved;
+    const shouldHalve = selectedMode === 'all' || String(selectedMode) === String(compIdx);
+    const finalAmount = shouldHalve ? round2(amount / 2) : amount;
+    newFareSum += finalAmount;
+    compIdx++;
     const trailingSuffix = suffix || '';
     const trailingDesignator = designator || '';
-    return `${halved.toFixed(2)}${fareBasis}${trailingSuffix}${trailingDesignator}`;
+    return `${finalAmount.toFixed(2)}${fareBasis}${trailingSuffix}${trailingDesignator}`;
   });
 
   const parsedHalved = parseFareCalcStringInternal(halvedFarePart + rest);
   const qSum = parsedHalved.qSurcharges.reduce((sum, q) => sum + q, 0);
-  const newCalculatedNuc = round2(newFareSum + qSum);
+  const stopoverSum = (parsedHalved.stopoverCharges || []).reduce((sum, s) => sum + s, 0);
+  const newCalculatedNuc = round2(newFareSum + qSum + stopoverSum);
 
   const updatedRest = rest.replace(/NUC\s*\d+(?:\.\d+)?/, `NUC${newCalculatedNuc.toFixed(2)}`);
   return halvedFarePart + updatedRest;
+}
+
+function renderHalveComponentOptions(components) {
+  if (!els.halveComponentOptions) return;
+  if (!components || components.length < 2) {
+    els.halveComponentOptions.innerHTML = '';
+    return;
+  }
+
+  const currentMode = state.selectedHalveMode || 'all';
+  let html = `
+    <label class="halve-chip ${currentMode === 'all' ? 'active' : ''}">
+      <input type="radio" name="halveComponentChoice" value="all" ${currentMode === 'all' ? 'checked' : ''}>
+      <span>All Components (${components.length})</span>
+    </label>
+  `;
+
+  components.forEach((comp, idx) => {
+    const basis = comp.fareBasis + (comp.suffix || '') + (comp.designator || '');
+    const isChecked = currentMode === String(idx);
+    html += `
+      <label class="halve-chip ${isChecked ? 'active' : ''}">
+        <input type="radio" name="halveComponentChoice" value="${idx}" ${isChecked ? 'checked' : ''}>
+        <span>Component ${idx + 1}: ${comp.amount.toFixed(2)} (${basis})</span>
+      </label>
+    `;
+  });
+
+  els.halveComponentOptions.innerHTML = html;
+
+  const radios = els.halveComponentOptions.querySelectorAll('input[name="halveComponentChoice"]');
+  radios.forEach(radio => {
+    radio.addEventListener('change', (e) => {
+      state.selectedHalveMode = e.target.value;
+      els.halveComponentOptions.querySelectorAll('.halve-chip').forEach(c => c.classList.remove('active'));
+      e.target.closest('.halve-chip')?.classList.add('active');
+      parseFareCalcString();
+    });
+  });
+}
+
+function updateFareComponentDetector() {
+  const rawInput = els.fareCalcString ? els.fareCalcString.value.trim() : '';
+  if (!rawInput) {
+    if (els.fareComponentDetectorBadge) els.fareComponentDetectorBadge.style.display = 'none';
+    if (els.halveComponentSelector) els.halveComponentSelector.style.display = 'none';
+    return;
+  }
+  const parsed = parseFareCalcStringInternal(rawInput.toUpperCase());
+  const count = parsed.fareComponents.length;
+  if (count > 0 && els.fareComponentDetectorBadge) {
+    els.fareComponentDetectorBadge.textContent = `${count} Component${count > 1 ? 's' : ''} Detected`;
+    els.fareComponentDetectorBadge.style.display = 'inline-block';
+  } else if (els.fareComponentDetectorBadge) {
+    els.fareComponentDetectorBadge.style.display = 'none';
+  }
+
+  renderHalveComponentOptions(parsed.fareComponents);
+
+  if (els.halveFareComponents && els.halveFareComponents.checked && count > 1) {
+    if (els.halveComponentSelector) els.halveComponentSelector.style.display = 'block';
+  } else {
+    if (els.halveComponentSelector) els.halveComponentSelector.style.display = 'none';
+  }
 }
 
 function handleHalveFareComponentsChange() {
@@ -1390,6 +1671,7 @@ function handleHalveFareComponentsChange() {
   const rawInput = els.fareCalcString.value.trim();
 
   if (!rawInput) {
+    if (els.halveComponentSelector) els.halveComponentSelector.style.display = 'none';
     return;
   }
 
@@ -1399,17 +1681,22 @@ function handleHalveFareComponentsChange() {
   if (isChecked) {
     if (isOneWayJourney(parsed, input)) {
       els.halveFareComponents.checked = false;
+      if (els.halveComponentSelector) els.halveComponentSelector.style.display = 'none';
       showError('Halving fare components is not applicable for a one-way journey.');
       return;
     }
     if (parsed.fareComponents.length === 0) {
       els.halveFareComponents.checked = false;
+      if (els.halveComponentSelector) els.halveComponentSelector.style.display = 'none';
       showError('No fare amounts found in the string to halve.');
       return;
     }
+    renderHalveComponentOptions(parsed.fareComponents);
+    if (els.halveComponentSelector) els.halveComponentSelector.style.display = 'block';
+  } else {
+    if (els.halveComponentSelector) els.halveComponentSelector.style.display = 'none';
   }
 
-  // Do not mutate els.fareCalcString.value; manually entered string stays intact
   parseFareCalcString();
 }
 
@@ -1418,8 +1705,19 @@ function clearParser() {
   els.parserResults.style.display = 'none';
   state.lastConvertedFareCalcString = null;
   state.unhalvedFareCalcString = null;
+  state.lastVerifiedMisplacedString = null;
+  state.selectedHalveMode = 'all';
   if (els.halveFareComponents) {
     els.halveFareComponents.checked = false;
+  }
+  if (els.halveComponentSelector) {
+    els.halveComponentSelector.style.display = 'none';
+  }
+  if (els.fareComponentDetectorBadge) {
+    els.fareComponentDetectorBadge.style.display = 'none';
+  }
+  if (els.stopoverChargesSection) {
+    els.stopoverChargesSection.style.display = 'none';
   }
   if (state.activePtc === 'ADT') {
     state.adtParsedFareCalc = null;
@@ -1437,15 +1735,17 @@ function round2(n) {
 // out of the same string — kept as literal copies (not a shared reference) because the parser's
 // regexes live inside that function's closure; if those patterns change, update both together.
 function deriveFareCalcString(adtString, percent, paxSuffix) {
+  const normalizedAdtString = normalizeTrailingQSurchargesInMemory(adtString);
+
   function findKeywordMatch(keyword) {
-    const strict = adtString.match(new RegExp(`(?<=^|\\s)${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
-    return strict || adtString.match(new RegExp(`${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+    const strict = normalizedAdtString.match(new RegExp(`(?<=^|\\s)${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+    return strict || normalizedAdtString.match(new RegExp(`${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
   }
 
   const nucKeywordMatch = findKeywordMatch('NUC');
   const nucIndex = nucKeywordMatch ? nucKeywordMatch.index : -1;
-  const farePart = nucIndex === -1 ? adtString : adtString.slice(0, nucIndex);
-  const rest = nucIndex === -1 ? '' : adtString.slice(nucIndex);
+  const farePart = nucIndex === -1 ? normalizedAdtString : normalizedAdtString.slice(0, nucIndex);
+  const rest = nucIndex === -1 ? '' : normalizedAdtString.slice(nucIndex);
 
   let scaledTotal = 0;
 
@@ -1467,7 +1767,16 @@ function deriveFareCalcString(adtString, percent, paxSuffix) {
     return match.replace(amountStr, scaled.toFixed(2));
   });
 
-  const recomputedNuc = round2(scaledTotal);
+  // Preserve unscaled stopover charges (never amend or discount for child/infant)
+  const stopoverPattern = /(?<![A-Za-z0-9])1S\s*(?:[A-Z]{3}\s*)?(?<sAmount>\d+(?:\.\d+)?)/g;
+  let sMatch;
+  let stopoverSum = 0;
+  while ((sMatch = stopoverPattern.exec(farePart)) !== null) {
+    const sAmount = sMatch.groups?.sAmount;
+    if (sAmount) stopoverSum += parseFloat(sAmount);
+  }
+
+  const recomputedNuc = round2(scaledTotal + stopoverSum);
   const scaledRest = rest.replace(/NUC(\d+(?:\.\d+)?)/, `NUC${recomputedNuc.toFixed(2)}`);
   return scaledFarePartWithQ + scaledRest;
 }
@@ -1562,16 +1871,17 @@ function findHybridBoundary(input) {
 // every edit is computed against the *original* (unmodified) string's positions first and the
 // result is assembled in one final pass — see the `edits` array below.
 function deriveHybridFareCalcString(adtString, ratios, suffixes) {
-  const { boundaryIndex, warning } = findHybridBoundary(adtString);
+  const normalizedAdtString = normalizeTrailingQSurchargesInMemory(adtString);
+  const { boundaryIndex, warning } = findHybridBoundary(normalizedAdtString);
 
   function findKeywordMatch(keyword) {
-    const strict = adtString.match(new RegExp(`(?<=^|\\s)${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
-    return strict || adtString.match(new RegExp(`${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+    const strict = normalizedAdtString.match(new RegExp(`(?<=^|\\s)${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
+    return strict || normalizedAdtString.match(new RegExp(`${keyword}\\s*(\\d+(?:\\.\\d+)?)`));
   }
   const nucKeywordMatch = findKeywordMatch('NUC');
   const nucIndex = nucKeywordMatch ? nucKeywordMatch.index : -1;
-  const farePart = nucIndex === -1 ? adtString : adtString.slice(0, nucIndex);
-  const rest = nucIndex === -1 ? '' : adtString.slice(nucIndex);
+  const farePart = nucIndex === -1 ? normalizedAdtString : normalizedAdtString.slice(0, nucIndex);
+  const rest = nucIndex === -1 ? '' : normalizedAdtString.slice(nucIndex);
 
   function phaseFor(index) {
     if (boundaryIndex === null) return 'outbound';
@@ -1626,7 +1936,16 @@ function deriveHybridFareCalcString(adtString, ratios, suffixes) {
   });
   rebuilt += farePart.slice(cursor);
 
-  const recomputedNuc = round2(scaledTotal);
+  // Preserve unscaled stopover charges across hybrid legs
+  const stopoverPattern = /(?<![A-Za-z0-9])1S\s*(?:[A-Z]{3}\s*)?(?<sAmount>\d+(?:\.\d+)?)/g;
+  let sMatch;
+  let stopoverSum = 0;
+  while ((sMatch = stopoverPattern.exec(farePart)) !== null) {
+    const sAmount = sMatch.groups?.sAmount;
+    if (sAmount) stopoverSum += parseFloat(sAmount);
+  }
+
+  const recomputedNuc = round2(scaledTotal + stopoverSum);
   const scaledRest = rest.replace(/NUC(\d+(?:\.\d+)?)/, `NUC${recomputedNuc.toFixed(2)}`);
   return { string: rebuilt + scaledRest, warning };
 }
@@ -1892,9 +2211,11 @@ els.changeFee.addEventListener('keypress', (e) => { if (e.key === 'Enter') calcu
 document.addEventListener('keydown', (e) => {
   const errorModal = document.getElementById('errorModal');
   const helpModal = document.getElementById('helpModal');
+  const qModal = document.getElementById('qCorrectionModal');
   const isErrorModalOpen = errorModal?.classList.contains('show');
   const isHelpModalOpen = helpModal?.classList.contains('show');
-  const isAnyModalOpen = isErrorModalOpen || isHelpModalOpen;
+  const isQModalOpen = qModal?.classList.contains('show');
+  const isAnyModalOpen = isErrorModalOpen || isHelpModalOpen || isQModalOpen;
 
   // Handle modal closing
   if (isAnyModalOpen && e.key === 'Escape') {
@@ -2264,147 +2585,148 @@ function calculateTaxes() {
   // Prevent recursive calls
   if (state.isCalculatingTax) return;
   state.isCalculatingTax = true;
-  state.clearFareCache();
+  try {
+    state.clearFareCache();
 
-  const oldText = els.oldTax.value;
-  const newText = els.newTax.value;
-  if (!oldText || !newText) {
-    showError('Enter both OLD TAX and NEW TAX.');
-    state.isCalculatingTax = false;
-    return;
-  }
-
-  // Check cache
-  const cacheKey = JSON.stringify({ oldText, newText, applyK3OnYQ: els.applyK3OnYQ.checked });
-  if (state.taxCalculationCache.has(cacheKey)) {
-    const cachedResult = state.taxCalculationCache.get(cacheKey);
-    renderTaxResult(cachedResult);
-    state.isCalculatingTax = false;
-    return;
-  }
-
-  const oldTaxData = parseTaxes(oldText);
-  const newTaxData = parseTaxes(newText);
-  const oldTaxes = oldTaxData.taxes;
-  const newTaxes = newTaxData.taxes;
-
-  let firstCurrency = null;
-  const result = {
-    positiveTaxes: [],
-    negativeTaxes: [],
-    posTotal: 0,
-    negTotal: 0,
-    currency: null,
-  };
-
-  // PD amounts are merged into oldTaxes/newTaxes just like regular entries (see parseTaxes),
-  // so a code that's fully restated (PD or not) on both sides nets to a 0 diff automatically,
-  // while any genuinely extra amount on either side still comes through as the real difference.
-  const allTaxCodes = new Set([
-    ...Object.keys(oldTaxes).map(k => k.substring(3)),
-    ...Object.keys(newTaxes).map(k => k.substring(3)),
-  ]);
-
-  allTaxCodes.forEach(code => {
-    const matchingOldKeys = Object.keys(oldTaxes).filter(k => k.endsWith(code));
-    const matchingNewKeys = Object.keys(newTaxes).filter(k => k.endsWith(code));
-
-    const oldAmount = matchingOldKeys.reduce((sum, key) => sum + (oldTaxes[key] || 0), 0);
-    const newAmount = matchingNewKeys.reduce((sum, key) => sum + (newTaxes[key] || 0), 0);
-    const diff = newAmount - oldAmount;
-
-    if (diff === 0) {
+    const oldText = els.oldTax.value;
+    const newText = els.newTax.value;
+    if (!oldText || !newText) {
+      showError('Enter both OLD TAX and NEW TAX.');
       return;
     }
 
-    const currency = matchingNewKeys.length > 0
-      ? matchingNewKeys[0].match(/^([A-Z]{3})/)[1]
-      : matchingOldKeys.length > 0
-        ? matchingOldKeys[0].match(/^([A-Z]{3})/)[1]
-        : firstCurrency ?? 'INR';
-
-    if (!firstCurrency) firstCurrency = currency;
-
-    if (diff > 0) {
-      const label = `${currency}${formatAmount(diff, currency)}${code}`;
-      result.positiveTaxes.push(label);
-      result.posTotal += diff;
-    } else if (diff < 0) {
-      const label = `-${currency}${formatAmount(Math.abs(diff), currency)}${code}`;
-      result.negativeTaxes.push(label);
-      result.negTotal += diff;
+    // Check cache
+    const cacheKey = JSON.stringify({ oldText, newText, applyK3OnYQ: els.applyK3OnYQ.checked });
+    if (state.taxCalculationCache.has(cacheKey)) {
+      const cachedResult = state.taxCalculationCache.get(cacheKey);
+      renderTaxResult(cachedResult);
+      return;
     }
-  });
 
-  result.currency = firstCurrency ?? newTaxData.currency ?? oldTaxData.currency ?? 'INR';
-  result.netTax = result.posTotal + result.negTotal;
+    const oldTaxData = parseTaxes(oldText);
+    const newTaxData = parseTaxes(newText);
+    const oldTaxes = oldTaxData.taxes;
+    const newTaxes = newTaxData.taxes;
 
-  // Calculate K3 on positive YQ if checkbox is checked
-  let k3OnYQ = 0;
-  if (els.applyK3OnYQ.checked) {
-    // Find positive YQ tax amount
-    const yqPattern = /YQ$/i;
-    const yqTax = result.positiveTaxes.find(tax => yqPattern.test(tax));
-    if (yqTax) {
-      const yqMatch = yqTax.match(/^([A-Z]{3})([0-9]+(?:\.[0-9]+)?)YQ$/i);
-      if (yqMatch) {
-        const yqAmount = parseFloat(yqMatch[2]);
-        // Calculate K3 based on cabin selection
-        if (els.cabin.value) {
-          const rate = K3_RATES[els.cabin.value] ?? 0.05;
-          k3OnYQ = yqAmount * rate;
-        } else {
-          showError('Select cabin when K3 on YQ is requested.');
-          // Calculation continues with k3OnYQ = 0
+    let firstCurrency = null;
+    const result = {
+      positiveTaxes: [],
+      negativeTaxes: [],
+      posTotal: 0,
+      negTotal: 0,
+      currency: null,
+    };
+
+    // PD amounts are merged into oldTaxes/newTaxes just like regular entries (see parseTaxes),
+    // so a code that's fully restated (PD or not) on both sides nets to a 0 diff automatically,
+    // while any genuinely extra amount on either side still comes through as the real difference.
+    const allTaxCodes = new Set([
+      ...Object.keys(oldTaxes).map(k => k.substring(3)),
+      ...Object.keys(newTaxes).map(k => k.substring(3)),
+    ]);
+
+    allTaxCodes.forEach(code => {
+      const matchingOldKeys = Object.keys(oldTaxes).filter(k => k.endsWith(code));
+      const matchingNewKeys = Object.keys(newTaxes).filter(k => k.endsWith(code));
+
+      const oldAmount = matchingOldKeys.reduce((sum, key) => sum + (oldTaxes[key] || 0), 0);
+      const newAmount = matchingNewKeys.reduce((sum, key) => sum + (newTaxes[key] || 0), 0);
+      const diff = newAmount - oldAmount;
+
+      if (diff === 0) {
+        return;
+      }
+
+      const currency = matchingNewKeys.length > 0
+        ? matchingNewKeys[0].match(/^([A-Z]{3})/)[1]
+        : matchingOldKeys.length > 0
+          ? matchingOldKeys[0].match(/^([A-Z]{3})/)[1]
+          : firstCurrency ?? 'INR';
+
+      if (!firstCurrency) firstCurrency = currency;
+
+      if (diff > 0) {
+        const label = `${currency}${formatAmount(diff, currency)}${code}`;
+        result.positiveTaxes.push(label);
+        result.posTotal += diff;
+      } else if (diff < 0) {
+        const label = `-${currency}${formatAmount(Math.abs(diff), currency)}${code}`;
+        result.negativeTaxes.push(label);
+        result.negTotal += diff;
+      }
+    });
+
+    result.currency = firstCurrency ?? newTaxData.currency ?? oldTaxData.currency ?? 'INR';
+    result.netTax = result.posTotal + result.negTotal;
+
+    // Calculate K3 on positive YQ if checkbox is checked
+    let k3OnYQ = 0;
+    if (els.applyK3OnYQ.checked) {
+      // Find positive YQ tax amount
+      const yqPattern = /YQ$/i;
+      const yqTax = result.positiveTaxes.find(tax => yqPattern.test(tax));
+      if (yqTax) {
+        const yqMatch = yqTax.match(/^([A-Z]{3})([0-9]+(?:\.[0-9]+)?)YQ$/i);
+        if (yqMatch) {
+          const yqAmount = parseFloat(yqMatch[2]);
+          // Calculate K3 based on cabin selection
+          if (els.cabin.value) {
+            const rate = K3_RATES[els.cabin.value] ?? 0.05;
+            k3OnYQ = yqAmount * rate;
+          } else {
+            showError('Select cabin when K3 on YQ is requested.');
+            // Calculation continues with k3OnYQ = 0
+          }
         }
       }
     }
-  }
-  result.k3OnYQ = k3OnYQ;
+    result.k3OnYQ = k3OnYQ;
 
-  // Store in cache
-  state.taxCalculationCache.set(cacheKey, result);
+    // Store in cache
+    state.taxCalculationCache.set(cacheKey, JSON.parse(JSON.stringify(result)));
 
-  renderTaxResult(result);
+    renderTaxResult(result);
 
-  const hasFare = (els.oldFare.value && els.newFare.value) || els.fareDiff.value.trim() !== '';
-  if (!hasFare) {
-    // Update fare calculator fields with recalculated values for tax-only mode (without fare)
-    const netTaxOnly = result.netTax;
-    const fareK3State = getCurrentFareK3State(result.currency);
-    const k3FromFare = (result.currency === fareK3State.currency) ? fareK3State.k3Fare : 0;
-    const k3FromFee = (result.currency === fareK3State.currency) ? fareK3State.k3Fee : 0;
-    const totalK3 = k3FromFare + k3OnYQ + k3FromFee;
-    const netTaxWithK3 = netTaxOnly + totalK3;
+    const hasFare = (els.oldFare.value && els.newFare.value) || els.fareDiff.value.trim() !== '';
+    if (!hasFare) {
+      // Update fare calculator fields with recalculated values for tax-only mode (without fare)
+      const netTaxOnly = result.netTax;
+      const fareK3State = getCurrentFareK3State(result.currency);
+      const k3FromFare = (result.currency === fareK3State.currency) ? fareK3State.k3Fare : 0;
+      const k3FromFee = (result.currency === fareK3State.currency) ? fareK3State.k3Fee : 0;
+      const totalK3 = k3FromFare + k3OnYQ;
+      const netTaxWithK3 = netTaxOnly + totalK3;
 
-    els.taxAdj.value = result.currency ? `${result.currency}${formatAmount(netTaxWithK3, result.currency)}` : '';
+      els.taxAdj.value = result.currency ? `${result.currency}${formatAmount(netTaxWithK3, result.currency)}` : '';
 
-    const activeSummary = state.ptcData[state.activePtc].summaryData;
-    if (activeSummary) {
-      const passengerCount = activeSummary.pax || 1;
-      const perPax = netTaxWithK3;
-      const roundedPerPax = parseFloat(formatAmount(perPax, result.currency)) || perPax;
-      const subTotal = roundedPerPax * passengerCount;
+      const activeSummary = state.ptcData[state.activePtc].summaryData;
+      if (activeSummary) {
+        const passengerCount = activeSummary.pax || 1;
+        const perPax = netTaxWithK3;
+        const roundedPerPax = parseFloat(formatAmount(perPax, result.currency)) || perPax;
+        const subTotal = roundedPerPax * passengerCount;
 
-      els.perPax.value = `${result.currency}${formatAmount(roundedPerPax, result.currency)}`;
-      els.subTotal.value = `${result.currency}${formatAmount(subTotal, result.currency)}`;
+        els.perPax.value = `${result.currency}${formatAmount(roundedPerPax, result.currency)}`;
+        els.subTotal.value = `${result.currency}${formatAmount(subTotal, result.currency)}`;
 
-      // Update stored summary data with new tax adjustment and Add Taxes text (K3 on YQ may have changed)
-      state.ptcData[state.activePtc].summaryData = {
-        ...activeSummary,
-        taxAdj: netTaxWithK3,
-        perPax: roundedPerPax,
-        subTotal,
-        addTaxes: els.addTaxes.value,
-        k3OnYQ,
-        k3Fee: k3FromFee
-      };
-      clearActiveTabDirty();
+        // Update stored summary data with new tax adjustment and Add Taxes text (K3 on YQ may have changed)
+        state.ptcData[state.activePtc].summaryData = {
+          ...activeSummary,
+          taxAdj: netTaxWithK3,
+          perPax: roundedPerPax,
+          subTotal,
+          addTaxes: els.addTaxes.value,
+          k3OnYQ,
+          k3Fee: k3FromFee
+        };
+        clearActiveTabDirty();
+      }
     }
-  }
 
-  state.isCalculatingTax = false;
-  saveStateToStorage();
+    saveStateToStorage();
+  } finally {
+    state.isCalculatingTax = false;
+  }
 }
 
 function buildCurrentSummaryData() {
@@ -2424,13 +2746,15 @@ function buildCurrentSummaryData() {
 
   const fareK3State = getCurrentFareK3State(currency, diff, feeAmount);
   const k3FareAmount = fareK3State.k3Fare;
+  const k3FeeAmount = fareK3State.k3Fee;
   const isTaxCurrencyMatch = !state.lastTaxResult || !state.lastTaxResult.currency || state.lastTaxResult.currency === currency;
   const netTaxOnly = (state.lastTaxResult && isTaxCurrencyMatch) ? state.lastTaxResult.netTax : 0;
   const k3OnYQ = (state.lastTaxResult && isTaxCurrencyMatch) ? (state.lastTaxResult.k3OnYQ ?? 0) : 0;
   const passengerCount = Math.max(1, parseInt(els.pax.value, 10) ?? 1);
 
-  const taxAdj = netTaxOnly + k3FareAmount + k3OnYQ + k3FeeAmount;
-  const perPax = diff + feeAmount + taxAdj;
+  const taxAdj = netTaxOnly + k3FareAmount + k3OnYQ;
+  const feeWithK3 = feeAmount + k3FeeAmount;
+  const perPax = diff + feeWithK3 + taxAdj;
   const roundedPerPax = parseFloat(formatAmount(perPax, currency)) || perPax;
   const subTotal = roundedPerPax * passengerCount;
 
@@ -2493,18 +2817,17 @@ function renderTaxResult(result) {
   els.taxResult.innerHTML = '';
   els.taxResult.appendChild(fragment);
 
-  // Calculate total K3 (fare diff K3 + YQ K3 + change fee K3)
+  // Calculate total K3 for Add Taxes (fare diff K3 + YQ K3; change fee K3 is folded directly into Change Fee)
   const fareK3State = getCurrentFareK3State();
   const k3FromFare = (result.currency === fareK3State.currency) ? fareK3State.k3Fare : 0;
-  const k3FromFee = (result.currency === fareK3State.currency) ? fareK3State.k3Fee : 0;
   const k3OnYQ = result.k3OnYQ || 0;
-  const totalK3 = k3FromFare + k3OnYQ + k3FromFee;
+  const k3ForAddTaxes = k3FromFare + k3OnYQ;
 
-  // Add total K3 to add taxes as a single entry
+  // Add K3 to add taxes as a single entry
   const positiveTaxStr = result.positiveTaxes.join('/');
   let k3TaxStr = '';
-  if (totalK3 > 0) {
-    k3TaxStr = `${result.currency}${formatAmount(totalK3, result.currency)}K3`;
+  if (k3ForAddTaxes > 0) {
+    k3TaxStr = `${result.currency}${formatAmount(k3ForAddTaxes, result.currency)}K3`;
   }
   els.addTaxes.value = updateAddTaxesWithK3(positiveTaxStr, k3TaxStr);
   els.refundTaxes.value = result.negativeTaxes.join('/') || '';
@@ -2512,7 +2835,7 @@ function renderTaxResult(result) {
   if (fareK3State.k3Fare > 0 && result.currency !== fareK3State.currency) {
     showError(`K3 from last fare calculation (${fareK3State.currency}${formatAmount(fareK3State.k3Fare, fareK3State.currency)}) is not added because tax currency is ${result.currency}.`);
   }
-  els.taxAdj.value = result.currency ? `${result.currency}${formatAmount(result.netTax + totalK3, result.currency)}` : '';
+  els.taxAdj.value = result.currency ? `${result.currency}${formatAmount(result.netTax + k3ForAddTaxes, result.currency)}` : '';
   state.lastTaxResult = result;
 
   const hasFare = (els.oldFare.value && els.newFare.value) || els.fareDiff.value.trim() !== '';
@@ -2571,23 +2894,21 @@ function calculateFare() {
   // Prevent recursive calls
   if (state.isCalculatingFare) return;
   state.isCalculatingFare = true;
+  try {
+    const oldFare = parseAmount(els.oldFare.value);
+    const newFare = parseAmount(els.newFare.value);
+    const manualDiff = parseAmount(els.fareDiff.value);
 
-  const oldFare = parseAmount(els.oldFare.value);
-  const newFare = parseAmount(els.newFare.value);
-  const manualDiff = parseAmount(els.fareDiff.value);
+    if (!manualDiff && (!oldFare || !newFare)) {
+      showError('Enter both Old Base Fare and New Base Fare.');
+      return;
+    }
 
-  if (!manualDiff && (!oldFare || !newFare)) {
-    showError('Enter both Old Base Fare and New Base Fare.');
-    state.isCalculatingFare = false;
-    return;
-  }
-
-  const baseCurrency = oldFare?.currency ?? newFare?.currency ?? els.currency.value ?? 'INR';
-  if (oldFare?.currency && newFare?.currency && oldFare.currency !== newFare.currency) {
-    showError('Old Fare and New Fare must use the same currency.');
-    state.isCalculatingFare = false;
-    return;
-  }
+    const baseCurrency = oldFare?.currency ?? newFare?.currency ?? els.currency.value ?? 'INR';
+    if (oldFare?.currency && newFare?.currency && oldFare.currency !== newFare.currency) {
+      showError('Old Fare and New Fare must use the same currency.');
+      return;
+    }
 
   const baseDiff = oldFare && newFare ? newFare.amount - oldFare.amount : (manualDiff ? manualDiff.amount : 0);
 
@@ -2707,9 +3028,9 @@ function calculateFare() {
   const netTaxOnly = (state.lastTaxResult && isTaxCurrencyMatch) ? state.lastTaxResult.netTax : 0;
   const k3OnYQ = (state.lastTaxResult && isTaxCurrencyMatch) ? (state.lastTaxResult.k3OnYQ ?? 0) : 0;
 
-  // Append combined K3 (tax difference K3 + fare diff K3 + YQ K3 + change fee K3) to Add Taxes
+  // Append K3 (fare diff K3 + YQ K3) to Add Taxes. Change Fee K3 is NOT included in Add Taxes!
   const basePositiveTaxes = (state.lastTaxResult && isTaxCurrencyMatch) ? state.lastTaxResult.positiveTaxes.join('/') : '';
-  const k3ForAddTaxes = k3Fare + k3OnYQ + k3Fee;
+  const k3ForAddTaxes = k3Fare + k3OnYQ;
   const k3FareStr = k3ForAddTaxes > 0 ? `${currency}${formatAmount(k3ForAddTaxes, currency)}K3` : '';
   els.addTaxes.value = updateAddTaxesWithK3(basePositiveTaxes, k3FareStr);
   if (!isTaxCurrencyMatch) {
@@ -2717,8 +3038,9 @@ function calculateFare() {
   }
 
   const k3Total = k3Fare + k3Fee;
-  const netTaxWithK3 = netTaxOnly + k3Fare + k3OnYQ + k3Fee;
-  const perPassenger = diff + feeAmount + netTaxWithK3;
+  const netTaxWithK3 = netTaxOnly + k3Fare + k3OnYQ;
+  const feeWithK3 = feeAmount + k3Fee;
+  const perPassenger = diff + feeWithK3 + netTaxWithK3;
   const roundedPerPassenger = parseFloat(formatAmount(perPassenger, currency)) || perPassenger;
   const subTotal = roundedPerPassenger * passengerCount;
 
@@ -2762,8 +3084,9 @@ function calculateFare() {
   state.ptcData[state.activePtc].summaryData = summaryData;
   clearActiveTabDirty();
   updatePtcTabUI();
-
-  state.isCalculatingFare = false;
+  } finally {
+    state.isCalculatingFare = false;
+  }
 }
 
 // One row definition per summary metric: a label plus a getter that formats that metric
@@ -2777,7 +3100,7 @@ const SUMMARY_ROW_DEFS = [
     get: d => {
       const feeCur = d.feeCurrency || d.currency;
       if (d.k3Fee > 0) {
-        return `${feeCur}${formatAmount(d.fee + d.k3Fee, feeCur)} (incl. K3 ${feeCur}${formatAmount(d.k3Fee, feeCur)})`;
+        return `${feeCur}${formatAmount(d.fee + d.k3Fee, feeCur)} (incl. of K3)`;
       }
       return `${feeCur}${formatAmount(d.fee, feeCur)}`;
     },
@@ -2877,6 +3200,16 @@ function buildSummaryTable(breakdown, amountPayable) {
     tbody.appendChild(tr);
   });
 
+  // Disclaimer note row centered inside the table spanning all columns
+  const trDisclaimer = document.createElement('tr');
+  const tdDisclaimer = document.createElement('td');
+  tdDisclaimer.colSpan = 1 + valueColSpan;
+  tdDisclaimer.className = 'summary-disclaimer-cell';
+  tdDisclaimer.style.textAlign = 'center';
+  tdDisclaimer.innerHTML = '<b>Please note that the fares are not guaranteed until ticketed and are subject to change as per availability</b>';
+  trDisclaimer.appendChild(tdDisclaimer);
+  tbody.appendChild(trDisclaimer);
+
   table.appendChild(tbody);
   return table;
 }
@@ -2896,11 +3229,6 @@ function renderSummary(data, breakdown) {
 
   els.summary.innerHTML = '';
   els.summary.appendChild(buildSummaryTable(breakdown, breakdown.length > 1 ? data : null));
-
-  const disclaimer = document.createElement('div');
-  disclaimer.className = 'summary-disclaimer';
-  disclaimer.innerHTML = '<b>Please note that the fares are not guaranteed until ticketed and are subject to change as per availability</b>';
-  els.summary.appendChild(disclaimer);
 }
 
 function removeK3FFromAddTaxes() {
@@ -2985,9 +3313,7 @@ function buildSummaryHtmlForClipboard(tables) {
     return `<table style="${tableStyle}" border="1" cellpadding="8" cellspacing="0">${rows}</table>`;
   }).join('<br>');
 
-  const disclaimerHtml = '<p style="text-align:center; font-weight:700; font-family:Arial, sans-serif; font-size:13px; color:#000000; margin:10px 0 0 0;">Please note that the fares are not guaranteed until ticketed and are subject to change as per availability</p>';
-
-  return `${tableHtml}<br>${disclaimerHtml}`;
+  return tableHtml;
 }
 
 function copySummaryTable() {
@@ -2996,13 +3322,11 @@ function copySummaryTable() {
     showError('No summary to copy.');
     return;
   }
-  const disclaimerText = 'Please note that the fares are not guaranteed until ticketed and are subject to change as per availability';
-  const tableText = Array.from(tables).map(table =>
+  const text = Array.from(tables).map(table =>
     Array.from(table.rows).map(row =>
       Array.from(row.cells).map(cell => cell.textContent).join('\t')
     ).join('\n')
   ).join('\n\n');
-  const text = `${tableText}\n\n${disclaimerText}`;
 
   function fallbackCopyPlainText() {
     navigator.clipboard.writeText(text).then(() => {
@@ -3064,7 +3388,7 @@ function generateGdsString(data, breakdown = null) {
   const totalSubTotal = items.reduce((sum, d) => sum + (d.subTotal || 0), 0);
 
   const feeWithK3 = totalBaseFee + totalK3Fee;
-  const netTaxForGds = totalTaxAdj - totalK3Fee;
+  const netTaxForGds = totalTaxAdj;
 
   const parts = [];
   parts.push(`FARE DIFF ${diffCur}${formatAmount(totalDiff, diffCur)}`);

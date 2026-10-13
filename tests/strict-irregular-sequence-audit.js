@@ -2,7 +2,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 const assert = require('assert');
 
-const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
+const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
 
 (async () => {
   console.log('========================================================================');
@@ -157,6 +157,10 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
   await page.fill('#fareCalcString', 'BOM EK X/DXB EK NYC 102.21TLEEPIN1/NDC2 EK X/DXB BOM 404.56XWEEFIN1/NDC2 Q5.00 NUC511.77 ROE90.3344456');
   await page.click('#parseButton');
   await page.waitForTimeout(200);
+  if (await page.isVisible('#qCorrectionModal.show')) {
+    await page.click('#qCorrectionApplyBtn');
+    await page.waitForTimeout(200);
+  }
 
   headerTh = await page.$eval('#summary table thead tr th:first-child', el => el.textContent.trim());
   check('Adding FCS dynamically updates Summary Header to "Booking class : Outbound T & Inbound X"', headerTh === 'Booking class : Outbound T & Inbound X', headerTh);

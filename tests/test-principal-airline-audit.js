@@ -54,12 +54,12 @@ const assert = require('assert');
   console.log('Case 1 Tax Adj:', case1TaxAdj);
   console.log('Case 1 Per Pax:', case1PerPax);
 
-  // K3: 5% of 7000 = 350, 5% of 3000 = 150, 5% of 2000 = 100 => Total K3 = 600
-  // Positive YQ = 2000 => Add Taxes = INR2000YQ/INR600K3 (Total 2600)
-  assert.ok(case1AddTaxes.includes('600K3') || case1AddTaxes.includes('600.00K3'), 'Add Taxes must have 600 K3: ' + case1AddTaxes);
+  // K3: 5% of 7000 = 350, 5% of 3000 = 150 (folded into Change Fee: 3150 incl. of K3), 5% of 2000 = 100 => K3 in Add Taxes = 450
+  // Positive YQ = 2000 => Add Taxes = INR2000YQ/INR450K3 (Total 2450)
+  assert.ok(case1AddTaxes.includes('450K3') || case1AddTaxes.includes('450.00K3'), 'Add Taxes must have 450 K3: ' + case1AddTaxes);
   assert.ok(case1AddTaxes.includes('2000YQ') || case1AddTaxes.includes('2000.00YQ'), 'Add Taxes must have 2000 YQ: ' + case1AddTaxes);
-  assert.strictEqual(case1TaxAdj, 'INR2600', 'Tax Adjustment Net must be INR2600');
-  assert.strictEqual(case1PerPax, 'INR12600', 'Per Pax must be 7000 + 3000 + 2600 = INR12600');
+  assert.strictEqual(case1TaxAdj, 'INR2450', 'Tax Adjustment Net must be INR2450');
+  assert.strictEqual(case1PerPax, 'INR12600', 'Per Pax must be 7000 + 3150 (fee incl K3) + 2450 = INR12600');
   console.log('✓ Case 1 passed: Standard Economy Reissue reconciled with zero audit discrepancy.');
 
   // =========================================================================
@@ -99,13 +99,13 @@ const assert = require('assert');
 
   // K3 at business rate (18% in K3_RATES):
   // Fare diff: 80,000 * 18% = 14,400
-  // Fee: 5,000 * 18% = 900
+  // Fee: 5,000 * 18% = 900 (folded into Change Fee: 5,900 incl. of K3)
   // YQ: 6,000 * 18% = 1,080
-  // Total K3 = 14400 + 900 + 1080 = 16,380
-  // Add Taxes = INR6000YQ/INR16380K3 (Total 22,380)
-  assert.ok(case2AddTaxes.includes('16380K3') || case2AddTaxes.includes('16380.00K3'), 'Add Taxes must have 16380 K3: ' + case2AddTaxes);
-  assert.strictEqual(case2TaxAdj, 'INR22380', 'Tax Adj Net must be INR22380');
-  assert.strictEqual(case2PerPax, 'INR107380', 'Per Pax must be 80000 + 5000 + 22380 = INR107380');
+  // Add Taxes K3 = 14,400 + 1,080 = 15,480
+  // Add Taxes = INR6000YQ/INR15480K3 (Total 21,480)
+  assert.ok(case2AddTaxes.includes('15480K3') || case2AddTaxes.includes('15480.00K3'), 'Add Taxes must have 15480 K3: ' + case2AddTaxes);
+  assert.strictEqual(case2TaxAdj, 'INR21480', 'Tax Adj Net must be INR21480');
+  assert.strictEqual(case2PerPax, 'INR107380', 'Per Pax must be 80000 + 5900 (fee incl K3) + 21480 = INR107380');
   console.log('✓ Case 2 passed: Cabin Upgrade dynamically scaled Business K3 correctly.');
 
   // =========================================================================

@@ -4,7 +4,7 @@ const fs = require('fs');
 const assert = require('assert');
 
 const artifactDir = path.resolve('C:/Users/Parth Joshi/.gemini/antigravity-ide/brain/1a69e0b2-33ac-4d8b-a578-b99b256dd4e6');
-const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
+const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
 
 (async () => {
   console.log('================================================================');

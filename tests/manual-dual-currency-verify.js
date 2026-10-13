@@ -2,7 +2,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 const assert = require('assert');
 
-const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
+const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
 
 (async () => {
   const browser = await chromium.launch();
@@ -60,7 +60,7 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
 
   let addTaxesVal = await page.inputValue('#addTaxes');
   console.log('Add Taxes value:', addTaxesVal);
-  assert(addTaxesVal.includes('INR364K3'), 'Add Taxes should contain INR364K3');
+  assert(addTaxesVal.includes('INR214K3'), 'Add Taxes should contain INR214K3 (fare diff K3)');
 
   let perPaxWithK3 = await page.inputValue('#perPax');
   console.log('Per Pax with K3:', perPaxWithK3);
@@ -96,7 +96,7 @@ const fileUrl = 'file://' + path.resolve(__dirname, '../index.html').replace(/\\
   assert.strictEqual(oldFareRow?.val, 'USD100.00', 'Old Fare should remain in USD');
   assert.strictEqual(newFareRow?.val, 'USD135.00', 'New Fare should remain in USD');
   assert.strictEqual(diffRow?.val, 'INR4277', 'Fare Difference should display as INR4277');
-  assert(feeRow?.val.includes('INR3150') && feeRow?.val.includes('INR150'), 'Change Fee should display with K3 breakdown');
+  assert(feeRow?.val.includes('INR3150') && feeRow?.val.includes('(incl. of K3)'), 'Change Fee should display INR3150 (incl. of K3)');
   assert.strictEqual(totalRow?.val, 'INR7641', 'Sub Total should be in INR');
 
   let gdsStr = await page.inputValue('#gdsString');

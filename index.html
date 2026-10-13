@@ -41,16 +41,14 @@ Changes in V4.6 (Bug Fix Release):
 <body>
   <h1>Manual Reprice - Master Calculator</h1>
   <div class="header-actions">
-    <div class="reload-wrapper" title="Reload tool (Refresh)">
-      <button id="reloadButton" class="reload-btn-text" type="button" aria-label="Reload application">
-        Refresh
-      </button>
-      <div class="reload-icon-diamond" aria-hidden="true">
-        <svg class="reload-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+    <div class="reload-wrapper" title="Reload Calculator">
+      <button id="reloadButton" class="reload-btn" type="button" aria-label="Reload calculator">
+        <svg class="reload-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
           <path d="M21 12a9 9 0 1 1-2.64-6.36L21 8"></path>
           <polyline points="21 3 21 8 16 8"></polyline>
         </svg>
-      </div>
+        <span class="reload-text">Reload Calculator</span>
+      </button>
     </div>
     <button id="themeToggle" class="theme-switch" type="button" role="switch" aria-checked="false" aria-label="Toggle dark mode" title="Toggle theme (Ctrl+M)">
       <span class="switch-track">
@@ -101,6 +99,40 @@ Changes in V4.6 (Bug Fix Release):
       <div class="modal-actions">
         <button class="modal-close-btn secondary" id="ptcPromptCancelBtn" type="button">Cancel</button>
         <button class="modal-close-btn" id="ptcPromptOkBtn" type="button">OK</button>
+      </div>
+    </div>
+  </div>
+  <div id="qCorrectionModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="qCorrectionTitle">
+    <div class="modal-box q-correction-box">
+      <div class="modal-header-minimal">
+        <div class="q-modal-title-group">
+          <span class="q-modal-badge">FARE CALC STRING FORMAT</span>
+          <h3 id="qCorrectionTitle" class="q-modal-heading">Fare Calculation Syntax Notice</h3>
+        </div>
+        <button class="modal-icon-close" id="qCorrectionCloseBtn" type="button" aria-label="Close dialog">&times;</button>
+      </div>
+      <div class="q-modal-body">
+        <p class="q-modal-desc">
+          A Q-surcharge was detected attached after the fare basis / ticket designator. In standard Fare Calc String format, Q-surcharges precede the fare component.
+        </p>
+        <div class="q-diff-card">
+          <div class="q-diff-label">
+            <span>Inputted String</span>
+            <span class="q-tag q-tag-warn">Misplaced Surcharge</span>
+          </div>
+          <div class="q-diff-code" id="qDiffInputted"></div>
+        </div>
+        <div class="q-diff-card q-diff-card-recommended">
+          <div class="q-diff-label">
+            <span>Standard Fare Calc String Format</span>
+            <span class="q-tag q-tag-success">Recommended</span>
+          </div>
+          <div class="q-diff-code" id="qDiffStandardized"></div>
+        </div>
+      </div>
+      <div class="q-modal-footer">
+        <button type="button" class="q-btn q-btn-secondary" id="qCorrectionAsIsBtn" title="Keep raw input untouched in text box">Validate As-Is</button>
+        <button type="button" class="q-btn q-btn-primary" id="qCorrectionApplyBtn">Apply Standard Format &amp; Validate</button>
       </div>
     </div>
   </div>
@@ -194,7 +226,10 @@ Changes in V4.6 (Bug Fix Release):
           <div class="collapsible-inner">
             <div class="section-grid">
               <div class="section-grid-full">
-                <label for="fareCalcString">Fare Calculation String</label>
+                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                  <label for="fareCalcString">Fare Calculation String</label>
+                  <span id="fareComponentDetectorBadge" class="fare-component-badge" style="display: none;"></span>
+                </div>
                 <textarea id="fareCalcString"
                   placeholder="Example: BOM EK X/DXB EK NYC 102.21TLEEPIN1/NDC2 EK X/DXB BOM 404.56XWEEFIN1/NDC2 Q5.00 NUC511.77 ROE90.3344456"></textarea>
               </div>
@@ -207,9 +242,15 @@ Changes in V4.6 (Bug Fix Release):
               <span id="autoCalcDescription" class="sr-only">Scales the validated Adult fare calculation string by the
                 passenger type percentage (or, on the hybrid tabs, by outbound/inbound leg) and fills this field
                 automatically.</span>
-              <div class="section-grid-full checkbox-cell checkbox-inline" id="halveFareComponentsRow">
-                <input id="halveFareComponents" type="checkbox" aria-label="Halve fare component values for round-trip journey">
-                <label for="halveFareComponents">Halve fare component values (1/2)</label>
+              <div class="section-grid-full checkbox-cell" id="halveFareComponentsRow">
+                <div class="checkbox-inline">
+                  <input id="halveFareComponents" type="checkbox" aria-label="Halve fare component values for round-trip journey">
+                  <label for="halveFareComponents">Halve fare component values (1/2)</label>
+                </div>
+                <div id="halveComponentSelector" class="halve-component-selector" style="display: none;" role="group" aria-label="Select fare components to halve">
+                  <span class="halve-selector-title">Select component(s) to halve:</span>
+                  <div id="halveComponentOptions" class="halve-component-options"></div>
+                </div>
               </div>
               <div class="section-grid-full button-row">
                 <button id="parseButton" type="button" aria-label="Parse fare calculation string">Convert</button>
@@ -229,6 +270,10 @@ Changes in V4.6 (Bug Fix Release):
                   <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">Q
                     Surcharges</div>
                   <ul id="qSurcharges" class="result-list" style="margin: 4px 0 0 0; padding-left: 20px;"></ul>
+                </div>
+                <div class="result-item" id="stopoverChargesSection" style="display: none;">
+                  <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">Stopover Charges</div>
+                  <ul id="stopoverCharges" class="result-list" style="margin: 4px 0 0 0; padding-left: 20px;"></ul>
                 </div>
                 <div class="result-item">
                   <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">

@@ -6,7 +6,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 const assert = require('assert');
 
-const fileUrl = 'file://' + path.resolve(process.argv[2]).replace(/\\/g, '/');
+const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
 
 (async () => {
   const browser = await chromium.launch();
@@ -62,7 +62,7 @@ const fileUrl = 'file://' + path.resolve(process.argv[2]).replace(/\\/g, '/');
 
   // --- UI-level: Amount Payable across 3 PTCs sums each PTC's own perPax*pax correctly ---
   async function fillPtc(oldFare, newFare, pax) {
-    await page.selectOption('#currency', 'AED');
+    await page.selectOption('#currency', 'USD');
     await page.fill('#oldFare', oldFare);
     await page.fill('#newFare', newFare);
     await page.fill('#pax', pax);
@@ -83,7 +83,7 @@ const fileUrl = 'file://' + path.resolve(process.argv[2]).replace(/\\/g, '/');
     const row = trs.find(tr => tr.cells[0].textContent === 'Amount Payable');
     return row ? row.cells[1].textContent : null;
   });
-  assert.strictEqual(amountPayable, 'AED640.00', 'Amount Payable should be 300 (ADT) + 300 (CNN, 150*2 pax) + 40 (INF) = 640');
+  assert.strictEqual(amountPayable, 'USD640.00', 'Amount Payable should be 300 (ADT) + 300 (CNN, 150*2 pax) + 40 (INF) = 640');
   console.log('CHECK6 OK: Amount Payable correctly sums each PTC\'s own subTotal (fare diff * its own pax) across 3 PTCs');
 
   console.log('CONSOLE_ERRORS:', JSON.stringify(errors));

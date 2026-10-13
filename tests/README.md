@@ -1,68 +1,74 @@
-# Regression tests
+# Regression & Automated Test Suites
 
-Playwright scripts that drive `index.html` directly (as a `file://` URL — no dev server needed)
-and assert on the rendered DOM. Each script is self-contained and exits non-zero on failure.
+Playwright & Node scripts that drive `index.html` directly (as a `file:///` URL — no dev server needed)
+and assert on the rendered DOM and core mathematical logic. Each script is self-contained and exits with code 0 on success.
 
-## Setup (one-time)
+## Running Tests
 
-```bash
-npm init -y
-npm install playwright
-npx playwright install chromium
-```
-
-Run this in a scratch folder outside the repo, or in the repo root if you don't mind `node_modules`
-being present locally (it's covered by a typical `.gitignore`, but this repo doesn't have a build
-step and doesn't ship one — these dependencies exist only to run the tests, not the app itself).
-
-## Running
-
-Each script takes the path to `index.html` as its one argument:
+Run the master test runner to execute all essential test suites:
 
 ```bash
-node tests/autocalc-verify.js index.html
+node tests/run-all-tests.js
 ```
 
-Run all of them:
+Or run an individual test suite:
 
 ```bash
-for f in tests/*-verify.js tests/*-table.js; do
-  echo "=== $f ==="
-  node "$f" index.html || echo "FAILED: $f"
-done
+node tests/test-extreme-chaos-fuzzing.js
 ```
 
-## What each covers
+Filter test suites by name:
 
+```bash
+node tests/run-all-tests.js chaos
+node tests/run-all-tests.js math
+```
+
+## Essential Test Suite Index (35 Suites)
+
+### 1. Master Audits & Chaos Fuzzing
 | Script | Covers |
 |---|---|
-| `autocalc-verify.js` | "Auto-calculate from Adult" toggle (CNN/INF single-ratio derivation) |
-| `autocalc-consecutive-q.js` | Consecutive Q-surcharges scale correctly under auto-calc |
-| `fcs-only-summary-verify.js` | A PTC with only a converted Fare Calc String (no fare/tax) still appears in Summarise |
-| `summary-staleness-verify.js` | Re-converting the Fare Calc String and toggling K3 both update the summary/GDS immediately |
-| `summary-sequence-verify.js` | A tax-only (or fare-calc-only) summary keeps picking up further tax recalculations, in any order |
-| `parser-hardening-verify.js` | Fare Calculation String Parser: embedded-keyword false positives, whitespace tolerance, case normalization, malformed-input warnings |
-| `q-surcharge-verify.js` | All documented Q-surcharge string shapes parse correctly |
-| `q-decimal-split-verify.js` | A `Q`-surcharge glued directly onto the previous surcharge's amount (`...50.00Q DXBYFC29.81`) keeps its decimal intact instead of splitting into two bogus integers |
-| `clipboard-border-verify.js` | Summary table copies with rich HTML formatting (not just plain text) and bold borders |
-| `custom-tabs-verify.js` | Add/rename/remove custom PTC tabs via the in-app modal, 2-tab cap |
-| `hybrid-tabs-verify.js` | INF/CNN and CNN/ADT hybrid tabs: outbound/inbound split, side trips, open jaw, fallback warnings |
-| `hybrid-q-directional-verify.js` | The return leg's own Q-surcharges (written before its fare amount, between the two primary components) scale at the *inbound* PTC rate, not the outbound one |
-| `ptc-single-table.js` | Consolidated Summary table layout: one column per PTC, no Total column, Amount Payable row |
-| `persistence-verify.js` | Session state (all tabs, custom tabs, active tab) survives a page reload once restored |
-| `restore-trigger-verify.js` | Restoration is trigger-based, not automatic: reload leaves fields empty and shows a banner; Restore populates everything; Dismiss clears the saved session for good; starting to type without restoring auto-dismisses the banner |
-| `xss-fix-verify.js` | NUC-validation-FAIL display and the clipboard HTML builder escape user input |
-| `summarise-live-flush-verify.js` | Summarise (and tab-switch/autosave) flush any edit still inside the 300ms auto-recalc debounce window instead of reading stale `summaryData` |
-| `tab-dirty-indicator-verify.js` | The "unsummarised data" tab dot lights up the instant a field is edited and clears once Calculate/Summarise/tab-switch folds it in, independently per tab |
-| `core-fare-tax-math-verify.js` | `calculateFare()`/`calculateTaxes()` core arithmetic: K3-on-fare-diff/change-fee at each cabin rate, Per Pax/Sub Total formulas, pax multiplication, PD-prefixed tax merging, K3-on-YQ |
-| `currency-rounding-verify.js` | `formatAmount()` against `roundingRules`: INR ceiling, 0-decimal currencies, 3-decimal currencies, default 2-decimal, zero/empty/NaN edge cases |
-| `tax-string-parsing-verify.js` | `parseAmount`/`parseTaxToken`/`parseTaxes`/`formatTaxInput`: the fixed 2-char tax-code anchor (vs. ambiguous digit+letter codes), PD prefix, invalid-entry rejection |
-| `summary-consolidation-math-verify.js` | `mergeSummaryData()` sums/perPax recompute/currency-mismatch guard; `buildTaxOnlySummaryData`/`buildFareCalcOnlySummaryData` exact fields; Amount Payable summed correctly across 3 PTCs with different pax counts |
-| `gds-string-verify.js` | `buildGdsLine`/`generateGdsString`: K3 folded into displayed Change Fee, +/- tax sign, single vs. multi-PTC (labeled lines + TOTAL), matches the live Amount Payable |
-| `fare-calc-nuc-roe-math-verify.js` | Parser's `calculatedNuc = fareSum + qSum`, `baseFare = calculatedNuc * ROE`, and the exact ±0.01 NUC-validation tolerance boundary |
-| `autocalc-percentage-math-verify.js` | `deriveFareCalcString()`'s exact 75%/10% per-token scaling (fare components and Q surcharges independently), NUC = sum of independently-rounded tokens; `round2()`'s float-rounding-trap handling |
-| `hybrid-boundary-fallback-verify.js` | `findHybridBoundary()`'s fallback when a source string doesn't have exactly 2 primary fare components (one-way, 3+ legs): whole string scaled at the outbound rate, with a warning naming the actual count found |
+| `test-extreme-chaos-fuzzing.js` | 6-phase property-based fuzzing: rapid checkbox matrix across all tabs, 250+ seeded chaotic actions, zig-zag switching, stopovers, selective halve chips, trailing Q syntax modal, summary & GDS consolidation |
+| `test-principal-airline-audit.js` | Real-world airline reissue audit across Air India, Emirates, and British Airways itineraries |
+| `strict-irregular-sequence-audit.js` | Irregular non-linear flows: A -> B -> A roundtrip edits, multi-space tax pasting, live currency switches, booking class headers |
+| `e2e-comprehensive-audit.js` | End-to-end full application flows: multi-currency calculations, fare difference validations, and summary generation |
 
-`ptc-verify.js` from earlier in this project's history is intentionally **not** included here —
-it asserted on a 3-table summary layout that predates the single consolidated table this app uses
-today, so it no longer reflects intended behavior.
+### 2. Modern Feature & UI Regressions
+| Script | Covers |
+|---|---|
+| `test-theme-switch-slider.js` | Header alignment, light/dark slider theme toggle, Ctrl+M shortcut, and minimal Reload Calculator button micro-rotation |
+| `test-trailing-q-surcharge.js` | Trailing Q surcharge syntax detection, verification modal, "Apply Standard Format" vs "Validate As-Is" |
+| `test-stopover-and-halve-selector.js` | Stopover charges (`1S...`) parsing, interactive selective halve chips (All / Component 1 / Component 2) with zero textarea mutation |
+| `currency-converter-verify.js` | 3-field currency converter collapsible card, Show/Hide toggle, live ROE calculation, and field sync |
+| `manual-dual-currency-verify.js` | Manual 2nd currency settlement (INR overwrite, K3 recalculation, per-pax routing) |
+| `custom-tabs-verify.js` | Add, rename, and remove custom PTC tabs via the in-app modal (2-tab cap) |
+| `hybrid-tabs-verify.js` | INF/CNN and CNN/ADT hybrid tabs: outbound/inbound leg split, side trips, open jaw, and fallback warnings |
+| `hybrid-q-directional-verify.js` | Inbound Q-surcharges scaled at the inbound PTC rate rather than outbound |
+| `ptc-single-table.js` | Consolidated Summary table layout: one column per PTC, Amount Payable row, and Booking class header |
+| `restore-trigger-verify.js` | Trigger-based session restore banner: Restore, Dismiss, and auto-dismiss on edit |
+| `persistence-verify.js` | Session state persistence across reloads once restored |
+| `clipboard-border-verify.js` | Summary table rich HTML clipboard formatting with styled borders |
+| `tab-dirty-indicator-verify.js` | Unsummarised dirty dot indicator per tab |
+| `xss-fix-verify.js` | User input escaping in NUC error display and HTML clipboard builder |
+
+### 3. Core Arithmetic & Unit-Level Tests
+| Script | Covers |
+|---|---|
+| `core-fare-tax-math-verify.js` | `calculateFare()` / `calculateTaxes()` arithmetic: K3 rates across cabins, perPax/subTotal, pax multiplier, PD tax merging, K3-on-YQ |
+| `currency-rounding-verify.js` | `formatAmount()` against `roundingRules`: INR ceiling, JPY nearest, BHD/KWD 3 decimals, default 2 decimals, zero/empty/NaN edge cases |
+| `tax-string-parsing-verify.js` | `parseAmount`, `parseTaxToken`, `parseTaxes`, `formatTaxInput`: 2-char code anchor, PD prefix, invalid rejection |
+| `summary-consolidation-math-verify.js` | `mergeSummaryData()` sums, perPax recompute, currency-mismatch guard, cross-PTC Amount Payable |
+| `gds-string-verify.js` | `buildGdsLine`, `generateGdsString`: K3 folded into displayed Change Fee, +/- tax sign, multi-PTC lines |
+| `fare-calc-nuc-roe-math-verify.js` | Parser's `calculatedNuc = fareSum + qSum`, `baseFare = calculatedNuc * ROE`, ±0.01 tolerance boundary |
+| `autocalc-percentage-math-verify.js` | `deriveFareCalcString()`'s 75%/10% scaling math and float-rounding trap handling |
+| `hybrid-boundary-fallback-verify.js` | `findHybridBoundary()` fallback when string does not have exactly 2 primary fare components |
+| `parser-hardening-verify.js` | Parser keyword edge cases, whitespace tolerance, case normalization |
+| `autocalc-verify.js` | "Auto-calculate from Adult" toggle (CNN/INF single-ratio derivation) |
+| `autocalc-consecutive-q.js` | Consecutive Q-surcharges scaling under auto-calc |
+| `q-surcharge-verify.js` | All documented Q-surcharge string syntax shapes |
+| `q-decimal-split-verify.js` | Glued Q-surcharge decimal retention (`...50.00Q DXBYFC29.81`) |
+| `fcs-only-summary-verify.js` | FCS-only PTC in summary table without fare/tax |
+| `summary-staleness-verify.js` | Re-converting string updates summary immediately |
+| `summary-sequence-verify.js` | Tax-only summary picking up further recalculations in any order |
+| `summarise-live-flush-verify.js` | Flushing pending debounced inputs on Summarise click |

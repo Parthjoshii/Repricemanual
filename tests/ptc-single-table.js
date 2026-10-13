@@ -2,7 +2,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 const assert = require('assert');
 
-const fileUrl = 'file://' + path.resolve(process.argv[2]).replace(/\\/g, '/');
+const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
 
 (async () => {
   const browser = await chromium.launch();
@@ -11,10 +11,8 @@ const fileUrl = 'file://' + path.resolve(process.argv[2]).replace(/\\/g, '/');
   page.on('pageerror', (e) => errors.push('pageerror: ' + String(e)));
   page.on('console', (msg) => { if (msg.type() === 'error') errors.push('console: ' + msg.text()); });
 
-  const shot = (name) => page.screenshot({ path: name, fullPage: true });
-
   async function fillPtc(oldFare, newFare, oldTax, newTax) {
-    await page.selectOption('#currency', 'AED');
+    await page.selectOption('#currency', 'USD');
     await page.selectOption('#cabin', 'economy');
     await page.fill('#oldFare', oldFare);
     await page.fill('#newFare', newFare);
@@ -29,7 +27,7 @@ const fileUrl = 'file://' + path.resolve(process.argv[2]).replace(/\\/g, '/');
   await page.waitForSelector('h1');
 
   // --- 1 PTC only ---
-  await fillPtc('1000', '1200', 'AED50YQ', 'AED70YQ');
+  await fillPtc('1000', '1200', 'USD50YQ', 'USD70YQ');
   await page.click('#summariseButton');
   await page.waitForTimeout(100);
 
@@ -37,16 +35,15 @@ const fileUrl = 'file://' + path.resolve(process.argv[2]).replace(/\\/g, '/');
   assert.strictEqual(tableCount1, 1, 'Expected exactly one table');
   const headers1 = await page.$$eval('#summary thead th', ths => ths.map(th => th.textContent));
   console.log('1-PTC headers:', headers1);
-  assert.deepStrictEqual(headers1, ['', 'Adult'], '1-PTC header should be blank + Adult only, no Total column');
+  assert.deepStrictEqual(headers1, ['Booking class', 'Adult'], '1-PTC header should be Booking class + Adult only, no Total column');
   const breakdownLeftover = await page.$('.summary-breakdown, .summary-breakdown-heading, .summary-breakdown-tables');
   assert.strictEqual(breakdownLeftover, null, 'No leftover breakdown DOM should exist');
-  console.log('CHECK1 OK: single PTC -> one table, columns [\'\', Adult], no Total column');
-  await shot('single-1ptc.png');
+  console.log('CHECK1 OK: single PTC -> one table, columns [\'Booking class\', Adult], no Total column');
 
   // --- 2 PTCs ---
   await page.click('#ptcTabCNN');
   await page.waitForTimeout(100);
-  await fillPtc('500', '550', 'AED10YQ', 'AED15YQ');
+  await fillPtc('500', '550', 'USD10YQ', 'USD15YQ');
   await page.click('#summariseButton');
   await page.waitForTimeout(100);
 
@@ -54,7 +51,7 @@ const fileUrl = 'file://' + path.resolve(process.argv[2]).replace(/\\/g, '/');
   assert.strictEqual(tableCount2, 1, 'Expected exactly one table for 2 PTCs');
   const headers2 = await page.$$eval('#summary thead th', ths => ths.map(th => th.textContent));
   console.log('2-PTC headers:', headers2);
-  assert.deepStrictEqual(headers2, ['', 'Adult', 'Child'], '2-PTC header should be [\'\', Adult, Child] -- no Total column');
+  assert.deepStrictEqual(headers2, ['Booking class', 'Adult', 'Child'], '2-PTC header should be [\'Booking class\', Adult, Child] -- no Total column');
 
   // Row-level sanity check: find the "Old Fare" row and check Adult/Child cells (no Total column)
   const oldFareRow = await page.$$eval('#summary tbody tr', trs => {
@@ -62,14 +59,14 @@ const fileUrl = 'file://' + path.resolve(process.argv[2]).replace(/\\/g, '/');
     return row ? Array.from(row.cells).map(c => c.textContent) : null;
   });
   console.log('Old Fare row:', oldFareRow);
-  assert.deepStrictEqual(oldFareRow, ['Old Fare', 'AED1000.00', 'AED500.00'], 'Old Fare row values mismatch');
+  assert.deepStrictEqual(oldFareRow, ['Old Fare', 'USD1000.00', 'USD500.00'], 'Old Fare row values mismatch');
 
   const subTotalRow = await page.$$eval('#summary tbody tr', trs => {
     const row = trs.find(tr => tr.cells[0].textContent.includes('Sub Total'));
     return row ? Array.from(row.cells).map(c => c.textContent) : null;
   });
   console.log('Sub Total row:', subTotalRow);
-  assert.deepStrictEqual(subTotalRow, ['Sub Total', 'AED220.00', 'AED55.00'], 'Sub Total row values mismatch');
+  assert.deepStrictEqual(subTotalRow, ['Sub Total', 'USD220.00', 'USD55.00'], 'Sub Total row values mismatch');
 
   // New "Amount Payable" row: single spanning cell = sum of both PTCs' Sub Total, positioned
   // right after Sub Total and before the Fare Calculation String rows.
@@ -88,21 +85,20 @@ const fileUrl = 'file://' + path.resolve(process.argv[2]).replace(/\\/g, '/');
   console.log('Amount Payable row:', amountPayableRow);
   assert.strictEqual(amountPayableRow.cellCount, 2, 'Amount Payable should be label + one spanning value cell');
   assert.strictEqual(amountPayableRow.colSpan, 2, 'Amount Payable value cell should span both PTC columns');
-  assert.strictEqual(amountPayableRow.value, 'AED275.00', 'Amount Payable should be the sum of both Sub Totals (220+55)');
-  console.log('CHECK2 OK: 2 PTCs -> one table, [\'\', Adult, Child], no Total column, Amount Payable row correct & positioned');
-  await shot('single-2ptc.png');
+  assert.strictEqual(amountPayableRow.value, 'USD275.00', 'Amount Payable should be the sum of both Sub Totals (220+55)');
+  console.log('CHECK2 OK: 2 PTCs -> one table, [\'Booking class\', Adult, Child], no Total column, Amount Payable row correct & positioned');
 
   // --- 3 PTCs (INF) ---
   await page.click('#ptcTabINF');
   await page.waitForTimeout(100);
-  await fillPtc('200', '210', 'AED2YQ', 'AED3YQ');
+  await fillPtc('200', '210', 'USD2YQ', 'USD3YQ');
   await page.click('#summariseButton');
   await page.waitForTimeout(100);
 
   const headers3 = await page.$$eval('#summary thead th', ths => ths.map(th => th.textContent));
   console.log('3-PTC headers:', headers3);
-  assert.deepStrictEqual(headers3, ['', 'Adult', 'Child', 'Infant'], '3-PTC header mismatch -- no Total column');
-  console.log('CHECK3 OK: 3 PTCs -> [\'\', Adult, Child, Infant], no Total column');
+  assert.deepStrictEqual(headers3, ['Booking class', 'Adult', 'Child', 'Infant'], '3-PTC header mismatch -- no Total column');
+  console.log('CHECK3 OK: 3 PTCs -> [\'Booking class\', Adult, Child, Infant], no Total column');
 
   const amountPayableRow3 = await page.$$eval('#summary tbody tr', trs => {
     const row = trs.find(tr => tr.cells[0].textContent === 'Amount Payable');
@@ -110,8 +106,7 @@ const fileUrl = 'file://' + path.resolve(process.argv[2]).replace(/\\/g, '/');
   });
   console.log('3-PTC Amount Payable row:', amountPayableRow3);
   assert.strictEqual(amountPayableRow3.colSpan, 3, 'Amount Payable value cell should span all 3 PTC columns');
-  assert.strictEqual(amountPayableRow3.value, 'AED286.00', 'Amount Payable should be 220+55+11');
-  await shot('single-3ptc.png');
+  assert.strictEqual(amountPayableRow3.value, 'USD286.00', 'Amount Payable should be 220+55+11');
 
   // --- Copy Summary content sanity (read what would be copied, without relying on clipboard permissions) ---
   const copyText = await page.evaluate(() => {

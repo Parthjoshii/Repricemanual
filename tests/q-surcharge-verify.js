@@ -2,7 +2,7 @@ const { chromium } = require('playwright');
 const path = require('path');
 const assert = require('assert');
 
-const fileUrl = 'file://' + path.resolve(process.argv[2]).replace(/\\/g, '/');
+const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\\/g, '/');
 
 let browser;
 (async () => {

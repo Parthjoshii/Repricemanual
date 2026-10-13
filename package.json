@@ -1,4 +1,10 @@
 {
+  "scripts": {
+    "test": "node tests/test-extreme-chaos-fuzzing.js",
+    "test:chaos": "node tests/test-extreme-chaos-fuzzing.js",
+    "test:all": "node tests/run-all-tests.js",
+    "test:unit": "node tests/run-all-tests.js math"
+  },
   "dependencies": {
     "playwright": "^1.62.1"
   }

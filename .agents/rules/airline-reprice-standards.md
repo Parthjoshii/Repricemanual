@@ -2,12 +2,15 @@
 
 These invariants govern all calculations, validations, and UI interactions in this repository. Any code modification must satisfy these constraints to guarantee zero audit flags.
 
-## 1. Zero-Audit-Flag Tax Reconciliation Invariant
+## 1. Zero-Audit-Flag Tax Reconciliation & Change Fee K3 Routing
 In GDS ticket reissues (Amadeus, Sabre, Travelport), the tax box entries on the ticket reissue mask must mathematically match the total net tax adjustment collected from the passenger:
 $$\text{Sum}(\text{Add Taxes}) - \text{Sum}(\text{Refund Taxes}) \equiv \text{Tax Adjustment (Net)}$$
 - Every positive tax difference must appear in `Add Taxes`.
 - Every negative tax difference must appear in `Refund Taxes`.
-- Additional tax components (such as K3 on positive YQ, K3 on Fare Difference, or K3 on Change Fee) must be merged into the respective tax token in `Add Taxes` so the totals remain in 100% balance.
+- Additional tax components from Fare Difference (K3 on Fare Diff) and positive YQ (K3 on YQ) are merged into `Add Taxes`.
+- **Change Fee K3 Routing**: K3 calculated on Change Fee is added directly to the Change Fee amount, displayed in the Summary Table as `(incl. of K3)`, and is strictly EXCLUDED from `Add Taxes` and `Tax Adjustment (Net)`.
+- Total per passenger remains in exact mathematical balance:
+  $$\text{Per Pax} = \text{Fare Diff} + (\text{Change Fee} + \text{K3}_{\text{Fee}}) + (\text{Tax Adjustment (Net)})$$
 
 ## 2. K3 Accumulation & Warning Guard Invariants
 - **Consolidated K3 Accumulation**: If a ticket already has a K3 difference resulting from old vs new tax inputs (e.g., `MUR567K3`), applying K3 on positive YQ (`MUR6K3`), fare difference, or change fee MUST NOT wipe out the existing K3. All K3 sources must be accumulated into a single consolidated token (e.g., `MUR573.00K3`).
@@ -33,3 +36,13 @@ $$\text{Sum}(\text{Add Taxes}) - \text{Sum}(\text{Refund Taxes}) \equiv \text{Ta
 - Positive tax adjustments must use high-contrast emerald green (`--tax-pos-color: #15803d` in light mode, `#86efac` in dark mode, `font-weight: 600`).
 - Negative tax adjustments must use high-contrast ruby crimson (`--tax-neg-color: #b91c1c` in light mode, `#fca5a5` in dark mode, `font-weight: 600`).
 - Switch-track toggle background colors use moon-blue in light mode (`#1ba0f2`) to match the dark-mode moon icon, and cream in dark mode (`#fae8a4`).
+
+## 7. Stopover Charges (1S) Invariants
+- Stopover charges are denoted by `1S` along with a numeric amount (e.g. `1S57.59 1S34.00`).
+- Stopover charges must be parsed and included in the Calculated NUC total and displayed in a dedicated Stopover Charges section.
+- **PTC Invariant**: When auto-calculating dependent passenger types (`CNN`, `INF`, `INF/CNN`, `CNN/ADT`) from Adult (`ADT`), stopover charges MUST NOT be scaled or discounted. Stopovers remain 100% unscaled and fixed across all passenger types.
+
+## 8. Selective Fare Component Halving
+- When halving is enabled on multi-component journeys, the user can choose to halve all components or select a specific fare component (e.g. Outbound leg only, or Inbound leg only).
+- Only the selected component is halved; unselected components remain full.
+- The raw user input string in `#fareCalcString` remains pristine at all times.
