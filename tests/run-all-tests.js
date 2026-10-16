@@ -38,7 +38,20 @@ function runTest(filename) {
     proc.stdout.on('data', d => { output += d.toString(); });
     proc.stderr.on('data', d => { output += d.toString(); });
 
+    const timeoutMs = filename.includes('chaos') || filename.includes('sectional') ? 360000 : 45000;
+    const timer = setTimeout(() => {
+      proc.kill();
+      resolve({
+        filename,
+        passed: false,
+        code: -1,
+        elapsed: ((Date.now() - startTime) / 1000).toFixed(2),
+        output: output + `\nTIMEOUT after ${timeoutMs / 1000}s`,
+      });
+    }, timeoutMs);
+
     proc.on('close', (code) => {
+      clearTimeout(timer);
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
       resolve({
         filename,

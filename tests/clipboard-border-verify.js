@@ -28,7 +28,7 @@ let browser;
   assert.strictEqual(tableBorder, '3px', 'Expected 3px table border');
 
   // --- Fill fare data and summarise so a summary table exists ---
-  await page.selectOption('#currency', 'AED');
+  await page.selectOption('#currency', 'USD');
   await page.selectOption('#cabin', 'economy');
   await page.fill('#oldFare', '1000');
   await page.fill('#newFare', '1200');
@@ -44,7 +44,7 @@ let browser;
   assert.strictEqual(thBorder, '3px');
   assert.strictEqual(tdBorder, '3px');
   assert.strictEqual(thBg, 'rgb(255, 255, 0)', 'Summary header should have yellow background');
-  const disclaimerTextDom = await page.$eval('#summary .summary-disclaimer', el => el.textContent.trim());
+  const disclaimerTextDom = await page.$eval('#summary .summary-disclaimer-cell', el => el.textContent.trim());
   assert.strictEqual(disclaimerTextDom, 'Please note that the fares are not guaranteed until ticketed and are subject to change as per availability');
   console.log('CHECK1 OK: summary table borders are 3px (bold), yellow header, and disclaimer rendered');
 
@@ -73,7 +73,7 @@ let browser;
   assert.ok(clipboardHtml.includes('#ffff00') || clipboardHtml.includes('#FFFF00'), 'Clipboard HTML table should have yellow header');
   assert.ok(clipboardHtml.includes('Please note that the fares are not guaranteed until ticketed and are subject to change as per availability'), 'Clipboard HTML should include disclaimer note');
   assert.ok(clipboardHtml.includes('Old Fare'), 'Clipboard HTML should contain the row labels');
-  assert.ok(clipboardText.includes('Old Fare\tAED1000.00'), 'Clipboard plain-text fallback should still be tab-separated');
+  assert.ok(clipboardText.includes('Old Fare\tUSD1000.00'), 'Clipboard plain-text fallback should still be tab-separated');
   assert.ok(clipboardText.includes('Please note that the fares are not guaranteed until ticketed and are subject to change as per availability'), 'Clipboard plain-text should include disclaimer note');
   console.log('CHECK2 OK: clipboard has rich HTML (yellow header, centered cells, bold borders, disclaimer) and plain-text fallback');
 

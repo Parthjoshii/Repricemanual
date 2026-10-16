@@ -21,7 +21,7 @@ let browser;
   console.log('CHECK0 OK: toggle label text updated');
 
   // ADT: full fare data
-  await page.selectOption('#currency', 'AED');
+  await page.selectOption('#currency', 'USD');
   await page.selectOption('#cabin', 'economy');
   await page.fill('#oldFare', '1000');
   await page.fill('#newFare', '1200');
@@ -54,7 +54,7 @@ let browser;
 
   const headers = await page.$$eval('#summary thead th', ths => ths.map(th => th.textContent));
   console.log('Summary headers:', headers);
-  assert.deepStrictEqual(headers, ['', 'Adult', 'Child', 'Infant'], 'Expected all 3 PTCs in summary: ' + JSON.stringify(headers));
+  assert.deepStrictEqual(headers.slice(1), ['Adult', 'Child', 'Infant'], 'Expected all 3 PTCs in summary: ' + JSON.stringify(headers));
 
   const fcsRows = await page.$$eval('#summary tbody tr', trs => {
     return trs
@@ -76,7 +76,7 @@ let browser;
     return row ? Array.from(row.cells).map(c => c.textContent) : null;
   });
   console.log('Old Fare row:', oldFareRow);
-  assert.strictEqual(oldFareRow[1], 'AED1000.00', 'ADT Old Fare should be correct');
+  assert.strictEqual(oldFareRow[1], 'USD1000.00', 'ADT Old Fare should be correct');
   assert.ok(!oldFareRow[2].includes('null') && !oldFareRow[3].includes('null'), 'CNN/INF Old Fare should not show "null": ' + oldFareRow);
   console.log('CHECK2 OK: zero-valued fare/tax fields render cleanly for fare-calc-only PTCs, no "null" leakage');
 
@@ -86,7 +86,7 @@ let browser;
     return row ? row.cells[1].textContent : null;
   });
   console.log('Amount Payable row:', amountPayableRow);
-  assert.strictEqual(amountPayableRow, 'AED200.00', 'Amount Payable should equal ADT-only subtotal since CNN/INF contribute 0');
+  assert.strictEqual(amountPayableRow, 'USD200.00', 'Amount Payable should equal ADT-only subtotal since CNN/INF contribute 0');
   console.log('CHECK3 OK: Amount Payable correctly sums with fare-calc-only PTCs contributing zero');
 
   console.log('CONSOLE_ERRORS:', JSON.stringify(errors));

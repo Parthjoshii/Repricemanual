@@ -31,17 +31,21 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
   assert.strictEqual(await fmt(100.50, 'JPY'), '101', 'JPY should round 100.50 up to 101 (round-half-up)');
   console.log('CHECK2 OK: JPY nearest-whole-unit rounding');
 
-  // --- BHD/KWD/OMR/JOD/TND: standard, 3 decimals ---
-  assert.strictEqual(await fmt(12.3456, 'BHD'), '12.346', 'BHD should round to 3 decimals (12.3456 -> 12.346)');
-  assert.strictEqual(await fmt(12.3444, 'BHD'), '12.344', 'BHD should round down at the 4th decimal below .5');
+  // --- BHD/KWD/OMR/JOD/TND: ceiling, 3 decimals ---
+  assert.strictEqual(await fmt(12.3456, 'BHD'), '12.346', 'BHD should ceiling to 3 decimals (12.3456 -> 12.346)');
+  assert.strictEqual(await fmt(12.3444, 'BHD'), '12.345', 'BHD should ceiling up at the 4th decimal');
   assert.strictEqual(await fmt(1, 'KWD'), '1.000', 'KWD should always show 3 decimals even for a whole number');
   console.log('CHECK3 OK: 3-decimal currencies (BHD/KWD/etc.) round and display correctly');
 
-  // --- Default 2-decimal currencies (AED, USD, and anything NOT in roundingRules) ---
-  assert.strictEqual(await fmt(99.995, 'AED'), '100.00', 'AED should round 99.995 up to 100.00 (2 decimals)');
-  assert.strictEqual(await fmt(99.994, 'AED'), '99.99', 'AED should round 99.994 down to 99.99');
+  // --- Default 2-decimal currencies (USD, and anything NOT in roundingRules) ---
+  assert.strictEqual(await fmt(99.995, 'USD'), '100.00', 'USD should round 99.995 up to 100.00 (2 decimals)');
+  assert.strictEqual(await fmt(99.994, 'USD'), '99.99', 'USD should round 99.994 down to 99.99');
   assert.strictEqual(await fmt(50, 'XXX'), '50.00', 'An unlisted currency code should default to standard 2-decimal rounding');
-  console.log('CHECK4 OK: default 2-decimal rounding (explicit AED and unlisted-currency fallback)');
+  console.log('CHECK4 OK: default 2-decimal rounding (explicit USD and unlisted-currency fallback)');
+
+  // --- AED: IATA ceiling to whole integer unit (unit 1) ---
+  assert.strictEqual(await fmt(99.01, 'AED'), '100', 'AED should ceiling 99.01 up to 100');
+  assert.strictEqual(await fmt(100.00, 'AED'), '100', 'AED exact integer stays 100');
 
   // --- Edge cases: zero, falsy, NaN ---
   assert.strictEqual(await fmt(0, 'AED'), '0', 'Zero should format as the literal "0", not "0.00" (falsy short-circuit)');

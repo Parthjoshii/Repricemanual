@@ -24,11 +24,12 @@ node tests/run-all-tests.js chaos
 node tests/run-all-tests.js math
 ```
 
-## Essential Test Suite Index (35 Suites)
+## Essential Test Suite Index (36 Suites)
 
-### 1. Master Audits & Chaos Fuzzing
+### 1. Master Audits, Sectional Precision & Chaos Fuzzing
 | Script | Covers |
 |---|---|
+| `test-sectional-incremental-precision.js` | High-scale (250+ steps) systematic sectional precision: pure taxes isolation, fare calc strings, direct fares & cabin K3, cross-tab zig-zag, with automated root-cause failure analyzer |
 | `test-extreme-chaos-fuzzing.js` | 6-phase property-based fuzzing: rapid checkbox matrix across all tabs, 250+ seeded chaotic actions, zig-zag switching, stopovers, selective halve chips, trailing Q syntax modal, summary & GDS consolidation |
 | `test-principal-airline-audit.js` | Real-world airline reissue audit across Air India, Emirates, and British Airways itineraries |
 | `strict-irregular-sequence-audit.js` | Irregular non-linear flows: A -> B -> A roundtrip edits, multi-space tax pasting, live currency switches, booking class headers |

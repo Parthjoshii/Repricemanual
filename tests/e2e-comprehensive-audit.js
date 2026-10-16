@@ -160,6 +160,11 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
     await page.click('#parseButton');
     await page.waitForTimeout(200);
 
+    if (await page.isVisible('#qCorrectionModal.show')) {
+      await page.click('#qCorrectionApplyBtn');
+      await page.waitForTimeout(200);
+    }
+
     // Re-summarize
     stateTransitions.push({ action: 'Re-summarize with Fare Calc String', timestamp: new Date().toISOString() });
     await page.click('#summariseButton');
@@ -208,7 +213,8 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
     await page.screenshot({ path: k3SyncScreenshotPath, fullPage: false });
 
     const pass = changeFeeRowK3Off.includes('INR6488') && 
-                 changeFeeRowK3On.includes('INR6813 (incl. K3 INR325)') &&
+                 changeFeeRowK3On.includes('INR6813') &&
+                 changeFeeRowK3On.includes('(incl. of K3)') &&
                  gdsStringK3On.includes('+ CHG FEE INR6813');
 
     recordResult(
@@ -362,6 +368,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
 
   // Test 4.3: Negative Taxes categorized in Refund Taxes
   try {
+    await page.selectOption('#currency', 'INR');
     await page.fill('#oldTax', 'INR500YQ/INR400YR');
     await page.fill('#newTax', 'INR200YQ/INR100YR');
     await page.click('#taxCalcButton');

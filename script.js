@@ -239,7 +239,7 @@ function showPtcPrompt({ message, defaultValue = '', requireInput = true }) {
 
 // Pattern matching trailing Q surcharges attached after a fare basis code, PTC suffix, or ticket designator.
 // Matches direct Q (Q12.29, Q 12.29), coded Q (Q COKDUB58.47, QBOM5.00), or bare city-pair surcharges (COKDUB58.47).
-const TRAILING_Q_REGEX = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(\/[A-Z0-9]{1,8}?)?\s*(Q\s*(?:[A-Z]{3}(?:\s*[A-Z]{3})?\s*)?\d+(?:\.\d+)?(?:\s*Q)?|[A-Z]{6}\d+(?:\.\d+)?(?:\s*Q)?)/g;
+const TRAILING_Q_REGEX = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(\/[A-Z0-9]{1,8}?)?\s*(Q\s*(?:[A-Z]{3}(?:\s*[A-Z]{3})?\s*)?\d+(?:\.\d+)?(?:\s*Q(?![A-Za-z]))?|[A-Z]{6}\d+(?:\.\d+)?(?:\s*Q(?![A-Za-z]))?)/g;
 
 function normalizeTrailingQSurchargesInMemory(str) {
   if (!str) return '';
@@ -2699,16 +2699,16 @@ function calculateTaxes() {
 
       els.taxAdj.value = result.currency ? `${result.currency}${formatAmount(netTaxWithK3, result.currency)}` : '';
 
-      const activeSummary = state.ptcData[state.activePtc].summaryData;
+      const activeSummary = state.ptcData[state.activePtc]?.summaryData;
+      const passengerCount = activeSummary?.pax || Math.max(1, parseInt(els.pax.value, 10) || 1);
+      const perPax = netTaxWithK3;
+      const roundedPerPax = parseFloat(formatAmount(perPax, result.currency)) || perPax;
+      const subTotal = roundedPerPax * passengerCount;
+
+      els.perPax.value = `${result.currency}${formatAmount(roundedPerPax, result.currency)}`;
+      els.subTotal.value = `${result.currency}${formatAmount(subTotal, result.currency)}`;
+
       if (activeSummary) {
-        const passengerCount = activeSummary.pax || 1;
-        const perPax = netTaxWithK3;
-        const roundedPerPax = parseFloat(formatAmount(perPax, result.currency)) || perPax;
-        const subTotal = roundedPerPax * passengerCount;
-
-        els.perPax.value = `${result.currency}${formatAmount(roundedPerPax, result.currency)}`;
-        els.subTotal.value = `${result.currency}${formatAmount(subTotal, result.currency)}`;
-
         // Update stored summary data with new tax adjustment and Add Taxes text (K3 on YQ may have changed)
         state.ptcData[state.activePtc].summaryData = {
           ...activeSummary,

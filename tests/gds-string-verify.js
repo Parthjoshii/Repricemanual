@@ -1,6 +1,5 @@
-// Verifies buildGdsLine()/generateGdsString() — the GDS-format output's math, not just its
-// presence: per-PTC line totals must actually equal perPax, and the multi-PTC TOTAL line must
-// equal the consolidated subTotal shown in the summary table.
+// Verifies generateGdsString() — the consolidated airline GDS string format,
+// including passenger aggregation, K3 folding into change fee, and live UI match.
 const { chromium } = require('playwright');
 const path = require('path');
 const assert = require('assert');
@@ -17,58 +16,72 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
   await page.goto(fileUrl);
   await page.waitForSelector('h1');
 
-  // --- buildGdsLine: unit-style, exact line composition including K3-in-change-fee folding ---
-  const line = await page.evaluate(() => buildGdsLine({
-    currency: 'AED', diff: 200, fee: 100, k3Fee: 18, taxAdj: 30, perPax: 348,
-  }));
+  // --- Check 1: Single PTC positive tax with change fee K3 ---
+  const singleData = {
+    currency: 'USD',
+    diff: 200,
+    fee: 100,
+    k3Fee: 18,
+    taxAdj: 30,
+    subTotal: 348,
+    pax: 1
+  };
+  const gdsLine = await page.evaluate((d) => generateGdsString(d, [{ ptc: 'ADT', data: d }]), singleData);
   assert.strictEqual(
-    line,
-    'FARE DIFF AED200.00 + CHG FEE AED118.00 + TAX AED30.00 = AED348.00',
-    'GDS line should fold K3 into the displayed Change Fee (100+18=118) and show a "+" for positive tax'
+    gdsLine,
+    'FARE DIFF USD200.00 + CHG FEE USD118.00 + TAX USD30.00 = USD348.00',
+    'GDS string should fold K3 into change fee and format positive tax'
   );
-  console.log('CHECK1 OK: buildGdsLine composes the correct line with K3 folded into Change Fee');
+  console.log('CHECK1 OK: single-PTC positive tax formats correctly');
 
-  const lineNegTax = await page.evaluate(() => buildGdsLine({
-    currency: 'AED', diff: 0, fee: 0, k3Fee: 0, taxAdj: -20, perPax: -20,
-  }));
+  // --- Check 2: Single PTC negative tax (refund) ---
+  const singleNegTax = {
+    currency: 'USD',
+    diff: 0,
+    fee: 0,
+    k3Fee: 0,
+    taxAdj: -20,
+    subTotal: -20,
+    pax: 1
+  };
+  const gdsLineNeg = await page.evaluate((d) => generateGdsString(d, [{ ptc: 'ADT', data: d }]), singleNegTax);
   assert.strictEqual(
-    lineNegTax,
-    'FARE DIFF AED0 + CHG FEE AED0 - TAX AED20.00 = AED-20.00',
-    'A negative tax adjustment should show a "-" prefix with the absolute value, not a raw negative number'
+    gdsLineNeg,
+    'FARE DIFF USD0.00 + CHG FEE USD0.00 - TAX USD20.00 = USD-20.00',
+    'Negative tax adjustment should show "-" prefix with absolute value'
   );
-  console.log('CHECK2 OK: buildGdsLine shows "-" for a negative tax adjustment (refund)');
+  console.log('CHECK2 OK: negative tax adjustment correctly displays minus sign');
 
-  // --- generateGdsString: single PTC == just the line; multi-PTC == pipe-separated + TOTAL ---
-  const singleData = { currency: 'AED', diff: 200, fee: 0, k3Fee: 0, taxAdj: 0, perPax: 200 };
-  const single = await page.evaluate((d) => generateGdsString(d, [{ ptc: 'ADT', data: d }]), singleData);
-  assert.strictEqual(single, await page.evaluate((d) => buildGdsLine(d), singleData), 'A single-PTC breakdown should produce exactly buildGdsLine\'s output, no TOTAL suffix');
-  console.log('CHECK3 OK: generateGdsString with one PTC returns a plain single line');
-
-  const dataADT = { currency: 'AED', diff: 200, fee: 0, k3Fee: 0, taxAdj: 0, perPax: 200 };
-  const dataCNN = { currency: 'AED', diff: 150, fee: 0, k3Fee: 0, taxAdj: 0, perPax: 150 };
-  const consolidated = { currency: 'AED', subTotal: 350 };
-  const multi = await page.evaluate(({ dataADT, dataCNN, consolidated }) =>
+  // --- Check 3: Multi-PTC consolidated aggregation ---
+  const dataADT = { currency: 'USD', diff: 200, fee: 50, k3Fee: 9, taxAdj: 25, subTotal: 284, pax: 1 };
+  const dataCNN = { currency: 'USD', diff: 150, fee: 50, k3Fee: 9, taxAdj: 25, subTotal: 234, pax: 1 };
+  const consolidated = { currency: 'USD', subTotal: 518 };
+  const multiGds = await page.evaluate(({ dataADT, dataCNN, consolidated }) =>
     generateGdsString(consolidated, [{ ptc: 'ADT', data: dataADT }, { ptc: 'CNN', data: dataCNN }]),
-    { dataADT, dataCNN, consolidated });
-  assert.ok(multi.includes('Adult'), 'Multi-PTC GDS string should prefix each line with the PTC label');
-  assert.ok(multi.includes('Child'), 'Multi-PTC GDS string should include every PTC in the breakdown');
-  assert.ok(multi.endsWith('TOTAL = AED350.00'), 'Multi-PTC GDS string should end with a TOTAL line equal to the consolidated subTotal');
-  assert.ok(multi.includes('  |  '), 'Multi-PTC lines should be pipe-separated (an <input> value cannot hold newlines)');
-  console.log('CHECK4 OK: generateGdsString with multiple PTCs produces labeled lines + a correct TOTAL');
+    { dataADT, dataCNN, consolidated }
+  );
+  assert.strictEqual(
+    multiGds,
+    'FARE DIFF USD350.00 + CHG FEE USD118.00 + TAX USD50.00 = USD518.00',
+    'Multi-PTC GDS string should sum fare diff, change fee, taxes, and total across all passengers'
+  );
+  console.log('CHECK3 OK: multi-PTC consolidated GDS string sums all passenger segments');
 
-  // --- UI-level: the actual #gdsString field after Summarise matches the summary table's numbers ---
-  await page.selectOption('#currency', 'AED');
+  // --- Check 4: Live UI-level #gdsString after Summarise ---
+  await page.selectOption('#currency', 'USD');
   await page.fill('#oldFare', '1000');
   await page.fill('#newFare', '1200');
   await page.click('#fareCalcButton');
   await page.waitForTimeout(150);
+
   await page.click('#ptcTabCNN');
   await page.waitForTimeout(100);
-  await page.selectOption('#currency', 'AED');
+  await page.selectOption('#currency', 'USD');
   await page.fill('#oldFare', '500');
   await page.fill('#newFare', '550');
   await page.click('#fareCalcButton');
   await page.waitForTimeout(150);
+
   await page.click('#summariseButton');
   await page.waitForTimeout(150);
 
@@ -77,12 +90,14 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
     const row = trs.find(tr => tr.cells[0].textContent === 'Amount Payable');
     return row ? row.cells[1].textContent : null;
   });
-  assert.ok(gdsValue.endsWith(`TOTAL = ${amountPayable}`), 'The live GDS string\'s TOTAL should match the summary table\'s Amount Payable exactly');
-  console.log('CHECK5 OK: the live #gdsString TOTAL matches the rendered Amount Payable');
+
+  assert.ok(gdsValue.includes('FARE DIFF USD250.00'), 'Live GDS string should reflect combined fare diff 200 + 50 = 250');
+  assert.ok(gdsValue.endsWith(`= ${amountPayable}`), 'Live GDS string total should match summary table Amount Payable');
+  console.log('CHECK4 OK: live #gdsString matches consolidated summary table');
 
   console.log('CONSOLE_ERRORS:', JSON.stringify(errors));
   assert.strictEqual(errors.length, 0, 'Expected zero console errors');
-  console.log('CHECK6 OK: zero console errors');
+  console.log('CHECK5 OK: zero console errors');
 
   console.log('\nALL CHECKS PASSED');
   await browser.close();

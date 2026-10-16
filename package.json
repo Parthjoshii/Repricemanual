@@ -2,6 +2,7 @@
   "scripts": {
     "test": "node tests/test-extreme-chaos-fuzzing.js",
     "test:chaos": "node tests/test-extreme-chaos-fuzzing.js",
+    "test:sectional": "node tests/test-sectional-incremental-precision.js",
     "test:all": "node tests/run-all-tests.js",
     "test:unit": "node tests/run-all-tests.js math"
   },

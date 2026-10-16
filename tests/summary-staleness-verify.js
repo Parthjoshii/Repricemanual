@@ -108,8 +108,8 @@ let browser;
   console.log('Change Fee row after K3 ON:', changeFeeRow);
   console.log('GDS string after K3 ON:', gdsAfterK3);
 
-  assert.ok(changeFeeRow.includes('incl. K3'), 'Table Change Fee row should show K3-inclusive amount: ' + changeFeeRow);
-  const tableFeeMatch = changeFeeRow.match(/EUR([\d.]+) \(incl\. K3 EUR([\d.]+)\)/);
+  assert.ok(changeFeeRow.includes('incl. of K3'), 'Table Change Fee row should show K3-inclusive amount: ' + changeFeeRow);
+  const tableFeeMatch = changeFeeRow.match(/EUR([\d.]+) \(incl\. of K3\)/);
   assert.ok(tableFeeMatch, 'Could not parse table Change Fee value: ' + changeFeeRow);
   const tableFeeTotal = tableFeeMatch[1];
 
