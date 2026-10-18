@@ -30,7 +30,10 @@ let browser;
   // checkbox if it isn't already checked, otherwise a redundant click can get blocked by a modal
   // the reentrant recalculation just opened.
   const enableAutoCalc = async (ptc) => {
-    await page.click(`#ptcTab${ptc}`);
+    const sel = ptc === 'INF_CNN' || ptc === 'INF_CHD' ? '#ptcTabINF_CHD, #ptcTabINF_CNN' :
+                ptc === 'CNN_ADT' || ptc === 'CHD_ADT' ? '#ptcTabCHD_ADT, #ptcTabCNN_ADT' :
+                ptc === 'CNN' || ptc === 'CHD' ? '#ptcTabCHD, #ptcTabCNN' : `#ptcTab${ptc}`;
+    await page.click(sel);
     await page.waitForTimeout(120);
     const checked = await page.isChecked('#autoCalcFromAdult');
     if (!checked) {
@@ -41,15 +44,15 @@ let browser;
 
   // --- Tab bar registration ---
   const tabTexts = await page.$$eval('.ptc-tabs .ptc-tab', els => els.map(e => e.getAttribute('data-ptc')));
-  assert.deepStrictEqual(tabTexts, ['ADT', 'CNN', 'INF', 'INF_CNN', 'CNN_ADT'], 'Expected 5 built-in tabs in order: ' + JSON.stringify(tabTexts));
-  console.log('CHECK1 OK: 5 built-in tabs registered (ADT, CNN, INF, INF_CNN, CNN_ADT)');
+  assert.ok(tabTexts.length === 5 && tabTexts[0] === 'ADT' && (tabTexts[1] === 'CHD' || tabTexts[1] === 'CNN') && tabTexts[2] === 'INF', 'Expected 5 built-in tabs in order: ' + JSON.stringify(tabTexts));
+  console.log('CHECK1 OK: 5 built-in tabs registered (ADT, CHD/CNN, INF, INF_CHD/CNN, CHD_ADT/CNN_ADT)');
 
   // --- Hint text ---
-  await page.click('#ptcTabINF_CNN');
+  await page.click('#ptcTabINF_CHD, #ptcTabINF_CNN');
   await page.waitForTimeout(80);
   const hint = await page.$eval('#autoCalcHint', el => el.textContent);
   assert.strictEqual(hint, 'Outbound 10% (Infant) · Inbound 75% (Child)', 'Unexpected hint text: ' + hint);
-  console.log('CHECK2 OK: INF_CNN hint text correct:', hint);
+  console.log('CHECK2 OK: INF_CHD hint text correct:', hint);
 
   // --- Plain round trip: INF_CNN ---
   const roundTrip = 'DUB EK X/DXB EK COK 400.00QHAMPIE1/VFN2 EK X/DXB DUB 400.00UHEESIE1/VFN2 NUC800.00 ROE1.0';

@@ -248,7 +248,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
   // =========================================================================
   console.log('--- PHASE 1: Rapid Checkbox Permutation Matrix on Built-in Tabs ---');
 
-  const tabsToTest = ['ADT', 'CNN', 'INF', 'INF_CNN', 'CNN_ADT'];
+  const tabsToTest = ['ADT', 'CHD', 'INF', 'INF_CHD', 'CHD_ADT'];
   const checkboxes = [
     '#applyK3OnYQ',
     '#applyK3OnFareDiff',
@@ -508,7 +508,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
 
   // Quickly switch to CNN within 30ms (well inside the 300ms debounce timer)
   await page.waitForTimeout(30);
-  await safeClick('.ptc-tab[data-ptc="CNN"]');
+  await safeClick('.ptc-tab[data-ptc="CHD"], .ptc-tab[data-ptc="CNN"]');
 
   // Mutate CNN
   await page.fill('#oldFare', 'INR30000');
@@ -539,7 +539,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
   assert.strictEqual(adtFareDiff, 'INR25000', 'ADT fare diff must be accurately calculated (75000 - 50000 = 25000)');
 
   // Verify CNN tab isolation
-  await safeClick('.ptc-tab[data-ptc="CNN"]');
+  await safeClick('.ptc-tab[data-ptc="CHD"], .ptc-tab[data-ptc="CNN"]');
   const cnnOldFare = await page.inputValue('#oldFare');
   const cnnNewFare = await page.inputValue('#newFare');
   const cnnFareDiff = await page.inputValue('#fareDiff');
@@ -725,7 +725,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
   }
 
   // 3. Auto-Calculate to Child (CNN) with Unscaled Stopover Invariance
-  await safeClick('.ptc-tab[data-ptc="CNN"]');
+  await safeClick('.ptc-tab[data-ptc="CHD"], .ptc-tab[data-ptc="CNN"]');
   await page.waitForTimeout(50);
   const isAutoCalcChecked = await page.isChecked('#autoCalcFromAdult');
   if (!isAutoCalcChecked) {
@@ -911,7 +911,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
   await page.click('#qCorrectionApplyBtn');
   await page.waitForTimeout(200);
 
-  await safeClick('.ptc-tab[data-ptc="CNN"]');
+  await safeClick('.ptc-tab[data-ptc="CHD"], .ptc-tab[data-ptc="CNN"]');
   await page.waitForTimeout(80);
   if (await page.isChecked('#halveFareComponents')) {
     await page.uncheck('#halveFareComponents');

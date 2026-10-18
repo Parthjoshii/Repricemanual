@@ -163,6 +163,7 @@ const els = {
   nucValidation: byId('nucValidation'),
   roe: byId('roe'),
   baseFare: byId('baseFare'),
+  baseFareRoundPrompt: byId('baseFareRoundPrompt'),
   parserToggleBtn: byId('parserToggleBtn'),
   parserCollapsible: byId('parserCollapsible'),
   ptcTabs: document.querySelector('.ptc-tabs'),
@@ -357,29 +358,41 @@ function showQCorrectionModal(detection) {
 // The first BUILT_IN_PTC_COUNT codes are the fixed built-in tabs; anything beyond that is a
 // user-added custom tab (see addCustomTab/renameCustomTab/removeCustomTab), capped at
 // MAX_CUSTOM_PTC_TABS.
-const PTC_CODES = ['ADT', 'CNN', 'INF', 'INF_CNN', 'CNN_ADT'];
+function normalizePtc(ptc) {
+  if (ptc === 'CNN') return 'CHD';
+  if (ptc === 'INF_CNN') return 'INF_CHD';
+  if (ptc === 'CNN_ADT') return 'CHD_ADT';
+  return ptc;
+}
+
+const PTC_CODES = ['ADT', 'CHD', 'INF', 'INF_CHD', 'CHD_ADT'];
 const BUILT_IN_PTC_COUNT = 5;
 const MAX_CUSTOM_PTC_TABS = 2;
 // Declared here (not near the summary-table code that mainly reads it) so it's available to
 // loadStateFromStorage()/syncAutoCalcUI(), both of which can run before the script has finished
 // its top-to-bottom pass — a `const` further down the file would still be in its temporal dead
 // zone at that point and throw a ReferenceError.
-const PTC_LABELS = { ADT: 'Adult', CNN: 'Child', INF: 'Infant', INF_CNN: 'Infant/Child', CNN_ADT: 'Child/Adult' };
+const PTC_LABELS = { ADT: 'Adult', CHD: 'Child', INF: 'Infant', INF_CHD: 'Infant to Child', CHD_ADT: 'Child to Adult' };
+const PTC_TABLE_LABELS = { ADT: 'Adult', CHD: 'Child', INF: 'Infant', INF_CHD: 'Infant/Child', CHD_ADT: 'Child/Adult' };
 
-// CNN/INF Fare Calculation Strings can be auto-derived from the validated ADT string by scaling
+// CHD/INF Fare Calculation Strings can be auto-derived from the validated ADT string by scaling
 // fare/surcharge amounts by these percentages and forcing this pax-type suffix onto fare basis codes.
-const PTC_AUTO_CALC_PERCENT = { CNN: 0.75, INF: 0.10 };
-const PTC_FARE_BASIS_SUFFIX = { CNN: 'CH', INF: 'IN' };
+const PTC_AUTO_CALC_PERCENT = { CHD: 0.75, INF: 0.10, CNN: 0.75 };
+const PTC_FARE_BASIS_SUFFIX = { CHD: 'CH', INF: 'IN', CNN: 'CH' };
 
 // Hybrid age-transition tabs: a passenger who ages up mid-journey (e.g. an infant turning 2
 // between outbound and return) prices the outbound leg at one PTC's rate and the inbound leg at
 // another's. Ratios/suffixes are keyed by leg rather than a single flat value like the map above.
 const PTC_HYBRID_RATIOS = {
+  INF_CHD: { outbound: 0.10, inbound: 0.75 },
+  CHD_ADT: { outbound: 0.75, inbound: 1.00 },
   INF_CNN: { outbound: 0.10, inbound: 0.75 },
   CNN_ADT: { outbound: 0.75, inbound: 1.00 },
 };
 // '' suffix = strip any existing CH/IN suffix (Adult fare basis codes carry none).
 const PTC_HYBRID_SUFFIX = {
+  INF_CHD: { outbound: 'IN', inbound: 'CH' },
+  CHD_ADT: { outbound: 'CH', inbound: '' },
   INF_CNN: { outbound: 'IN', inbound: 'CH' },
   CNN_ADT: { outbound: 'CH', inbound: '' },
 };
@@ -492,6 +505,7 @@ function restorePtc(snapshot) {
   els.nucValidation.innerHTML = snapshot.nucValidationHtml || '';
   els.roe.textContent = snapshot.roeText || '';
   els.baseFare.textContent = snapshot.baseFareText || '';
+  updateBaseFareRoundPrompt(els.currency.value);
   updateFareComponentDetector();
   const hasOld = (els.oldFare.value || '').trim() !== '';
   const hasNew = (els.newFare.value || '').trim() !== '';
@@ -522,8 +536,32 @@ function getActivePtcCodes() {
 }
 
 function ptcTabButton(code) {
-  return els.ptcTabs.querySelector(`.ptc-tab[data-ptc="${code}"]`);
+  const norm = normalizePtc(code);
+  return els.ptcTabs.querySelector(`.ptc-tab[data-ptc="${norm}"]`) ||
+         els.ptcTabs.querySelector(`.ptc-tab[data-ptc-alias="${code}"]`) ||
+         els.ptcTabs.querySelector(`.ptc-tab[data-ptc="${code}"]`);
 }
+
+function updateGliderPosition(immediate = false) {
+  const glider = document.querySelector('.tab-glider');
+  if (!glider) return;
+  const activeBtn = document.querySelector(`.ptc-tab[data-ptc="${state.activePtc}"]`) ||
+                    document.querySelector('.ptc-tab[aria-selected="true"]');
+  if (!activeBtn) return;
+
+  if (immediate) {
+    const prevTransition = glider.style.transition;
+    glider.style.transition = 'none';
+    glider.style.transform = `translateX(${activeBtn.offsetLeft}px)`;
+    glider.style.width = `${activeBtn.offsetWidth}px`;
+    glider.offsetHeight; // force reflow
+    glider.style.transition = prevTransition;
+  } else {
+    glider.style.transform = `translateX(${activeBtn.offsetLeft}px)`;
+    glider.style.width = `${activeBtn.offsetWidth}px`;
+  }
+}
+window.addEventListener('resize', () => updateGliderPosition(true));
 
 function updatePtcTabUI() {
   PTC_CODES.forEach(ptc => {
@@ -531,12 +569,18 @@ function updatePtcTabUI() {
     if (!btn) return;
     const isActive = ptc === state.activePtc;
     btn.setAttribute('aria-selected', String(isActive));
-    btn.classList.toggle('has-data', hasPtcData(ptc));
-    btn.classList.toggle('dirty', !!state.ptcData[ptc].dirty);
+    const hasData = Boolean(hasPtcData(ptc));
+    const isDirty = Boolean(state.ptcData[ptc]?.dirty);
+    const isInSummary = Boolean(state.isSummaryGenerated && state.summarisedPtcs?.has(ptc) && hasData && !isDirty);
+
+    btn.classList.toggle('has-data', hasData);
+    btn.classList.toggle('dirty', isDirty);
+    btn.classList.toggle('in-summary', isInSummary);
   });
   const customCount = PTC_CODES.length - BUILT_IN_PTC_COUNT;
   els.ptcAddTabButton.hidden = customCount >= MAX_CUSTOM_PTC_TABS;
   syncAutoCalcUI();
+  updateGliderPosition();
   saveStateToStorage();
 }
 
@@ -619,10 +663,26 @@ function restoreSession() {
   if (!saved) return;
 
   PTC_CODES.length = 0;
-  saved.ptcCodes.forEach(code => PTC_CODES.push(code));
+  saved.ptcCodes.forEach(code => PTC_CODES.push(normalizePtc(code)));
   Object.keys(PTC_LABELS).forEach(key => delete PTC_LABELS[key]);
-  Object.assign(PTC_LABELS, saved.ptcLabels || {});
-  state.ptcData = saved.ptcData;
+  Object.assign(PTC_LABELS, { ADT: 'Adult', CHD: 'Child', INF: 'Infant', INF_CHD: 'Infant to Child', CHD_ADT: 'Child to Adult' });
+  if (saved.ptcLabels) {
+    Object.keys(saved.ptcLabels).forEach(key => {
+      PTC_LABELS[normalizePtc(key)] = saved.ptcLabels[key];
+    });
+  }
+  state.ptcData = {
+    ADT: { formSnapshot: null, summaryData: null, dirty: false },
+    CHD: { formSnapshot: null, summaryData: null, dirty: false },
+    INF: { formSnapshot: null, summaryData: null, dirty: false },
+    INF_CHD: { formSnapshot: null, summaryData: null, dirty: false },
+    CHD_ADT: { formSnapshot: null, summaryData: null, dirty: false },
+  };
+  if (saved.ptcData) {
+    Object.keys(saved.ptcData).forEach(key => {
+      state.ptcData[normalizePtc(key)] = saved.ptcData[key];
+    });
+  }
   state.adtParsedFareCalc = saved.adtParsedFareCalc || null;
 
   PTC_CODES.slice(BUILT_IN_PTC_COUNT).forEach(code => {
@@ -631,13 +691,15 @@ function restoreSession() {
     els.ptcAddTabButton.insertAdjacentElement('beforebegin', btn);
   });
 
-  state.activePtc = PTC_CODES.includes(saved.activePtc) ? saved.activePtc : 'ADT';
+  const restoredActive = normalizePtc(saved.activePtc);
+  state.activePtc = PTC_CODES.includes(restoredActive) ? restoredActive : 'ADT';
   restorePtc(state.ptcData[state.activePtc]?.formSnapshot || defaultPtcSnapshot());
 
   hideRestoreBanner();
   sessionCanRestore = false;
   suppressAutoSave = false;
   updatePtcTabUI();
+  updateGliderPosition(true);
 
   // If summary data was previously computed, restore the summary table
   try {
@@ -707,7 +769,7 @@ window.addEventListener('beforeunload', () => {
   saveStateToStorage();
 });
 
-// The "Auto-calculate from Adult" toggle applies to CNN/INF (single ratio) and INF_CNN/CNN_ADT
+// The "Auto-calculate from Adult" toggle applies to CHD/INF (single ratio) and INF_CHD/CHD_ADT
 // (hybrid, two ratios): shows/hides its row, keeps the Fare Calculation String field/Convert
 // button locked while active, and shows a small split-percentage hint for the hybrid tabs only.
 function syncAutoCalcUI() {
@@ -728,7 +790,9 @@ function syncAutoCalcUI() {
 }
 
 function switchPtcTab(newPtc) {
+  newPtc = normalizePtc(newPtc);
   if (!PTC_CODES.includes(newPtc) || newPtc === state.activePtc) return;
+  removePendingPopovers();
   // Same staleness risk as Summarise: an edit still inside the debounce window would otherwise be
   // captured into formSnapshot's raw field value but never folded into summaryData for this tab.
   flushPendingCalculations();
@@ -858,6 +922,8 @@ async function removeCustomTab(code) {
 }
 
 const state = {
+  isSummaryGenerated: false,
+  summarisedPtcs: new Set(),
   lastTaxResult: null,
   lastFareK3Total: 0,
   lastFareCurrency: null,
@@ -884,10 +950,10 @@ const state = {
   activePtc: 'ADT',
   ptcData: {
     ADT: { formSnapshot: null, summaryData: null, dirty: false },
-    CNN: { formSnapshot: null, summaryData: null, dirty: false },
+    CHD: { formSnapshot: null, summaryData: null, dirty: false },
     INF: { formSnapshot: null, summaryData: null, dirty: false },
-    INF_CNN: { formSnapshot: null, summaryData: null, dirty: false },
-    CNN_ADT: { formSnapshot: null, summaryData: null, dirty: false },
+    INF_CHD: { formSnapshot: null, summaryData: null, dirty: false },
+    CHD_ADT: { formSnapshot: null, summaryData: null, dirty: false },
   },
   updateFareK3(currency, total, addTaxesStr) {
     this.lastFareCurrency = currency;
@@ -1024,11 +1090,20 @@ function validateTaxInputs() {
   els[id].addEventListener('input', debouncedCalculateFare);
 });
 
+function updateBulbVisibility() {
+  const hasOld = (els.oldFare?.value || '').trim() !== '';
+  const hasNew = (els.newFare?.value || '').trim() !== '';
+  const displayStyle = (hasOld && hasNew) ? 'inline-flex' : 'none';
+  if (els.fareDiffBulb) els.fareDiffBulb.style.display = displayStyle;
+  if (els.changeFeeBulb) els.changeFeeBulb.style.display = displayStyle;
+}
+
 ['oldFare', 'newFare'].forEach(id => {
   els[id].addEventListener('input', () => {
     if (state.ptcData[state.activePtc]) {
       state.ptcData[state.activePtc].manualFareDiff = false;
     }
+    updateBulbVisibility();
   });
 });
 
@@ -1065,6 +1140,7 @@ els.currency.addEventListener('change', () => {
   }
   state.clearFareCache();
   debouncedCalculateFare();
+  updateBaseFareRoundPrompt(els.currency.value);
 });
 els.cabin.addEventListener('change', () => {
   debouncedCalculateFare();
@@ -1111,6 +1187,7 @@ els.fareCalcString.addEventListener('input', () => {
   // Editing the Adult string without reconverting invalidates it as an auto-calc source.
   if (state.activePtc === 'ADT') {
     state.adtParsedFareCalc = null;
+    invalidateAutoCalcDependents();
   }
   state.lastVerifiedMisplacedString = null;
   updateFareComponentDetector();
@@ -1124,10 +1201,37 @@ els.autoCalcFromAdult.addEventListener('change', () => {
     applyAutoCalc(state.activePtc);
   } else {
     syncAutoCalcUI();
+    if (els.fareCalcString.value.trim() !== '' || state.ptcData[state.activePtc]?.summaryData) {
+      markTabDirty(state.activePtc);
+    }
   }
 });
 if (els.halveFareComponents) {
   els.halveFareComponents.addEventListener('change', handleHalveFareComponentsChange);
+}
+
+if (els.baseFareRoundPrompt) {
+  els.baseFareRoundPrompt.addEventListener('click', (e) => {
+    e.stopPropagation();
+    els.baseFareRoundPrompt.classList.toggle('active');
+  });
+
+  document.addEventListener('click', (e) => {
+    if (els.baseFareRoundPrompt && !els.baseFareRoundPrompt.contains(e.target)) {
+      els.baseFareRoundPrompt.classList.remove('active');
+    }
+  });
+
+  els.baseFareRoundPrompt.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      els.baseFareRoundPrompt.classList.remove('active');
+      els.baseFareRoundPrompt.blur();
+    } else if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      e.stopPropagation();
+      els.baseFareRoundPrompt.classList.toggle('active');
+    }
+  });
 }
 
 function showSummaryStaleNotice() {
@@ -1142,17 +1246,36 @@ function hideSummaryStaleNotice() {
   }
 }
 
-// Marks the active tab as having data entered that isn't reflected in its summary yet — cleared
+// Marks a tab as having data entered that isn't reflected in its summary yet — cleared
 // again wherever a fresh summaryData actually gets committed (see calculateFare()/calculateTaxes()).
 // Cheap by design (only touches the one affected tab button) since it runs on every keystroke.
-function markActiveTabDirty() {
-  const entry = state.ptcData[state.activePtc];
+function markTabDirty(ptc) {
+  const entry = state.ptcData[ptc];
   if (entry && !entry.dirty) {
     entry.dirty = true;
-    const btn = ptcTabButton(state.activePtc);
-    if (btn) btn.classList.add('dirty');
+    state.summarisedPtcs?.delete(ptc);
+    const btn = ptcTabButton(ptc);
+    if (btn) {
+      btn.classList.add('dirty');
+      btn.classList.remove('in-summary');
+    }
   }
   showSummaryStaleNotice();
+}
+
+function markActiveTabDirty() {
+  markTabDirty(state.activePtc);
+}
+
+function invalidateAutoCalcDependents() {
+  PTC_CODES.forEach(ptc => {
+    if (ptc === 'ADT' || !isAutoCalcEligible(ptc)) return;
+    const entry = state.ptcData[ptc];
+    const isAutoCalc = entry?.formSnapshot?.fields?.autoCalcFromAdult || (state.activePtc === ptc && els.autoCalcFromAdult.checked);
+    if (isAutoCalc && entry) {
+      markTabDirty(ptc);
+    }
+  });
 }
 
 // Clears the dirty flag for the active tab — called wherever a fresh summaryData actually gets
@@ -1358,6 +1481,7 @@ async function parseFareCalcString(options = {}) {
   // the latest Adult data.
   if (state.activePtc === 'ADT') {
     state.adtParsedFareCalc = state.lastConvertedFareCalcString;
+    invalidateAutoCalcDependents();
   }
 
   // Update active tab's summaryData with the converted fare calc string
@@ -1388,6 +1512,7 @@ async function parseFareCalcString(options = {}) {
   const baseFare = calculatedNuc * parsed.roe;
   const fareCurrency = els.currency.value || '';
   els.baseFare.textContent = fareCurrency ? formatAmount(baseFare, fareCurrency) : baseFare.toFixed(2);
+  updateBaseFareRoundPrompt(fareCurrency);
 
   // Show results
   els.parserResults.style.display = 'block';
@@ -1610,8 +1735,9 @@ function renderHalveComponentOptions(components) {
   }
 
   const currentMode = state.selectedHalveMode || 'all';
+  const allTitle = `All Components (${components.length})`;
   let html = `
-    <label class="halve-chip ${currentMode === 'all' ? 'active' : ''}">
+    <label class="halve-chip ${currentMode === 'all' ? 'active' : ''}" title="${escapeHtml(allTitle)}">
       <input type="radio" name="halveComponentChoice" value="all" ${currentMode === 'all' ? 'checked' : ''}>
       <span>All Components (${components.length})</span>
     </label>
@@ -1620,8 +1746,9 @@ function renderHalveComponentOptions(components) {
   components.forEach((comp, idx) => {
     const basis = comp.fareBasis + (comp.suffix || '') + (comp.designator || '');
     const isChecked = currentMode === String(idx);
+    const compLabel = `Component ${idx + 1}: ${comp.amount.toFixed(2)} (${basis})`;
     html += `
-      <label class="halve-chip ${isChecked ? 'active' : ''}">
+      <label class="halve-chip ${isChecked ? 'active' : ''}" title="${escapeHtml(compLabel)}">
         <input type="radio" name="halveComponentChoice" value="${idx}" ${isChecked ? 'checked' : ''}>
         <span>Component ${idx + 1}: ${comp.amount.toFixed(2)} (${basis})</span>
       </label>
@@ -1652,7 +1779,7 @@ function updateFareComponentDetector() {
   const count = parsed.fareComponents.length;
   if (count > 0 && els.fareComponentDetectorBadge) {
     els.fareComponentDetectorBadge.textContent = `${count} Component${count > 1 ? 's' : ''} Detected`;
-    els.fareComponentDetectorBadge.style.display = 'inline-block';
+    els.fareComponentDetectorBadge.style.display = 'inline-flex';
   } else if (els.fareComponentDetectorBadge) {
     els.fareComponentDetectorBadge.style.display = 'none';
   }
@@ -1700,6 +1827,13 @@ function handleHalveFareComponentsChange() {
   parseFareCalcString();
 }
 
+const BASE_FARE_ROUND_PROMPT_MSG = 'The calculated Base Fare (NUC × ROE) is a raw conversion. Check via ResConnect for correct Currency Rounding Rule & update the fare.';
+
+function updateBaseFareRoundPrompt() {
+  if (!els.baseFareRoundPrompt) return;
+  els.baseFareRoundPrompt.setAttribute('data-tooltip', BASE_FARE_ROUND_PROMPT_MSG);
+}
+
 function clearParser() {
   els.fareCalcString.value = '';
   els.parserResults.style.display = 'none';
@@ -1719,8 +1853,12 @@ function clearParser() {
   if (els.stopoverChargesSection) {
     els.stopoverChargesSection.style.display = 'none';
   }
+  if (els.baseFareRoundPrompt) {
+    els.baseFareRoundPrompt.classList.remove('active');
+  }
   if (state.activePtc === 'ADT') {
     state.adtParsedFareCalc = null;
+    invalidateAutoCalcDependents();
   }
 }
 
@@ -1979,6 +2117,19 @@ function applyAutoCalc(ptc, { silent = false } = {}) {
   if (warning) {
     showError(warning);
   }
+
+  // If this tab is not already cleanly part of the summary with this exact derived string,
+  // mark it dirty so its tab status indicator turns Amber and Copy Summary is safely guarded.
+  const isAlreadySummarised = Boolean(
+    state.isSummaryGenerated &&
+    state.summarisedPtcs?.has(ptc) &&
+    state.ptcData[ptc]?.summaryData?.convertedFareCalcString === derived &&
+    !state.ptcData[ptc]?.dirty
+  );
+
+  if (!isAlreadySummarised) {
+    markTabDirty(ptc);
+  }
 }
 
 function toggleParserSection() {
@@ -2053,7 +2204,10 @@ function mergeSummaryData(dataList) {
   }
   const numericKeys = ['oldFare', 'newFare', 'diff', 'k3Fare', 'k3Fee', 'k3OnYQ', 'fee', 'taxAdj', 'subTotal', 'pax'];
   const merged = { currency, baseCurrency, diffCurrency, feeCurrency, baseFeeCurrency, addTaxes: '', refundTaxes: '', convertedFareCalcString: '' };
-  numericKeys.forEach(key => { merged[key] = dataList.reduce((sum, d) => sum + (d[key] || 0), 0); });
+  numericKeys.forEach(key => {
+    const rawSum = dataList.reduce((sum, d) => sum + (d[key] || 0), 0);
+    merged[key] = key === 'pax' ? Math.round(rawSum) : round2(rawSum);
+  });
   merged.perPax = merged.pax > 0 ? merged.subTotal / merged.pax : merged.subTotal;
   merged.addTaxes = dataList.map(d => d.addTaxes).filter(Boolean).join('/');
   merged.refundTaxes = dataList.map(d => d.refundTaxes).filter(Boolean).join('/');
@@ -2062,6 +2216,7 @@ function mergeSummaryData(dataList) {
 }
 
 function handleSummarise() {
+  removePendingPopovers();
   // Flush any edit still sitting inside the 300ms auto-recalc debounce window — otherwise a field
   // edited immediately before clicking Summarise wouldn't be reflected in summaryData yet.
   flushPendingCalculations();
@@ -2111,6 +2266,7 @@ function handleSummarise() {
 
   if (activePtcs.length === 1) {
     renderSummary(breakdown[0].data, breakdown);
+    updatePtcTabUI();
     return;
   }
 
@@ -2120,6 +2276,7 @@ function handleSummarise() {
     return;
   }
   renderSummary(consolidated, breakdown);
+  updatePtcTabUI();
 }
 
 // Help icon click to show keyboard shortcuts
@@ -2259,8 +2416,8 @@ document.addEventListener('keydown', (e) => {
     }
   }
 
-  // Regular Enter key for calculation (only for fare fields, not tax fields)
-  if (!isAnyModalOpen && e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
+  // Regular Enter key for calculation (only for fare fields, not tax fields or buttons)
+  if (!isAnyModalOpen && e.key === 'Enter' && e.target.tagName !== 'TEXTAREA' && e.target.tagName !== 'BUTTON') {
     // Don't handle Enter if it's on tax fields (they have their own handlers)
     if (e.target.id === 'oldTax' || e.target.id === 'newTax') {
       return;
@@ -2560,10 +2717,10 @@ function getCurrentFareK3State(currencyOverride = null, diffOverride = null, fee
   if (k3Requested && cabin) {
     const rate = K3_RATES[cabin] ?? 0.05;
     if (applyFareDiffK3 && diff > 0) {
-      k3Fare = diff * rate;
+      k3Fare = round2(diff * rate);
     }
     if (applyChangeFeeK3 && feeAmount !== 0) {
-      k3Fee = feeAmount * rate;
+      k3Fee = round2(feeAmount * rate);
     }
   }
 
@@ -2596,7 +2753,7 @@ function calculateTaxes() {
     }
 
     // Check cache
-    const cacheKey = JSON.stringify({ oldText, newText, applyK3OnYQ: els.applyK3OnYQ.checked });
+    const cacheKey = JSON.stringify({ oldText, newText, applyK3OnYQ: els.applyK3OnYQ.checked, cabin: els.cabin.value });
     if (state.taxCalculationCache.has(cacheKey)) {
       const cachedResult = state.taxCalculationCache.get(cacheKey);
       renderTaxResult(cachedResult);
@@ -2648,16 +2805,16 @@ function calculateTaxes() {
       if (diff > 0) {
         const label = `${currency}${formatAmount(diff, currency)}${code}`;
         result.positiveTaxes.push(label);
-        result.posTotal += diff;
+        result.posTotal = round2(result.posTotal + diff);
       } else if (diff < 0) {
         const label = `-${currency}${formatAmount(Math.abs(diff), currency)}${code}`;
         result.negativeTaxes.push(label);
-        result.negTotal += diff;
+        result.negTotal = round2(result.negTotal + diff);
       }
     });
 
     result.currency = firstCurrency ?? newTaxData.currency ?? oldTaxData.currency ?? 'INR';
-    result.netTax = result.posTotal + result.negTotal;
+    result.netTax = round2(result.posTotal + result.negTotal);
 
     // Calculate K3 on positive YQ if checkbox is checked
     let k3OnYQ = 0;
@@ -2672,7 +2829,7 @@ function calculateTaxes() {
           // Calculate K3 based on cabin selection
           if (els.cabin.value) {
             const rate = K3_RATES[els.cabin.value] ?? 0.05;
-            k3OnYQ = yqAmount * rate;
+            k3OnYQ = round2(yqAmount * rate);
           } else {
             showError('Select cabin when K3 on YQ is requested.');
             // Calculation continues with k3OnYQ = 0
@@ -2863,6 +3020,7 @@ function clearTaxes() {
   state.lastSummaryData = null;
   state.ptcData[state.activePtc].summaryData = null;
   state.isSummaryGenerated = false;
+  state.summarisedPtcs?.clear();
   hideSummaryStaleNotice();
 
   const hasFare = (els.oldFare.value && els.newFare.value) || els.fareDiff.value.trim() !== '';
@@ -3042,7 +3200,7 @@ function calculateFare() {
   const feeWithK3 = feeAmount + k3Fee;
   const perPassenger = diff + feeWithK3 + netTaxWithK3;
   const roundedPerPassenger = parseFloat(formatAmount(perPassenger, currency)) || perPassenger;
-  const subTotal = roundedPerPassenger * passengerCount;
+  const subTotal = round2(roundedPerPassenger * passengerCount);
 
   els.taxAdj.value = `${currency}${formatAmount(netTaxWithK3, currency)}`;
   els.perPax.value = `${currency}${formatAmount(roundedPerPassenger, currency)}`;
@@ -3153,7 +3311,7 @@ function buildSummaryTable(breakdown, amountPayable) {
 
   breakdown.forEach(({ ptc }) => {
     const th = document.createElement('th');
-    th.textContent = PTC_LABELS[ptc] || ptc;
+    th.textContent = PTC_TABLE_LABELS[ptc] || PTC_LABELS[ptc] || ptc;
     headRow.appendChild(th);
   });
   thead.appendChild(headRow);
@@ -3191,7 +3349,7 @@ function buildSummaryTable(breakdown, amountPayable) {
   breakdown.forEach(({ ptc, data }) => {
     const tr = document.createElement('tr');
     const tdLabel = document.createElement('td');
-    tdLabel.innerHTML = `<b>Fare Calculation String ${PTC_LABELS[ptc] || ptc}</b>`;
+    tdLabel.innerHTML = `<b>Fare Calculation String ${PTC_TABLE_LABELS[ptc] || PTC_LABELS[ptc] || ptc}</b>`;
     const tdVal = document.createElement('td');
     tdVal.colSpan = valueColSpan;
     tdVal.textContent = data.convertedFareCalcString || '-';
@@ -3218,6 +3376,12 @@ function buildSummaryTable(breakdown, amountPayable) {
 // summaryData (same object as a single PTC's data when only one PTC is active).
 function renderSummary(data, breakdown) {
   state.isSummaryGenerated = true;
+  state.summarisedPtcs = new Set(breakdown.map(b => b.ptc));
+  breakdown.forEach(b => {
+    if (state.ptcData[b.ptc]) {
+      state.ptcData[b.ptc].dirty = false;
+    }
+  });
   hideSummaryStaleNotice();
 
   // Show summary content
@@ -3260,6 +3424,7 @@ function clearFare() {
   els.gdsString.value = '';
   els.summaryContent.style.display = 'none';
   state.isSummaryGenerated = false;
+  state.summarisedPtcs?.clear();
   hideSummaryStaleNotice();
   // Preserve tax values when clearing fare only
   state.updateFareK3(null, 0, '');
@@ -3316,7 +3481,87 @@ function buildSummaryHtmlForClipboard(tables) {
   return tableHtml;
 }
 
+let pendingPopoverDismissTimer = null;
+
+function removePendingPopovers() {
+  document.querySelectorAll('.tab-pending-popover').forEach(el => el.remove());
+  els.summariseButton?.classList.remove('summarise-highlight-pulse');
+  if (pendingPopoverDismissTimer) {
+    clearTimeout(pendingPopoverDismissTimer);
+    pendingPopoverDismissTimer = null;
+  }
+}
+
+function showPendingTabPopover(ptc) {
+  removePendingPopovers();
+  const btn = ptcTabButton(ptc);
+  if (!btn) return;
+
+  btn.scrollIntoView({ behavior: 'auto', block: 'nearest', inline: 'nearest' });
+
+  const pop = document.createElement('div');
+  pop.className = 'tab-pending-popover';
+  pop.setAttribute('role', 'alert');
+  pop.innerHTML = `
+    <span style="color: #f59e0b; font-size: 0.85rem; line-height: 1;">⚠️</span>
+    <span>Inputs modified — Click <strong>Summarise</strong></span>
+  `;
+
+  document.body.appendChild(pop);
+
+  const rect = btn.getBoundingClientRect();
+  const popWidth = pop.offsetWidth || 215;
+  const popHeight = pop.offsetHeight || 30;
+  const viewportWidth = document.documentElement.clientWidth;
+  const padding = 16;
+
+  // Horizontal smart clamping: ensures popover never overflows viewport edges (e.g. on first tab ADT)
+  const btnCenterX = rect.left + (rect.width / 2);
+  const minCenterX = padding + (popWidth / 2);
+  const maxCenterX = viewportWidth - padding - (popWidth / 2);
+  const clampedCenterX = Math.max(minCenterX, Math.min(btnCenterX, maxCenterX));
+
+  // Dynamic arrow offset so the pointer triangle still points directly at the tab center
+  const arrowOffset = btnCenterX - clampedCenterX;
+  const maxArrowOffset = (popWidth / 2) - 16;
+  const clampedArrowOffset = Math.max(-maxArrowOffset, Math.min(arrowOffset, maxArrowOffset));
+
+  pop.style.left = `${window.scrollX + clampedCenterX}px`;
+  pop.style.setProperty('--arrow-offset', `${clampedArrowOffset}px`);
+
+  // Vertical placement: place above tab, or below if near top of viewport
+  if (rect.top - popHeight - 10 < 10) {
+    pop.classList.add('popover-below');
+    pop.style.top = `${window.scrollY + rect.bottom + 8}px`;
+  } else {
+    pop.classList.remove('popover-below');
+    pop.style.top = `${window.scrollY + rect.top - 8}px`;
+  }
+
+  els.summariseButton?.classList.add('summarise-highlight-pulse');
+
+  pendingPopoverDismissTimer = setTimeout(removePendingPopovers, 5000);
+}
+
+document.addEventListener('click', (e) => {
+  if (e.target.closest && (e.target.closest('#copySummaryButton') || e.target.closest('.tab-pending-popover'))) return;
+  removePendingPopovers();
+});
+
 function copySummaryTable() {
+  const pendingPtcs = PTC_CODES.filter(ptc => {
+    const hasData = hasPtcData(ptc);
+    const isDirty = Boolean(state.ptcData[ptc]?.dirty);
+    const isInSummary = Boolean(state.isSummaryGenerated && state.summarisedPtcs?.has(ptc) && hasData && !isDirty);
+    return isDirty || (hasData && !isInSummary);
+  });
+
+  if (pendingPtcs.length > 0) {
+    const targetPtc = pendingPtcs.includes(state.activePtc) ? state.activePtc : pendingPtcs[0];
+    showPendingTabPopover(targetPtc);
+    return;
+  }
+
   const tables = els.summary.querySelectorAll('table');
   if (tables.length === 0) {
     showError('No summary to copy.');
@@ -3436,3 +3681,18 @@ function copyGdsString() {
 loadTheme();
 initSessionRestore();
 updatePtcTabUI();
+updateGliderPosition(true);
+
+window.addEventListener('resize', () => updateGliderPosition(true));
+if (window.ResizeObserver && els.ptcTabs) {
+  let lastTabsWidth = els.ptcTabs.offsetWidth;
+  new ResizeObserver((entries) => {
+    for (const entry of entries) {
+      const currentWidth = entry.contentRect.width;
+      if (Math.abs(currentWidth - lastTabsWidth) > 1) {
+        lastTabsWidth = currentWidth;
+        updateGliderPosition(true);
+      }
+    }
+  }).observe(els.ptcTabs);
+}

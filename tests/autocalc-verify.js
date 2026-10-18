@@ -21,7 +21,7 @@ let browser;
   console.log('CHECK1 OK: auto-calc row hidden on ADT tab');
 
   // Toggle ON before ADT validated -> should error and revert
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(100);
   const cnnRowVisible = await page.isVisible('#autoCalcFromAdultRow');
   assert.strictEqual(cnnRowVisible, true, 'Auto-calc row should be visible on CNN tab');
@@ -46,7 +46,7 @@ let browser;
   assert.ok(nucValidationAdt.includes('PASS'), 'ADT string should validate PASS');
 
   // Switch to CNN, toggle ON
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(100);
   await page.check('#autoCalcFromAdult');
   await page.waitForTimeout(150);
@@ -86,7 +86,7 @@ let browser;
   console.log('CHECK5 OK: toggling OFF re-enables editing, retains last derived value');
 
   // Switch back to CNN -> should still show its own derived value (per-tab state preserved)
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(100);
   const cnnFieldValueAgain = await page.inputValue('#fareCalcString');
   assert.strictEqual(cnnFieldValueAgain, cnnFieldValue, 'CNN tab should retain its own derived value on switch-back');
@@ -99,7 +99,7 @@ let browser;
   await page.waitForTimeout(100);
   await page.fill('#fareCalcString', 'BOM EK DXB Q10.00 500.00TLEEPIN1/NDC2 NUC510.00 ROE1.0');
   await page.waitForTimeout(100);
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(150);
   const cnnFieldAfterStaleAdtEdit = await page.inputValue('#fareCalcString');
   console.log('CNN field after ADT edited-but-not-reconverted, then switched to CNN:', cnnFieldAfterStaleAdtEdit);
@@ -111,7 +111,7 @@ let browser;
   await page.waitForTimeout(100);
   await page.click('#parseButton');
   await page.waitForTimeout(150);
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(150);
   const cnnFieldAfterReconvert = await page.inputValue('#fareCalcString');
   console.log('CNN field after ADT reconverted to 500 and switching back:', cnnFieldAfterReconvert);

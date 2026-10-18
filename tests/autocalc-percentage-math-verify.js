@@ -42,7 +42,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
   await page.waitForTimeout(150);
   assert.ok((await page.textContent('#nucValidation')).includes('PASS'), 'ADT source string should itself validate PASS before deriving from it');
 
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(100);
   await page.check('#autoCalcFromAdult');
   await page.waitForTimeout(150);

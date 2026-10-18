@@ -32,7 +32,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
 
   // --- One-way fare (1 primary fare component) -> fallback to whole-string-at-outbound-rate ---
   await setAdtString('BOM EK DXB 300.00TLEEPIN1/NDC2 NUC300.00 ROE1.0');
-  await page.click('#ptcTabCNN_ADT'); // CNN/ADT hybrid tab: outbound 75% (CH), inbound 100% (no suffix)
+  await page.click('#ptcTabCHD_ADT, #ptcTabCNN_ADT'); // CNN/ADT hybrid tab: outbound 75% (CH), inbound 100% (no suffix)
   await page.waitForTimeout(100);
   await page.check('#autoCalcFromAdult');
   await page.waitForTimeout(150);
@@ -54,7 +54,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
 
   // --- Three-leg fare (3 primary fare components) -> same fallback ---
   await setAdtString('BOM EK DXB 300.00TLEEPIN1/NDC2 EK DXB 100.00TLEEPIN1/NDC2 EK BOM 50.00TLEEPIN1/NDC2 NUC450.00 ROE1.0');
-  await page.click('#ptcTabCNN_ADT');
+  await page.click('#ptcTabCHD_ADT, #ptcTabCNN_ADT');
   await page.waitForTimeout(100);
   // autoCalcFromAdult is already checked from before switching away — switching tabs re-derives
   // automatically (applyAutoCalc silent re-run), so no need to re-check it here.
@@ -71,7 +71,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
 
   // --- A normal exactly-2-component string should NOT trigger the fallback warning ---
   await setAdtString('BOM EK DXB 300.00TLEEPIN1/NDC2 EK BOM 200.00TLEEPIN1/NDC2 NUC500.00 ROE1.0');
-  await page.click('#ptcTabCNN_ADT');
+  await page.click('#ptcTabCHD_ADT, #ptcTabCNN_ADT');
   await page.waitForTimeout(150);
   const warningVisible3 = await page.isVisible('#errorModal.show');
   assert.strictEqual(warningVisible3, false, 'A normal 2-component round-trip string should NOT trigger the fallback warning');

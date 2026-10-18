@@ -256,7 +256,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
   try {
     // 1. ADT is already populated. Switch to CNN tab.
     stateTransitions.push({ action: 'Switch to CNN Tab', timestamp: new Date().toISOString() });
-    await page.click('#ptcTabCNN');
+    await page.click('#ptcTabCHD, #ptcTabCNN');
     await page.waitForTimeout(300);
 
     // Enter CNN fares in USD and manual INR conversion

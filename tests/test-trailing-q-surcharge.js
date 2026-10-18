@@ -173,7 +173,7 @@ const assert = require('assert');
   await page.waitForTimeout(200);
 
   // Switch to CNN
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(200);
 
   // Enable Auto-calculate from Adult

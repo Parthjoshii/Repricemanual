@@ -64,7 +64,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
   // edit, switch back, and the edit should have made it into the tab's own stored data. ---
   await page.fill('#oldFare', '1000');
   await page.fill('#newFare', '2000'); // no wait
-  await page.click('#ptcTabCNN'); // switch away immediately — exercises the same flush in switchPtcTab()
+  await page.click('#ptcTabCHD, #ptcTabCNN'); // switch away immediately — exercises the same flush in switchPtcTab()
   await page.waitForTimeout(100);
   await page.click('#ptcTabADT');
   await page.waitForTimeout(100);

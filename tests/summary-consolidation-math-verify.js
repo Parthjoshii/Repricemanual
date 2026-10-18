@@ -70,7 +70,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
     await page.waitForTimeout(150);
   }
   await fillPtc('1000', '1300', '1'); // ADT: diff 300
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(100);
   await fillPtc('500', '650', '2'); // CNN: diff 150 * 2 pax = 300
   await page.click('#ptcTabINF');

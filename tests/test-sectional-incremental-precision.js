@@ -53,7 +53,7 @@ const CURRENCIES = [
 
 const CABINS = ['economy', 'premium', 'business', 'first'];
 const CABIN_RATES = { economy: 0.05, premium: 0.18, business: 0.18, first: 0.18 };
-const TABS = ['ADT', 'CNN', 'INF', 'INF_CNN', 'CNN_ADT'];
+const TABS = ['ADT', 'CHD', 'INF', 'INF_CHD', 'CHD_ADT'];
 
 function roundVal(amount, currRule) {
   if (isNaN(amount) || amount === 0) return 0;

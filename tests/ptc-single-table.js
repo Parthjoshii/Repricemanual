@@ -41,7 +41,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
   console.log('CHECK1 OK: single PTC -> one table, columns [\'Booking class\', Adult], no Total column');
 
   // --- 2 PTCs ---
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(100);
   await fillPtc('500', '550', 'USD10YQ', 'USD15YQ');
   await page.click('#summariseButton');

@@ -55,7 +55,7 @@ let browser;
   console.log('CHECK1 OK: re-converting the fare calc string after an initial Summarise now updates the summary table');
 
   // --- Bug 1 reverse order: convert BEFORE calculating fare at all (fresh PTC tab) ---
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(100);
   const stringC = 'BOM EK DXB 500.00TLEEPIN1/NDC2 NUC500.00 ROE1.0';
   await page.fill('#fareCalcString', stringC);

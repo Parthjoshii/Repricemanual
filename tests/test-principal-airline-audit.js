@@ -147,7 +147,7 @@ const assert = require('assert');
   // =========================================================================
   console.log('--- Case 4: Hybrid Pax Journey (CNN_ADT Outbound Child, Inbound Adult) ---');
   // First, parse and validate the Adult fare calculation string on ADT tab
-  await page.click('.ptc-tab:has-text("ADT")');
+  await page.click('.ptc-tab[data-ptc="ADT"], .ptc-tab:has-text("Adult"), .ptc-tab:has-text("ADT")');
   await page.waitForTimeout(200);
 
   const adultHybridSource = 'DUB EK X/DXB EK COK Q DUBCOK58.47Q DUBCOK18.82 470.74QHAMPIE1/VFN2 EK X/DXB EK DUB Q COKDUB58.47Q COKDUB23.41 585.36UHEESIE1/VFN2 NUC1215.27END ROE0.855028';
@@ -155,8 +155,8 @@ const assert = require('assert');
   await page.click('#parseButton');
   await page.waitForTimeout(200);
 
-  // Switch to CNN/ADT tab and enable Auto-calculate from Adult
-  const tabSelector = '.ptc-tab:has-text("CNN/ADT"), .ptc-tab:has-text("CNN_ADT")';
+  // Switch to CHD/ADT (or CNN/ADT) tab and enable Auto-calculate from Adult
+  const tabSelector = '#ptcTabCHD_ADT, #ptcTabCNN_ADT, .ptc-tab[data-ptc="CHD_ADT"], .ptc-tab:has-text("Child to Adult"), .ptc-tab:has-text("CHD/ADT"), .ptc-tab:has-text("CNN/ADT")';
   await page.click(tabSelector);
   await page.waitForTimeout(200);
 
@@ -194,7 +194,7 @@ const assert = require('assert');
   // =========================================================================
   console.log('--- Case 5: Three-Decimal Currency Exchange (KWD) ---');
   // Switch back to ADT tab
-  await page.click('.ptc-tab:has-text("ADT")');
+  await page.click('.ptc-tab[data-ptc="ADT"], .ptc-tab:has-text("Adult"), .ptc-tab:has-text("ADT")');
   await page.waitForTimeout(200);
 
   await page.selectOption('#currency', 'KWD');

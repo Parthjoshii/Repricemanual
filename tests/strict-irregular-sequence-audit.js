@@ -253,7 +253,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
   console.log('\n--- SCENARIO 7: Multi-PTC Tab Switching & Dynamic Consolidation ---');
   // ADT has USD 100 diff
   // Switch to CNN
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(150);
   await page.selectOption('#currency', 'USD');
   await page.selectOption('#cabin', 'economy');

@@ -29,6 +29,7 @@ node tests/run-all-tests.js math
 ### 1. Master Audits, Sectional Precision & Chaos Fuzzing
 | Script | Covers |
 |---|---|
+| `master-system-audit.js` | **Master Zero-Defect System Audit**: Single-file comprehensive test suite spanning all 5 modules (Math & Currency, GDS Linear Parser, Tab State Isolation, UI/UX Geometry & Zero-Flash Paint Pipeline with tab glider transit & stacking invariance, and 200-step Extreme Chaos Fuzzing) |
 | `test-sectional-incremental-precision.js` | High-scale (250+ steps) systematic sectional precision: pure taxes isolation, fare calc strings, direct fares & cabin K3, cross-tab zig-zag, with automated root-cause failure analyzer |
 | `test-extreme-chaos-fuzzing.js` | 6-phase property-based fuzzing: rapid checkbox matrix across all tabs, 250+ seeded chaotic actions, zig-zag switching, stopovers, selective halve chips, trailing Q syntax modal, summary & GDS consolidation |
 | `test-principal-airline-audit.js` | Real-world airline reissue audit across Air India, Emirates, and British Airways itineraries |

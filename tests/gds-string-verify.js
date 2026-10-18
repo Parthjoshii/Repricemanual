@@ -74,7 +74,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
   await page.click('#fareCalcButton');
   await page.waitForTimeout(150);
 
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(100);
   await page.selectOption('#currency', 'USD');
   await page.fill('#oldFare', '500');

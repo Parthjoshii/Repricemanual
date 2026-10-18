@@ -35,15 +35,15 @@ let browser;
   await page.click('#fareCalcButton');
   await page.waitForTimeout(150);
 
-  // Switch to CNN and leave a fare-calc string there
-  await page.click('#ptcTabCNN');
+  // Switch to Child tab and leave a fare-calc string there
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(100);
   const cnnString = 'BOM EK DXB 300.00TLEEPIN1CH/NDC2 NUC300.00 ROE1.0';
   await page.fill('#fareCalcString', cnnString);
   await page.click('#parseButton');
   await page.waitForTimeout(150);
 
-  // Stay on CNN as the active tab, then reload the page (new page, same storage/context).
+  // Stay on Child as the active tab, then reload the page (new page, same storage/context).
   // Restoration is trigger-based, not automatic (see restore-trigger-verify.js for that
   // behavior in detail) — click "Restore Previous Session" before asserting anything restored.
   await page.waitForTimeout(150);
@@ -56,9 +56,9 @@ let browser;
 
   const errorsAfterReload = [...errors];
 
-  // Active tab should still be CNN
+  // Active tab should still be CHD (or CNN alias)
   const activeTab = await page.getAttribute('.ptc-tab[aria-selected="true"]', 'data-ptc');
-  assert.strictEqual(activeTab, 'CNN', 'Active tab should be restored to CNN: ' + activeTab);
+  assert.ok(activeTab === 'CHD' || activeTab === 'CNN', 'Active tab should be restored to CHD/CNN: ' + activeTab);
   const cnnFieldValue = await page.inputValue('#fareCalcString');
   assert.strictEqual(cnnFieldValue, cnnString, 'CNN fare calc string should survive reload');
   console.log('CHECK1 OK: active tab and its live field values restored after reload');

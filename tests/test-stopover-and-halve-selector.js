@@ -63,7 +63,7 @@ const assert = require('assert');
   // TEST 2: Stopovers Unscaled During Auto-Calculate from Adult
   // -------------------------------------------------------------------------
   console.log('\n--- TEST 2: Auto-Calculate to Child (CNN) with Unscaled Stopovers ---');
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(150);
 
   // Check Auto-calculate from Adult

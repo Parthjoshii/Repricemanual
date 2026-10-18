@@ -26,7 +26,10 @@ let browser;
   };
 
   const enableAutoCalc = async (ptc) => {
-    await page.click(`#ptcTab${ptc}`);
+    const sel = ptc === 'INF_CNN' || ptc === 'INF_CHD' ? '#ptcTabINF_CHD, #ptcTabINF_CNN' :
+                ptc === 'CNN_ADT' || ptc === 'CHD_ADT' ? '#ptcTabCHD_ADT, #ptcTabCNN_ADT' :
+                ptc === 'CNN' || ptc === 'CHD' ? '#ptcTabCHD, #ptcTabCNN' : `#ptcTab${ptc}`;
+    await page.click(sel);
     await page.waitForTimeout(120);
     const checked = await page.isChecked('#autoCalcFromAdult');
     if (!checked) {

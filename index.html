@@ -30,11 +30,23 @@ Changes in V4.6 (Bug Fix Release):
 -->
 
 <!DOCTYPE html>
-<html lang="en" data-theme="light">
+<html lang="en">
 
 <head>
   <meta charset="UTF-8" />
+  <script>
+    (function () {
+      try {
+        var savedTheme = localStorage.getItem('theme') || 'light';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+      } catch (e) {
+        document.documentElement.setAttribute('data-theme', 'light');
+      }
+    })();
+  </script>
   <title>Fare + Tax Master Calculator</title>
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="alternate icon" type="image/png" href="favicon.svg">
   <link rel="stylesheet" href="styles.css">
 </head>
 
@@ -70,7 +82,20 @@ Changes in V4.6 (Bug Fix Release):
         </span>
       </span>
     </button>
-    <button id="helpIcon" class="help-icon" type="button" aria-label="Show keyboard shortcuts">⌨️</button>
+    <button id="helpIcon" class="help-icon" type="button" aria-label="Show keyboard shortcuts" title="Keyboard shortcuts (Ctrl+?)">
+      <svg class="keyboard-svg" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <rect x="2" y="4" width="20" height="16" rx="2.5" ry="2.5"></rect>
+        <line x1="6" y1="8" x2="6.01" y2="8"></line>
+        <line x1="10" y1="8" x2="10.01" y2="8"></line>
+        <line x1="14" y1="8" x2="14.01" y2="8"></line>
+        <line x1="18" y1="8" x2="18.01" y2="8"></line>
+        <line x1="6" y1="12" x2="6.01" y2="12"></line>
+        <line x1="10" y1="12" x2="10.01" y2="12"></line>
+        <line x1="14" y1="12" x2="14.01" y2="12"></line>
+        <line x1="18" y1="12" x2="18.01" y2="12"></line>
+        <line x1="7" y1="16" x2="17" y2="16"></line>
+      </svg>
+    </button>
   </div>
   <div id="errorModal" class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="modalMessage">
     <div class="modal-box error">
@@ -144,33 +169,35 @@ Changes in V4.6 (Bug Fix Release):
       <button type="button" id="dismissRestoreButton" class="secondary">Dismiss</button>
     </div>
   </div>
-  <div class="ptc-tabs" role="tablist" aria-label="Passenger Type">
-    <button type="button" class="ptc-tab" id="ptcTabADT" data-ptc="ADT" role="tab" aria-selected="true">ADT<span
+  <div class="calculator-workspace">
+    <div class="ptc-tabs" role="tablist" aria-label="Passenger Type">
+    <div class="tab-glider" aria-hidden="true"></div>
+    <button type="button" class="ptc-tab" id="ptcTabADT" data-ptc="ADT" role="tab" aria-selected="true"><span class="ptc-tab-label">Adult</span><span
         class="ptc-tab-dot" aria-hidden="true"></span></button>
-    <button type="button" class="ptc-tab" id="ptcTabCNN" data-ptc="CNN" role="tab" aria-selected="false">CNN<span
+    <button type="button" class="ptc-tab" id="ptcTabCHD" data-ptc="CHD" data-ptc-alias="CNN" role="tab" aria-selected="false"><span class="ptc-tab-label">Child</span><span
         class="ptc-tab-dot" aria-hidden="true"></span></button>
-    <button type="button" class="ptc-tab" id="ptcTabINF" data-ptc="INF" role="tab" aria-selected="false">INF<span
+    <button type="button" class="ptc-tab" id="ptcTabINF" data-ptc="INF" role="tab" aria-selected="false"><span class="ptc-tab-label">Infant</span><span
         class="ptc-tab-dot" aria-hidden="true"></span></button>
-    <button type="button" class="ptc-tab" id="ptcTabINF_CNN" data-ptc="INF_CNN" role="tab"
-      aria-selected="false">INF/CNN<span class="ptc-tab-dot" aria-hidden="true"></span></button>
-    <button type="button" class="ptc-tab" id="ptcTabCNN_ADT" data-ptc="CNN_ADT" role="tab"
-      aria-selected="false">CNN/ADT<span class="ptc-tab-dot" aria-hidden="true"></span></button>
-    <button type="button" class="ptc-add-tab" id="ptcAddTabButton" aria-label="Add custom passenger type tab">+</button>
+    <button type="button" class="ptc-tab" id="ptcTabINF_CHD" data-ptc="INF_CHD" data-ptc-alias="INF_CNN" role="tab"
+      aria-selected="false"><span class="ptc-tab-label">Infant to Child</span><span class="ptc-tab-dot" aria-hidden="true"></span></button>
+    <button type="button" class="ptc-tab" id="ptcTabCHD_ADT" data-ptc="CHD_ADT" data-ptc-alias="CNN_ADT" role="tab"
+      aria-selected="false"><span class="ptc-tab-label">Child to Adult</span><span class="ptc-tab-dot" aria-hidden="true"></span></button>
+    <button type="button" class="ptc-add-tab" id="ptcAddTabButton" aria-label="Add custom passenger type tab" title="Add custom passenger type (max 2)">+</button>
   </div>
   <div class="calculator-container">
     <div class="left-column">
       <section aria-labelledby="taxSectionHeading">
         <div class="section-header">
           <h2 id="taxSectionHeading">Tax Adjustment Calculator
-            <span class="info-guide-badge" tabindex="0" role="tooltip"
-              data-tooltip="Directly paste tax breakdown from E-ticket — Tax codes are automatically converted to required format"
-              aria-label="Tax Adjustment Help Guide">
-              <span class="badge-3d-icon">
-                <span class="badge-3d-inner">
-                  <span class="badge-question-mark">?</span>
-                </span>
-              </span>
-            </span>
+            <button type="button" class="minimal-help-btn info-guide-badge"
+              aria-label="Help: Tax Adjustment Calculator"
+              data-tooltip="Audits net differences between OLD and NEW ticket taxes. Automatically aggregates fuel surcharges (YQ/YR) and GST (K3).">
+              <svg class="help-monoline-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+            </button>
           </h2>
           <button class="toggle-btn" id="taxToggleBtn" type="button" aria-expanded="true"
             aria-controls="taxCollapsible">Hide</button>
@@ -188,9 +215,9 @@ Changes in V4.6 (Bug Fix Release):
                 <textarea id="newTax" placeholder="NEW TAX" aria-describedby="newTaxDesc"></textarea>
                 <span id="newTaxDesc" class="sr-only">Enter new tax amounts in format: INR100YQ or 100YQ</span>
               </div>
-              <div class="checkbox-cell checkbox-inline">
+              <div class="checkbox-cell checkbox-inline section-grid-full">
                 <input id="applyK3OnYQ" type="checkbox" aria-describedby="k3YQDescription">
-                <label for="applyK3OnYQ">Apply K3 on Positive YQ Tax</label>
+                <label for="applyK3OnYQ" class="k3-trigger-label">Apply K3 on Positive YQ Tax</label>
               </div>
               <span id="k3YQDescription" class="sr-only">Calculates K3 tax on the positive YQ fuel surcharge difference,
                 based on the selected cabin type.</span>
@@ -209,15 +236,15 @@ Changes in V4.6 (Bug Fix Release):
       <section aria-labelledby="parserSectionHeading">
         <div class="section-header">
           <h2 id="parserSectionHeading">Fare Calculation String Validator
-            <span class="info-guide-badge" tabindex="0" role="tooltip"
-              data-tooltip="Input fare components and surcharges for NEW fare — total NUC, ROE, and Base Fare are automatically calculated and validated."
-              aria-label="Fare Calculation Validator Help Guide">
-              <span class="badge-3d-icon">
-                <span class="badge-3d-inner">
-                  <span class="badge-question-mark">?</span>
-                </span>
-              </span>
-            </span>
+            <button type="button" class="minimal-help-btn info-guide-badge"
+              aria-label="Help: Fare Calculation String Validator"
+              data-tooltip="Validates linear GDS fare construction strings. Decodes city pairs, directional Q surcharges, cumulative NUC, and applicable IATA ROE.">
+              <svg class="help-monoline-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <circle cx="12" cy="12" r="10"></circle>
+                <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                <line x1="12" y1="17" x2="12.01" y2="17"></line>
+              </svg>
+            </button>
           </h2>
           <button class="toggle-btn" id="parserToggleBtn" type="button" aria-expanded="true"
             aria-controls="parserCollapsible">Hide</button>
@@ -226,9 +253,11 @@ Changes in V4.6 (Bug Fix Release):
           <div class="collapsible-inner">
             <div class="section-grid">
               <div class="section-grid-full">
-                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div class="fare-calc-header-row">
                   <label for="fareCalcString">Fare Calculation String</label>
-                  <span id="fareComponentDetectorBadge" class="fare-component-badge" style="display: none;"></span>
+                  <div class="fare-component-badge-container">
+                    <span id="fareComponentDetectorBadge" class="fare-component-badge" style="display: none;"></span>
+                  </div>
                 </div>
                 <textarea id="fareCalcString"
                   placeholder="Example: BOM EK X/DXB EK NYC 102.21TLEEPIN1/NDC2 EK X/DXB BOM 404.56XWEEFIN1/NDC2 Q5.00 NUC511.77 ROE90.3344456"></textarea>
@@ -302,10 +331,22 @@ Changes in V4.6 (Bug Fix Release):
                     style="font-size: 1.1rem; color: var(--text-primary); margin-top: 4px;"></div>
                 </div>
                 <div class="result-item">
-                  <div class="result-label" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">
-                    Base Fare (NUC × ROE)</div>
+                  <div class="result-label base-fare-label-row" style="font-weight: 600; color: var(--text-secondary); font-size: 0.9rem;">
+                    <span>Base Fare (NUC × ROE)</span>
+                    <button type="button" id="baseFareRoundPrompt" class="base-fare-round-prompt"
+                      aria-label="Notice: Check round off on ResConnect for Base Fare"
+                      data-tooltip="The calculated Base Fare (NUC × ROE) is a raw conversion. Check via ResConnect for correct Currency Rounding Rule &amp; update the fare.">
+                      <svg class="hint-monoline-icon" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+                        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path>
+                        <path d="M9 18h6"></path>
+                        <path d="M10 22h4"></path>
+                      </svg>
+                      <span class="base-fare-prompt-text">Check Round Off on ResConnect</span>
+                    </button>
+                  </div>
                   <div id="baseFare" class="result-value highlight"
-                    style="font-size: 1.1rem; color: var(--primary-cyan); font-weight: 700; margin-top: 4px;"></div>
+                    style="font-size: 1.1rem; color: var(--text-primary); font-weight: 700; margin-top: 4px;"></div>
                 </div>
               </div>
             </div>
@@ -316,15 +357,15 @@ Changes in V4.6 (Bug Fix Release):
 
     <section aria-labelledby="fareSectionHeading">
       <h2 id="fareSectionHeading">Fare Calculator
-        <span class="info-guide-badge" tabindex="0" role="tooltip"
-          data-tooltip="Enter currency as per filed fare. If issuing in a 2nd currency, enter converted settlement amount in Fare Difference / Change Fee."
-          aria-label="Fare Calculator Help Guide">
-          <span class="badge-3d-icon">
-            <span class="badge-3d-inner">
-              <span class="badge-question-mark">?</span>
-            </span>
-          </span>
-        </span>
+        <button type="button" class="minimal-help-btn info-guide-badge"
+          aria-label="Help: Fare Calculator"
+          data-tooltip="Calculates financial settlements for ticket exchanges: base fare variance, net tax adjustments, and airline reissue penalty fees.">
+          <svg class="help-monoline-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+            <circle cx="12" cy="12" r="10"></circle>
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+            <line x1="12" y1="17" x2="12.01" y2="17"></line>
+          </svg>
+        </button>
       </h2>
       <div class="section-grid">
         <div>
@@ -423,19 +464,14 @@ Changes in V4.6 (Bug Fix Release):
             <span>Fare Difference</span>
             <span id="baseFareDiffBadge" class="base-diff-badge" style="display: none;"></span>
             <span id="fareDiffBulb" class="animated-bulb-tip" style="display: none;" tabindex="0" role="tooltip"
-              data-tooltip="Use Fare Difference Converter below or enter converted settlement amount manually.">
-              <span class="badge-3d-bulb-icon">
-                <span class="badge-3d-bulb-inner">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="outline-bulb-svg">
-                    <path d="M9 18h6"></path>
-                    <path d="M10 22h4"></path>
-                    <path
-                      d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1.55.64 2.94 1.6 3.93.77.78 1.22 1.53 1.4 2.51">
-                    </path>
-                  </svg>
-                </span>
-              </span>
+              aria-label="Notice: Foreign currency detected on base fare"
+              data-tooltip="Dual-Currency Detection: If base fare is filed in foreign currency, use the Fare Difference Converter below or enter converted settlement amount manually per BSR/ROE.">
+              <svg class="hint-monoline-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path>
+                <path d="M9 18h6"></path>
+                <path d="M10 22h4"></path>
+              </svg>
             </span>
           </label>
           <input id="fareDiff" placeholder="e.g. 3000 or INR12400" aria-label="Fare difference amount">
@@ -444,7 +480,7 @@ Changes in V4.6 (Bug Fix Release):
           <label>&nbsp;</label>
           <div>
             <input id="applyK3OnFareDiff" type="checkbox" aria-describedby="k3Description">
-            <label for="applyK3OnFareDiff">Apply K3 on Fare Difference</label>
+            <label for="applyK3OnFareDiff" class="k3-trigger-label">Apply K3 on Fare Difference</label>
           </div>
         </div>
         <span id="k3Description" class="sr-only">Calculates K3 service tax on the applicable amount based on the
@@ -457,19 +493,14 @@ Changes in V4.6 (Bug Fix Release):
           <label for="changeFee" class="field-label-with-bulb">
             <span>Change Fee</span>
             <span id="changeFeeBulb" class="animated-bulb-tip" style="display: none;" tabindex="0" role="tooltip"
-              data-tooltip="Enter in settlement currency (e.g. INR 3000) if issuing in a different currency.">
-              <span class="badge-3d-bulb-icon">
-                <span class="badge-3d-bulb-inner">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" class="outline-bulb-svg">
-                    <path d="M9 18h6"></path>
-                    <path d="M10 22h4"></path>
-                    <path
-                      d="M15.09 14c.18-.98.65-1.74 1.41-2.5A4.65 4.65 0 0 0 18 8 6 6 0 0 0 6 8c0 1.55.64 2.94 1.6 3.93.77.78 1.22 1.53 1.4 2.51">
-                    </path>
-                  </svg>
-                </span>
-              </span>
+              aria-label="Notice: Settlement currency for change fee"
+              data-tooltip="Settlement Guidance: Enter penalty in ticket issuance / settlement currency (e.g. INR 3000) if reissuing in a currency different from filed fare.">
+              <svg class="hint-monoline-icon" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+                stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                <path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.7 1.3 1.5 1.5 2.5"></path>
+                <path d="M9 18h6"></path>
+                <path d="M10 22h4"></path>
+              </svg>
             </span>
           </label>
           <input id="changeFee" placeholder="e.g. 3000 or INR3000" aria-label="Change fee amount">
@@ -478,13 +509,25 @@ Changes in V4.6 (Bug Fix Release):
           <label>&nbsp;</label>
           <div>
             <input id="applyK3OnChangeFee" type="checkbox" aria-describedby="k3Description">
-            <label for="applyK3OnChangeFee">Apply K3 on Change Fee</label>
+            <label for="applyK3OnChangeFee" class="k3-trigger-label">Apply K3 on Change Fee</label>
           </div>
         </div>
 
         <div class="section-grid-full currency-converter-card" id="currencyConverterCard">
           <div class="currency-converter-header">
-            <h3 class="currency-converter-main-title">Fare Difference Converter</h3>
+            <div class="currency-converter-title-group">
+              <h3 class="currency-converter-main-title">Fare Difference Converter</h3>
+              <button type="button" class="minimal-help-btn info-guide-badge"
+                aria-label="Help: Fare Difference Converter"
+                data-tooltip="Converts filed base fare differences using applicable IATA Rate of Exchange (ROE) or BSR, applying IATA currency rounding.">
+                <svg class="help-monoline-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+                  stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+                  <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                </svg>
+              </button>
+            </div>
             <button type="button" class="toggle-btn collapsed inline-toggle" id="converterToggleBtn"
               aria-expanded="false" aria-controls="converterCollapsible">Show</button>
           </div>
@@ -591,8 +634,8 @@ Changes in V4.6 (Bug Fix Release):
           <input id="taxAdj" readonly aria-label="Net tax adjustment amount">
         </div>
         <div>
-          <label for="perPax">Amount Payable per Passenger</label>
-          <input id="perPax" readonly aria-label="Amount payable per passenger">
+          <label for="perPax">Amount Payable per Pax</label>
+          <input id="perPax" readonly aria-label="Amount payable per pax">
         </div>
         <div>
           <label for="pax">No. of Pax</label>
@@ -611,18 +654,19 @@ Changes in V4.6 (Bug Fix Release):
       </div>
     </section>
   </div>
+</div>
 
   <section class="full-width" aria-labelledby="summaryHeading">
     <h2 id="summaryHeading">Final Summary
-      <span class="info-guide-badge" tabindex="0" role="tooltip"
-        data-tooltip="Click to generate multi-PTC summary and One-line string. Made changes? Click again to update"
-        aria-label="Final Summary Help Guide">
-        <span class="badge-3d-icon">
-          <span class="badge-3d-inner">
-            <span class="badge-question-mark">?</span>
-          </span>
-        </span>
-      </span>
+      <button type="button" class="minimal-help-btn info-guide-badge"
+        aria-label="Help: Final Summary"
+        data-tooltip="Generates a unified audit table and consolidated GDS reissue command string ready for single-click clipboard copying.">
+        <svg class="help-monoline-icon" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+          <circle cx="12" cy="12" r="10"></circle>
+          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+          <line x1="12" y1="17" x2="12.01" y2="17"></line>
+        </svg>
+      </button>
     </h2>
     <div class="button-row section-grid-full summarise-btn-container">
       <button id="summariseButton" type="button" aria-label="Generate summary and GDS string">Summarise</button>

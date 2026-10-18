@@ -70,7 +70,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
   console.log('CHECK5 OK: passenger count multiplies Sub Total, not Per Pax');
 
   // --- F: fresh tab — tax diff math, including PD-prefix merging ---
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(100);
   await page.selectOption('#currency', 'USD');
   // Old: USD50YQ. New: a PD-restated USD50YQ plus a genuinely new USD30YQ -> merged new total 80,

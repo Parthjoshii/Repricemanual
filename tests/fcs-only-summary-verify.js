@@ -29,7 +29,7 @@ let browser;
   await page.waitForTimeout(150);
 
   // CNN: only a fare calc string, no fare/tax calculated
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(100);
   const cnnString = 'BOM EK DXB 300.00TLEEPIN1CH/NDC2 NUC300.00 ROE1.0';
   await page.fill('#fareCalcString', cnnString);

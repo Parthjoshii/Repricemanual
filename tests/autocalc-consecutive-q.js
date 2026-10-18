@@ -22,7 +22,7 @@ let browser;
   const nucValidation = await page.$eval('#nucValidation', el => el.textContent);
   assert.ok(nucValidation.includes('PASS'), 'ADT consecutive-Q string should validate PASS: ' + nucValidation);
 
-  await page.click('#ptcTabCNN');
+  await page.click('#ptcTabCHD, #ptcTabCNN');
   await page.waitForTimeout(100);
   await page.click('#autoCalcFromAdult');
   await page.waitForTimeout(150);
