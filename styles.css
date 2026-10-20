@@ -515,14 +515,14 @@ textarea {
 }
 
 /* Standalone checkbox cell in grid (Fare Diff K3 & Change Fee K3) - Centered with adjacent input */
-.checkbox-cell:not(.checkbox-inline) {
+section[aria-labelledby="fareSectionHeading"] .checkbox-cell:not(.checkbox-inline) {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
   margin: 0;
 }
 
-.checkbox-cell:not(.checkbox-inline)>label:first-child {
+section[aria-labelledby="fareSectionHeading"] .checkbox-cell:not(.checkbox-inline)>label:first-child {
   display: block;
   height: 20px;
   min-height: 20px;
@@ -531,7 +531,7 @@ textarea {
   visibility: hidden;
 }
 
-.checkbox-cell:not(.checkbox-inline)>div {
+section[aria-labelledby="fareSectionHeading"] .checkbox-cell:not(.checkbox-inline)>div {
   display: flex;
   align-items: center;
   height: 36px;
@@ -541,7 +541,7 @@ textarea {
   gap: 4px;
 }
 
-.checkbox-cell:not(.checkbox-inline) input {
+section[aria-labelledby="fareSectionHeading"] .checkbox-cell:not(.checkbox-inline) input {
   width: 14px;
   height: 14px;
   margin: 0;
@@ -1675,7 +1675,7 @@ th {
     grid-template-columns: 1fr;
   }
 
-  .checkbox-cell:not(.checkbox-inline)>label:first-child {
+  section[aria-labelledby="fareSectionHeading"] .checkbox-cell:not(.checkbox-inline)>label:first-child {
     display: none;
   }
 }
@@ -2196,44 +2196,62 @@ th {
   }
 }
 
-/* Compact Selective Halving Section - 3 items in a line */
+/* Compact Selective Halving Section & Clean Chip Layout */
+.halve-fare-components-cell {
+  display: flex;
+  flex-direction: column;
+  margin: 4px 0 6px 0;
+  gap: 8px;
+}
+
 .halve-component-selector {
-  margin-top: 8px;
-  padding: 8px 10px;
+  display: block;
+  width: 100%;
+  height: auto !important;
+  min-height: fit-content;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  padding: 10px 14px;
   border-radius: 8px;
-  background: rgba(16, 20, 38, 0.45);
-  border: 1px solid rgba(44, 50, 88, 0.7);
+  background: rgba(16, 20, 38, 0.55);
+  border: 1px solid rgba(56, 189, 248, 0.25);
+  box-sizing: border-box;
   animation: fadeInDown 0.22s ease-out;
 }
 
 [data-theme="light"] .halve-component-selector {
-  background: rgba(245, 245, 220, 0.45);
-  border-color: rgba(220, 215, 190, 0.75);
+  background: rgba(241, 245, 249, 0.9);
+  border-color: #cbd5e1;
 }
 
 .halve-selector-title {
   display: flex;
   align-items: center;
-  gap: 5px;
-  font-size: 0.67rem;
+  gap: 6px;
+  font-size: 0.72rem;
   font-weight: 700;
   color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.5px;
-  margin-bottom: 6px;
+  margin-bottom: 8px;
 }
 
 .halve-component-options {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
+}
+
+#parserCollapsible .button-row {
+  margin-top: 8px;
 }
 
 .halve-chip {
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  padding: 6px 12px;
+  gap: 8px;
+  padding: 6px 14px;
   border-radius: 6px;
   font-size: 0.80rem;
   font-weight: 600;

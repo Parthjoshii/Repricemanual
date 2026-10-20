@@ -2604,13 +2604,15 @@ function sanitizeTaxString(text) {
 function formatTaxInput(text) {
   if (!text) return '';
 
+  // Pre-normalize: collapse spaces between PD and following digits (e.g. "PD 1000OD" -> "PD1000OD")
+  const preNormalized = text.replace(/\bPD\s+(\d)/gi, 'PD$1');
   // Split by multiple separators: spaces, commas, newlines, tabs, slashes
-  const entries = text.split(/[\s,\/\n\t]+/).filter(Boolean);
+  const entries = preNormalized.split(/[\s,\/\n\t]+/).filter(Boolean);
   const validEntries = [];
   const invalidEntries = [];
 
   // Validate each entry: 3-letter currency + amount + exactly 2-character tax code (letters
-  // and/or digits, e.g. YQ, K3, 6A — see parseTaxToken for why this must be exactly 2, not 1-6).
+  // and/or digits, e.g. YQ, K3, 6A, OD — see parseTaxToken for why this must be exactly 2, not 1-6).
   const pattern = /^([A-Z]{3})(\d+(?:\.\d+)?)([A-Z0-9]{2})$/i;
   const paidPattern = /^PD(?:([A-Z]{3}))?(\d+(?:\.\d+)?)([A-Z0-9]{2})$/i;
 
@@ -2635,7 +2637,7 @@ function formatTaxInput(text) {
 
   // Show warning for invalid entries
   if (invalidEntries.length > 0) {
-    showError(`Skipped invalid tax entries: ${invalidEntries.join(', ')}. Format: CurrencyAmountTaxCode (e.g., INR30K3)`);
+    showError(`Skipped invalid tax entries: ${invalidEntries.join(', ')}. Format: CurrencyAmountTaxCode (e.g., INR30K3, INR1000OD) or PDAmountTaxCode (e.g., PD1000OD)`);
   }
 
   // Join valid entries with slashes
@@ -2686,16 +2688,21 @@ function updateAddTaxesWithK3(baseAddTaxes, k3FareStr) {
 // while any extra amount on either side (PD or not) still shows up as the real difference.
 function parseTaxes(text) {
   const taxes = {};
-  if (!text) return { taxes, currency: null };
-  const tokens = text.split(/[\s,\/\n\t]+/).map(t => t.trim()).filter(Boolean);
+  if (!text) return { taxes, currency: null, hasOD: false };
+  const preNormalized = text.replace(/\bPD\s+(\d)/gi, 'PD$1');
+  const tokens = preNormalized.split(/[\s,\/\n\t]+/).map(t => t.trim()).filter(Boolean);
   const parsedTokens = tokens.map(parseTaxToken).filter(Boolean);
-  const inferredCurrency = parsedTokens.find(t => t.currency)?.currency || 'INR';
+  const inferredCurrency = parsedTokens.find(t => t.currency)?.currency || els.currency?.value || 'INR';
+  let hasOD = false;
   parsedTokens.forEach(parsed => {
+    if (parsed.code === 'OD') {
+      hasOD = true;
+    }
     const cur = parsed.currency || inferredCurrency;
     const key = `${cur}${parsed.code}`;
     taxes[key] = (taxes[key] || 0) + parsed.amount;
   });
-  return { taxes, currency: inferredCurrency };
+  return { taxes, currency: inferredCurrency, hasOD };
 }
 
 function getCurrentFareK3State(currencyOverride = null, diffOverride = null, feeOverride = null) {
@@ -2764,6 +2771,7 @@ function calculateTaxes() {
     const newTaxData = parseTaxes(newText);
     const oldTaxes = oldTaxData.taxes;
     const newTaxes = newTaxData.taxes;
+    const hasPaidOD = oldTaxData.hasOD || newTaxData.hasOD;
 
     let firstCurrency = null;
     const result = {
@@ -2772,6 +2780,7 @@ function calculateTaxes() {
       posTotal: 0,
       negTotal: 0,
       currency: null,
+      hasPaidOD,
     };
 
     // PD amounts are merged into oldTaxes/newTaxes just like regular entries (see parseTaxes),
@@ -2783,6 +2792,12 @@ function calculateTaxes() {
     ]);
 
     allTaxCodes.forEach(code => {
+      // OD is the tax code for Change Fee. When entered in old or new taxes, it represents a fee
+      // that is already paid and must NOT be calculated / adjusted in the tax difference calculation.
+      if (code.toUpperCase() === 'OD') {
+        return;
+      }
+
       const matchingOldKeys = Object.keys(oldTaxes).filter(k => k.endsWith(code));
       const matchingNewKeys = Object.keys(newTaxes).filter(k => k.endsWith(code));
 
@@ -2813,7 +2828,7 @@ function calculateTaxes() {
       }
     });
 
-    result.currency = firstCurrency ?? newTaxData.currency ?? oldTaxData.currency ?? 'INR';
+    result.currency = firstCurrency ?? newTaxData.currency ?? oldTaxData.currency ?? els.currency?.value ?? 'INR';
     result.netTax = round2(result.posTotal + result.negTotal);
 
     // Calculate K3 on positive YQ if checkbox is checked
@@ -2961,6 +2976,10 @@ function renderTaxResult(result) {
   if (result.k3OnYQ > 0) {
     k3OnYQDisplay = `<br><b>K3 on YQ:</b> ${result.currency}${formatAmount(result.k3OnYQ, result.currency)}`;
   }
+  let odNoticeDisplay = '';
+  if (result.hasPaidOD) {
+    odNoticeDisplay = `<div class="tax-od-notice" style="margin-top: 10px; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.4;"><span style="color: var(--primary-cyan); font-weight: 600;">OD Tax (Change Fee):</span> Already paid — excluded from tax adjustment.</div>`;
+  }
   div.innerHTML = `
     <b>Positive Taxes</b><br><br>
     <span class="pos">${result.positiveTaxes.join('/') || noTaxes}</span><br><br>
@@ -2968,7 +2987,7 @@ function renderTaxResult(result) {
     <span class="neg">${result.negativeTaxes.join('/') || 'None'}</span><br><br>
     <b>Positive Total:</b> ${result.currency}${formatAmount(result.posTotal, result.currency)}<br>
     <b>Negative Total:</b> -${result.currency}${formatAmount(Math.abs(result.negTotal), result.currency)}<br>
-    <b>Net Total:</b> ${result.currency}${formatAmount(result.netTax, result.currency)}${k3OnYQDisplay}
+    <b>Net Total:</b> ${result.currency}${formatAmount(result.netTax, result.currency)}${k3OnYQDisplay}${odNoticeDisplay}
   `;
   fragment.appendChild(div);
   els.taxResult.innerHTML = '';

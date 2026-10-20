@@ -321,6 +321,69 @@ class AuditReporter {
   reporter.assert('Net tax diff equals 250 (300 YQ - 50 IN)', taxResult.netTax === 250, taxResult.netTax);
   reporter.assert('K3 on YQ at 18% equals 54', taxResult.k3OnYQ === 54, taxResult.k3OnYQ);
 
+  // 1.4.1 OD Tax Code (Change Fee) Exclusion Permutations
+  // Test A: OD entered in both Old and New taxes (INR500YQ INR1000OD vs INR800YQ INR1000OD)
+  await safeFill('#oldTax', 'INR500YQ INR1000OD');
+  await safeFill('#newTax', 'INR800YQ INR1000OD');
+  await safeUncheck('#applyK3OnYQ');
+  await safeClick('#taxCalcButton');
+  await page.waitForTimeout(60);
+
+  const odResultA = await page.evaluate(() => ({
+    netTax: state.lastTaxResult?.netTax,
+    positiveTaxes: state.lastTaxResult?.positiveTaxes,
+    negativeTaxes: state.lastTaxResult?.negativeTaxes,
+    addTaxes: els.addTaxes.value,
+    refundTaxes: els.refundTaxes.value,
+    taxResultText: els.taxResult.innerText,
+  }));
+  reporter.assert('OD in both sides excluded from diff (netTax === 300)', odResultA.netTax === 300, odResultA.netTax);
+  reporter.assert('OD not present in positive taxes or Add Taxes', !odResultA.positiveTaxes.some(t => t.includes('OD')) && !odResultA.addTaxes.includes('OD'));
+  reporter.assert('OD not present in negative taxes or Refund Taxes', !odResultA.negativeTaxes.some(t => t.includes('OD')) && !odResultA.refundTaxes.includes('OD'));
+  reporter.assert('OD change fee notice displayed in results', odResultA.taxResultText.includes('OD Tax (Change Fee): Already paid'));
+
+  // Test B: OD in Old Tax only (INR500YQ INR1000OD vs INR800YQ) - OD must NOT be refunded
+  await safeFill('#oldTax', 'INR500YQ INR1000OD');
+  await safeFill('#newTax', 'INR800YQ');
+  await safeClick('#taxCalcButton');
+  await page.waitForTimeout(60);
+
+  const odResultB = await page.evaluate(() => ({
+    netTax: state.lastTaxResult?.netTax,
+    negativeTaxes: state.lastTaxResult?.negativeTaxes,
+    refundTaxes: els.refundTaxes.value,
+  }));
+  reporter.assert('OD in Old Tax only is NOT refunded (negative taxes empty)', odResultB.netTax === 300 && odResultB.negativeTaxes.length === 0, odResultB.negativeTaxes);
+  reporter.assert('Refund Taxes field excludes OD', !odResultB.refundTaxes.includes('OD'), odResultB.refundTaxes);
+
+  // Test C: OD in New Tax as PD1000OD (INR500YQ vs INR800YQ PD1000OD) - OD must NOT be added
+  await safeFill('#oldTax', 'INR500YQ');
+  await safeFill('#newTax', 'INR800YQ PD1000OD');
+  await safeClick('#taxCalcButton');
+  await page.waitForTimeout(60);
+
+  const odResultC = await page.evaluate(() => ({
+    netTax: state.lastTaxResult?.netTax,
+    positiveTaxes: state.lastTaxResult?.positiveTaxes,
+    addTaxes: els.addTaxes.value,
+  }));
+  reporter.assert('PD+value+OD in New Tax is NOT added (netTax === 300)', odResultC.netTax === 300, odResultC.netTax);
+  reporter.assert('Positive Taxes contains only YQ and excludes OD', odResultC.positiveTaxes.length === 1 && odResultC.positiveTaxes[0] === 'INR300YQ', odResultC.positiveTaxes);
+  reporter.assert('Add Taxes field excludes OD', !odResultC.addTaxes.includes('OD'), odResultC.addTaxes);
+
+  // Test D: OD entered standalone in both sides (INR1000OD vs PD1000OD) -> zero diff
+  await safeFill('#oldTax', 'INR1000OD');
+  await safeFill('#newTax', 'PD1000OD');
+  await safeClick('#taxCalcButton');
+  await page.waitForTimeout(60);
+
+  const odResultD = await page.evaluate(() => ({
+    netTax: state.lastTaxResult?.netTax,
+    posTotal: state.lastTaxResult?.posTotal,
+    negTotal: state.lastTaxResult?.negTotal,
+  }));
+  reporter.assert('Standalone OD in Old & New yields exact 0 net tax adjustment', odResultD.netTax === 0 && odResultD.posTotal === 0 && odResultD.negTotal === 0, odResultD);
+
   // 1.5 Multi-PTC Consolidated Summary Math
   const summaryConsolidation = await page.evaluate(() => {
     const list = [
@@ -791,6 +854,47 @@ class AuditReporter {
   // Return active tab to ADT for clean state
   await safeClick('#ptcTabADT');
   await page.waitForTimeout(350);
+
+  // 4.7 Halve Fare Component Selector Layout & Non-Overlap Invariant
+  await safeFill('#fareCalcString', 'NYC EK X/DXB EK BOM118.50TLENPUS2/USN2 EK X/DXB EK NYC798.00KLEESUS1/USN2 NUC237.00END ROE1.000000 XF JFK4.50');
+  await page.dispatchEvent('#fareCalcString', 'input');
+  await safeCheck('#halveFareComponents');
+  await page.waitForTimeout(150);
+
+  const halveGeometry = await page.evaluate(() => {
+    const selector = document.getElementById('halveComponentSelector');
+    const chips = Array.from(document.querySelectorAll('#halveComponentOptions .halve-chip'));
+    const parseBtn = document.getElementById('parseButton');
+    const clearBtn = document.getElementById('parserClearButton');
+    const selBox = selector.getBoundingClientRect();
+    const parseBox = parseBtn.getBoundingClientRect();
+    const clearBox = clearBtn.getBoundingClientRect();
+
+    let maxChipBottom = 0;
+    chips.forEach(chip => {
+      const b = chip.getBoundingClientRect();
+      if (b.bottom > maxChipBottom) maxChipBottom = b.bottom;
+    });
+
+    const minBtnTop = Math.min(parseBox.top, clearBox.top);
+    const chipToButtonGap = minBtnTop - maxChipBottom;
+    const selectorToButtonGap = minBtnTop - selBox.bottom;
+
+    return {
+      selectorVisible: selector.style.display !== 'none' && selBox.height > 0,
+      selectorHeight: selBox.height,
+      chipCount: chips.length,
+      maxChipBottom,
+      minBtnTop,
+      chipToButtonGap,
+      selectorToButtonGap,
+      noOverlap: chipToButtonGap >= 4 && selectorToButtonGap >= 4,
+    };
+  });
+
+  reporter.assert('Halve component selector is visible with multiple chips', halveGeometry.selectorVisible && halveGeometry.chipCount >= 3, `${halveGeometry.chipCount} chips`);
+  reporter.assert('Halve component selector height expands naturally (> 45px)', halveGeometry.selectorHeight >= 45, `${halveGeometry.selectorHeight}px`);
+  reporter.assert('Chips and Convert/Clear buttons have zero overlap (gap >= 4px)', halveGeometry.noOverlap, `gap = ${halveGeometry.chipToButtonGap}px`);
 
   // ==========================================================================
   // MODULE 5: EXTREME STATEFUL CHAOS FUZZING & IRREGULAR SEQUENCES
