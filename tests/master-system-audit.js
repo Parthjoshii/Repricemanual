@@ -384,6 +384,22 @@ class AuditReporter {
   }));
   reporter.assert('Standalone OD in Old & New yields exact 0 net tax adjustment', odResultD.netTax === 0 && odResultD.posTotal === 0 && odResultD.negTotal === 0, odResultD);
 
+  // 1.4.2 Tax Result DOM XSS Injection Immunity
+  await safeFill('#oldTax', 'INR500YQ <img src="invalid-img" onerror="window.TAX_XSS=true">');
+  await safeFill('#newTax', 'INR800YQ <script>window.TAX_XSS=true</script>');
+  await safeClick('#taxCalcButton');
+  await page.waitForTimeout(60);
+
+  const taxXssCheck = await page.evaluate(() => {
+    const resEl = document.getElementById('taxResult');
+    return {
+      hasXssFlag: !!window.TAX_XSS,
+      injectedImgCount: resEl.querySelectorAll('img').length,
+      injectedScriptCount: resEl.querySelectorAll('script').length,
+    };
+  });
+  reporter.assert('Tax Result DOM XSS injection prevented (0 executable nodes)', !taxXssCheck.hasXssFlag && taxXssCheck.injectedImgCount === 0 && taxXssCheck.injectedScriptCount === 0);
+
   // 1.5 Multi-PTC Consolidated Summary Math
   const summaryConsolidation = await page.evaluate(() => {
     const list = [
@@ -993,6 +1009,10 @@ class AuditReporter {
 
   // Save audit artifact report
   const auditReportPath = path.resolve('C:/Users/Parth Joshi/.gemini/antigravity-ide/brain/643cd18c-a97f-4475-80c9-0ad6e75f8e33/master_zero_defect_audit_report.json');
+  const auditReportDir = path.dirname(auditReportPath);
+  if (!fs.existsSync(auditReportDir)) {
+    fs.mkdirSync(auditReportDir, { recursive: true });
+  }
   fs.writeFileSync(auditReportPath, JSON.stringify({
     timestamp: new Date().toISOString(),
     totalTests: reporter.totalTests,

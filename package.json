@@ -8,5 +8,8 @@
   },
   "dependencies": {
     "playwright": "^1.62.1"
+  },
+  "devDependencies": {
+    "@dietrichgebert/ponytail": "^5.3.2"
   }
 }

@@ -2969,28 +2969,88 @@ function extractK3FareFromAddTaxes() {
 function renderTaxResult(result) {
   const noTaxes = result.currency ? `${result.currency}${formatAmount(0, result.currency)}` : 'None';
 
-  // Use DocumentFragment for batch DOM updates
+  // Use DocumentFragment for batch DOM updates and safe DOM construction to eliminate XSS vectors
   const fragment = document.createDocumentFragment();
   const div = document.createElement('div');
-  let k3OnYQDisplay = '';
+
+  // Positive Taxes
+  const bPos = document.createElement('b');
+  bPos.textContent = 'Positive Taxes';
+  div.appendChild(bPos);
+  div.appendChild(document.createElement('br'));
+  div.appendChild(document.createElement('br'));
+
+  const spanPos = document.createElement('span');
+  spanPos.className = 'pos';
+  spanPos.textContent = result.positiveTaxes.join('/') || noTaxes;
+  div.appendChild(spanPos);
+  div.appendChild(document.createElement('br'));
+  div.appendChild(document.createElement('br'));
+
+  // Negative Taxes
+  const bNeg = document.createElement('b');
+  bNeg.textContent = 'Negative Taxes';
+  div.appendChild(bNeg);
+  div.appendChild(document.createElement('br'));
+  div.appendChild(document.createElement('br'));
+
+  const spanNeg = document.createElement('span');
+  spanNeg.className = 'neg';
+  spanNeg.textContent = result.negativeTaxes.join('/') || 'None';
+  div.appendChild(spanNeg);
+  div.appendChild(document.createElement('br'));
+  div.appendChild(document.createElement('br'));
+
+  // Positive Total
+  const bPosTotal = document.createElement('b');
+  bPosTotal.textContent = 'Positive Total:';
+  div.appendChild(bPosTotal);
+  div.appendChild(document.createTextNode(` ${result.currency}${formatAmount(result.posTotal, result.currency)}`));
+  div.appendChild(document.createElement('br'));
+
+  // Negative Total
+  const bNegTotal = document.createElement('b');
+  bNegTotal.textContent = 'Negative Total:';
+  div.appendChild(bNegTotal);
+  div.appendChild(document.createTextNode(` -${result.currency}${formatAmount(Math.abs(result.negTotal), result.currency)}`));
+  div.appendChild(document.createElement('br'));
+
+  // Net Total
+  const bNetTotal = document.createElement('b');
+  bNetTotal.textContent = 'Net Total:';
+  div.appendChild(bNetTotal);
+  div.appendChild(document.createTextNode(` ${result.currency}${formatAmount(result.netTax, result.currency)}`));
+
+  // K3 on YQ (if applicable)
   if (result.k3OnYQ > 0) {
-    k3OnYQDisplay = `<br><b>K3 on YQ:</b> ${result.currency}${formatAmount(result.k3OnYQ, result.currency)}`;
+    div.appendChild(document.createElement('br'));
+    const bK3 = document.createElement('b');
+    bK3.textContent = 'K3 on YQ:';
+    div.appendChild(bK3);
+    div.appendChild(document.createTextNode(` ${result.currency}${formatAmount(result.k3OnYQ, result.currency)}`));
   }
-  let odNoticeDisplay = '';
+
+  // OD Notice (if applicable)
   if (result.hasPaidOD) {
-    odNoticeDisplay = `<div class="tax-od-notice" style="margin-top: 10px; font-size: 0.82rem; color: var(--text-secondary); line-height: 1.4;"><span style="color: var(--primary-cyan); font-weight: 600;">OD Tax (Change Fee):</span> Already paid — excluded from tax adjustment.</div>`;
+    const odNotice = document.createElement('div');
+    odNotice.className = 'tax-od-notice';
+    odNotice.style.marginTop = '10px';
+    odNotice.style.fontSize = '0.82rem';
+    odNotice.style.color = 'var(--text-secondary)';
+    odNotice.style.lineHeight = '1.4';
+
+    const odSpan = document.createElement('span');
+    odSpan.style.color = 'var(--primary-cyan)';
+    odSpan.style.fontWeight = '600';
+    odSpan.textContent = 'OD Tax (Change Fee):';
+    odNotice.appendChild(odSpan);
+
+    odNotice.appendChild(document.createTextNode(' Already paid \u2014 excluded from tax adjustment.'));
+    div.appendChild(odNotice);
   }
-  div.innerHTML = `
-    <b>Positive Taxes</b><br><br>
-    <span class="pos">${result.positiveTaxes.join('/') || noTaxes}</span><br><br>
-    <b>Negative Taxes</b><br><br>
-    <span class="neg">${result.negativeTaxes.join('/') || 'None'}</span><br><br>
-    <b>Positive Total:</b> ${result.currency}${formatAmount(result.posTotal, result.currency)}<br>
-    <b>Negative Total:</b> -${result.currency}${formatAmount(Math.abs(result.negTotal), result.currency)}<br>
-    <b>Net Total:</b> ${result.currency}${formatAmount(result.netTax, result.currency)}${k3OnYQDisplay}${odNoticeDisplay}
-  `;
+
   fragment.appendChild(div);
-  els.taxResult.innerHTML = '';
+  els.taxResult.textContent = '';
   els.taxResult.appendChild(fragment);
 
   // Calculate total K3 for Add Taxes (fare diff K3 + YQ K3; change fee K3 is folded directly into Change Fee)
@@ -3023,7 +3083,7 @@ function renderTaxResult(result) {
 function clearTaxes() {
   els.oldTax.value = '';
   els.newTax.value = '';
-  els.taxResult.innerHTML = '';
+  els.taxResult.textContent = '';
   els.addTaxes.value = '';
   els.refundTaxes.value = '';
   els.taxAdj.value = '';
