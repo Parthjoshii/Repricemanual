@@ -118,6 +118,8 @@ const els = {
   applyK3OnFareDiff: byId('applyK3OnFareDiff'),
   applyK3OnChangeFee: byId('applyK3OnChangeFee'),
   applyK3OnYQ: byId('applyK3OnYQ'),
+  copyTaxFromAdult: byId('copyTaxFromAdult'),
+  copyTaxFromAdultRow: byId('copyTaxFromAdultRow'),
   inrMessage: byId('inrMessage'),
   addTaxes: byId('addTaxes'),
   refundTaxes: byId('refundTaxes'),
@@ -428,6 +430,7 @@ const PTC_SNAPSHOT_FIELDS = [
   { id: 'subTotal', kind: 'value' },
   { id: 'fareCalcString', kind: 'value' },
   { id: 'autoCalcFromAdult', kind: 'checked' },
+  { id: 'copyTaxFromAdult', kind: 'checked' },
   { id: 'halveFareComponents', kind: 'checked' },
 ];
 
@@ -580,6 +583,7 @@ function updatePtcTabUI() {
   const customCount = PTC_CODES.length - BUILT_IN_PTC_COUNT;
   els.ptcAddTabButton.hidden = customCount >= MAX_CUSTOM_PTC_TABS;
   syncAutoCalcUI();
+  syncCopyTaxUI();
   updateGliderPosition();
   saveStateToStorage();
 }
@@ -789,6 +793,11 @@ function syncAutoCalcUI() {
   }
 }
 
+function syncCopyTaxUI() {
+  if (!els.copyTaxFromAdultRow) return;
+  els.copyTaxFromAdultRow.style.display = (state.activePtc === 'CHD') ? '' : 'none';
+}
+
 function switchPtcTab(newPtc) {
   newPtc = normalizePtc(newPtc);
   if (!PTC_CODES.includes(newPtc) || newPtc === state.activePtc) return;
@@ -802,6 +811,9 @@ function switchPtcTab(newPtc) {
   updatePtcTabUI();
   if (isAutoCalcEligible(newPtc) && els.autoCalcFromAdult.checked) {
     applyAutoCalc(newPtc, { silent: true });
+  }
+  if (newPtc === 'CHD' && els.copyTaxFromAdult?.checked) {
+    applyCopyTaxFromAdult({ silent: true });
   }
 }
 
@@ -1172,6 +1184,24 @@ els.applyK3OnChangeFee.addEventListener('change', () => {
 els.applyK3OnYQ.addEventListener('change', () => {
   state.clearTaxCache();
   debouncedCalculateTaxes();
+});
+if (els.copyTaxFromAdult) {
+  els.copyTaxFromAdult.addEventListener('change', () => {
+    if (state.activePtc !== 'CHD') return;
+    if (els.copyTaxFromAdult.checked) {
+      applyCopyTaxFromAdult();
+    }
+  });
+}
+
+['oldTax', 'newTax'].forEach(id => {
+  if (els[id]) {
+    els[id].addEventListener('input', () => {
+      if (state.activePtc === 'CHD' && els.copyTaxFromAdult && els.copyTaxFromAdult.checked) {
+        els.copyTaxFromAdult.checked = false;
+      }
+    });
+  }
 });
 
 // Parser event listeners
@@ -2132,6 +2162,30 @@ function applyAutoCalc(ptc, { silent = false } = {}) {
   }
 }
 
+function getAdultTaxes() {
+  const adtSnapshot = state.ptcData['ADT']?.formSnapshot;
+  return {
+    oldTax: (adtSnapshot?.fields?.oldTax ?? (state.activePtc === 'ADT' ? els.oldTax.value : '')).trim(),
+    newTax: (adtSnapshot?.fields?.newTax ?? (state.activePtc === 'ADT' ? els.newTax.value : '')).trim(),
+  };
+}
+
+function applyCopyTaxFromAdult({ silent = false } = {}) {
+  if (state.activePtc !== 'CHD') return;
+  const adultTaxes = getAdultTaxes();
+  if (!adultTaxes.oldTax && !adultTaxes.newTax) {
+    if (!silent) {
+      showError('Please enter taxes in the Adult tab first.');
+      if (els.copyTaxFromAdult) els.copyTaxFromAdult.checked = false;
+    }
+    return;
+  }
+  els.oldTax.value = adultTaxes.oldTax;
+  els.newTax.value = adultTaxes.newTax;
+  calculateTaxes();
+  markTabDirty('CHD');
+}
+
 function toggleParserSection() {
   els.parserCollapsible.classList.toggle('collapsed');
   els.parserToggleBtn.classList.toggle('collapsed');
@@ -3088,6 +3142,7 @@ function clearTaxes() {
   els.refundTaxes.value = '';
   els.taxAdj.value = '';
   els.applyK3OnYQ.checked = false;
+  if (els.copyTaxFromAdult) els.copyTaxFromAdult.checked = false;
   state.k3TaxWarningShown = false;
   state.lastTaxResult = null;
   state.clearTaxCache();

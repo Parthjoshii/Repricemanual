@@ -555,6 +555,7 @@ section[aria-labelledby="fareSectionHeading"] .checkbox-cell:not(.checkbox-inlin
 label[for="applyK3OnYQ"],
 label[for="applyK3OnFareDiff"],
 label[for="applyK3OnChangeFee"],
+label[for="copyTaxFromAdult"],
 .k3-trigger-label {
   font-size: 0.75rem;
   font-weight: 600;

@@ -215,10 +215,17 @@ Changes in V4.6 (Bug Fix Release):
                 <textarea id="newTax" placeholder="NEW TAX" aria-describedby="newTaxDesc"></textarea>
                 <span id="newTaxDesc" class="sr-only">Enter new tax amounts in format: INR100YQ or 100YQ</span>
               </div>
-              <div class="checkbox-cell checkbox-inline section-grid-full">
-                <input id="applyK3OnYQ" type="checkbox" aria-describedby="k3YQDescription">
-                <label for="applyK3OnYQ" class="k3-trigger-label">Apply K3 on Positive YQ Tax</label>
+              <div class="checkbox-cell checkbox-inline section-grid-full tax-checkboxes-row" style="display: flex; flex-wrap: wrap; gap: 16px; align-items: center;">
+                <div class="checkbox-inline" id="copyTaxFromAdultRow" style="display: none; margin: 0;">
+                  <input id="copyTaxFromAdult" type="checkbox" aria-describedby="copyTaxDesc">
+                  <label for="copyTaxFromAdult" class="k3-trigger-label">Copy Taxes from Adult</label>
+                </div>
+                <div class="checkbox-inline" style="margin: 0;">
+                  <input id="applyK3OnYQ" type="checkbox" aria-describedby="k3YQDescription">
+                  <label for="applyK3OnYQ" class="k3-trigger-label">Apply K3 on Positive YQ Tax</label>
+                </div>
               </div>
+              <span id="copyTaxDesc" class="sr-only">Copies the OLD and NEW tax values entered in the Adult tab to the Child tab.</span>
               <span id="k3YQDescription" class="sr-only">Calculates K3 tax on the positive YQ fuel surcharge difference,
                 based on the selected cabin type.</span>
               <div class="section-grid-full button-row">

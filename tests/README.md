@@ -53,6 +53,7 @@ node tests/run-all-tests.js math
 | `clipboard-border-verify.js` | Summary table rich HTML clipboard formatting with styled borders |
 | `tab-dirty-indicator-verify.js` | Unsummarised dirty dot indicator per tab |
 | `xss-fix-verify.js` | User input escaping in NUC error display and HTML clipboard builder |
+| `child-copy-tax-verify.js` | Child tab "Copy Taxes from Adult" visibility, automatic calculation, manual-typing auto-uncheck, and tab auto-sync |
 
 ### 3. Core Arithmetic & Unit-Level Tests
 | Script | Covers |

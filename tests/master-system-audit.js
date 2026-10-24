@@ -693,6 +693,49 @@ class AuditReporter {
     customTabAfter.count === customTabCountBefore && customTabAfter.activePtc === 'ADT',
     `${customTabAfter.count} tabs, active: ${customTabAfter.activePtc}`);
 
+  // 3.5 Child Tab Copy Taxes from Adult Lifecycle
+  const adtCopyTaxDisplay = await page.$eval('#copyTaxFromAdultRow', el => window.getComputedStyle(el).display);
+  reporter.assert('Copy Taxes from Adult checkbox is hidden on Adult tab', adtCopyTaxDisplay === 'none', adtCopyTaxDisplay);
+
+  await safeClick('#ptcTabCHD');
+  await page.waitForTimeout(60);
+  const chdCopyTaxDisplay = await page.$eval('#copyTaxFromAdultRow', el => window.getComputedStyle(el).display);
+  reporter.assert('Copy Taxes from Adult checkbox is visible on Child tab', chdCopyTaxDisplay !== 'none', chdCopyTaxDisplay);
+
+  await safeClick('#ptcTabADT');
+  await page.waitForTimeout(60);
+  await safeFill('#oldTax', 'INR500YQ INR1000OD');
+  await safeFill('#newTax', 'INR800YQ INR1000OD');
+  await safeClick('#taxCalcButton');
+  await page.waitForTimeout(60);
+
+  await safeClick('#ptcTabCHD');
+  await page.waitForTimeout(60);
+  await safeClick('label[for="copyTaxFromAdult"]');
+  await page.waitForTimeout(100);
+
+  const chdCopied = await page.evaluate(() => ({
+    oldTax: els.oldTax.value,
+    newTax: els.newTax.value,
+    netTax: state.lastTaxResult?.netTax,
+    isChecked: els.copyTaxFromAdult.checked,
+  }));
+  reporter.assert('Copy Taxes from Adult copies OLD & NEW taxes to Child', chdCopied.oldTax.includes('INR500YQ') && chdCopied.newTax.includes('INR800YQ') && chdCopied.isChecked);
+  reporter.assert('Child taxes automatically calculated upon copy (netTax === 300)', chdCopied.netTax === 300, chdCopied.netTax);
+
+  await safeFill('#newTax', 'INR900YQ');
+  await page.waitForTimeout(60);
+  const chdUncheckedOnEdit = await page.evaluate(() => els.copyTaxFromAdult.checked);
+  reporter.assert('Child copy tax checkbox auto-unchecks on manual tax edit', !chdUncheckedOnEdit);
+
+  await safeClick('#ptcTabINF');
+  await page.waitForTimeout(60);
+  const infCopyTaxDisplay = await page.$eval('#copyTaxFromAdultRow', el => window.getComputedStyle(el).display);
+  reporter.assert('Copy Taxes from Adult checkbox is hidden on Infant tab', infCopyTaxDisplay === 'none', infCopyTaxDisplay);
+
+  await safeClick('#ptcTabADT');
+  await page.waitForTimeout(60);
+
   // ==========================================================================
   // MODULE 4: UI/UX DESIGN GEOMETRY & CSS PAINT PIPELINE AUDIT
   // ==========================================================================
@@ -736,7 +779,7 @@ class AuditReporter {
 
   // 4.2 Single-Line Invariant Across All Viewports
   const singleLineCheck = await page.evaluate(() => {
-    const ids = ['applyK3OnYQ', 'applyK3OnFareDiff', 'applyK3OnChangeFee'];
+    const ids = ['applyK3OnYQ', 'applyK3OnFareDiff', 'applyK3OnChangeFee', 'copyTaxFromAdult'];
     return ids.map(id => {
       const lbl = document.querySelector(`label[for="${id}"]`);
       const r = lbl.getBoundingClientRect();
