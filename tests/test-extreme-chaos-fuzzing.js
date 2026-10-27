@@ -767,7 +767,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
     return r ? r.cells[1]?.textContent.trim() : null;
   });
   console.log('  Summary Change Fee cell:', summaryFeeCell);
-  assert.ok(summaryFeeCell.includes('(incl. of K3)'), 'Change Fee must indicate inclusion of K3');
+  assert.ok(summaryFeeCell.toLowerCase().includes('(incl. of k3'), 'Change Fee must indicate inclusion of K3');
   console.log('  ✓ Centered disclaimer row and K3 Change Fee routing verified in summary table.');
 
   // =========================================================================

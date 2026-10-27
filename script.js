@@ -449,6 +449,13 @@ function defaultPtcSnapshot() {
     else fields[id] = '';
   });
   fields.pax = '1';
+  // If Adult tab has a cabin selected, default new/uninitialized snapshots to that cabin
+  const adtCabin = state.activePtc === 'ADT'
+    ? (els.cabin ? els.cabin.value : '')
+    : (state.ptcData?.['ADT']?.formSnapshot?.fields?.cabin || '');
+  if (adtCabin) {
+    fields.cabin = adtCabin;
+  }
   const stateValues = {};
   PTC_STATE_KEYS.forEach(key => { stateValues[key] = key === 'lastFareK3Total' ? 0 : (key === 'lastK3AddTaxes' ? '' : null); });
   return { fields, stateValues, parserVisible: false, qSurchargesVisible: false };
@@ -892,7 +899,7 @@ async function addCustomTab() {
 
   const code = generatePtcCode(label);
   PTC_CODES.push(code);
-  state.ptcData[code] = { formSnapshot: null, summaryData: null, dirty: false };
+  state.ptcData[code] = { formSnapshot: defaultPtcSnapshot(), summaryData: null, dirty: false };
   PTC_LABELS[code] = label;
 
   const btn = buildCustomTabButton(code, label);
@@ -1155,6 +1162,9 @@ els.currency.addEventListener('change', () => {
   updateBaseFareRoundPrompt(els.currency.value);
 });
 els.cabin.addEventListener('change', () => {
+  if (state.activePtc === 'ADT') {
+    syncCabinToOtherTabs(els.cabin.value);
+  }
   debouncedCalculateFare();
   // Also trigger tax calculation if K3 on YQ checkbox is checked
   if (els.applyK3OnYQ.checked && els.oldTax.value && els.newTax.value) {
@@ -1185,6 +1195,43 @@ els.applyK3OnYQ.addEventListener('change', () => {
   state.clearTaxCache();
   debouncedCalculateTaxes();
 });
+
+// Auto-sync Cabin selection from Adult (ADT) tab to all other tabs
+function syncCabinToOtherTabs(cabinValue) {
+  if (state.activePtc !== 'ADT') return;
+  PTC_CODES.forEach(ptc => {
+    if (ptc === 'ADT') return;
+    if (!state.ptcData[ptc]) return;
+    if (!state.ptcData[ptc].formSnapshot) {
+      state.ptcData[ptc].formSnapshot = defaultPtcSnapshot();
+    }
+    state.ptcData[ptc].formSnapshot.fields.cabin = cabinValue;
+    if (state.ptcData[ptc].summaryData) {
+      markTabDirty(ptc);
+    }
+  });
+}
+
+// Auto-sync Change Fee and 'Apply K3 on Change Fee' from Adult (ADT) tab to Child (CHD) tab
+function syncChangeFeeToChild() {
+  if (state.activePtc !== 'ADT') return;
+  if (!state.ptcData['CHD']) return;
+  if (!state.ptcData['CHD'].formSnapshot) {
+    state.ptcData['CHD'].formSnapshot = defaultPtcSnapshot();
+  }
+  state.ptcData['CHD'].formSnapshot.fields.changeFee = els.changeFee.value;
+  state.ptcData['CHD'].formSnapshot.fields.applyK3OnChangeFee = els.applyK3OnChangeFee.checked;
+  if (els.cabin.value) {
+    state.ptcData['CHD'].formSnapshot.fields.cabin = els.cabin.value;
+  }
+  if (state.ptcData['CHD'].summaryData) {
+    markTabDirty('CHD');
+  }
+}
+
+els.changeFee.addEventListener('input', syncChangeFeeToChild);
+els.changeFee.addEventListener('change', syncChangeFeeToChild);
+els.applyK3OnChangeFee.addEventListener('change', syncChangeFeeToChild);
 if (els.copyTaxFromAdult) {
   els.copyTaxFromAdult.addEventListener('change', () => {
     if (state.activePtc !== 'CHD') return;
@@ -1544,6 +1591,9 @@ async function parseFareCalcString(options = {}) {
   els.baseFare.textContent = fareCurrency ? formatAmount(baseFare, fareCurrency) : baseFare.toFixed(2);
   updateBaseFareRoundPrompt(fareCurrency);
 
+  // Check if any fare component has country code 'IN' (characters 5-6 of 8-character fare basis)
+  updateINFareDetection(parsed.fareComponents);
+
   // Show results
   els.parserResults.style.display = 'block';
 
@@ -1798,11 +1848,27 @@ function renderHalveComponentOptions(components) {
   });
 }
 
+const IN_FARE_ALERT_MSG = 'IN fare detected, check if K3 needs to be calculated.';
+
+function updateINFareDetection(fareComponents = []) {
+  const hasINCountryCode = fareComponents.some(comp => {
+    const basis = comp.fareBasis || '';
+    return basis.length >= 7 && basis.substring(5, 7).toUpperCase() === 'IN';
+  });
+
+  if (hasINCountryCode) {
+    showINRMessage(IN_FARE_ALERT_MSG);
+  } else {
+    clearINRMessage();
+  }
+}
+
 function updateFareComponentDetector() {
   const rawInput = els.fareCalcString ? els.fareCalcString.value.trim() : '';
   if (!rawInput) {
     if (els.fareComponentDetectorBadge) els.fareComponentDetectorBadge.style.display = 'none';
     if (els.halveComponentSelector) els.halveComponentSelector.style.display = 'none';
+    clearINRMessage();
     return;
   }
   const parsed = parseFareCalcStringInternal(rawInput.toUpperCase());
@@ -1813,6 +1879,8 @@ function updateFareComponentDetector() {
   } else if (els.fareComponentDetectorBadge) {
     els.fareComponentDetectorBadge.style.display = 'none';
   }
+
+  updateINFareDetection(parsed.fareComponents);
 
   renderHalveComponentOptions(parsed.fareComponents);
 
@@ -1867,6 +1935,7 @@ function updateBaseFareRoundPrompt() {
 function clearParser() {
   els.fareCalcString.value = '';
   els.parserResults.style.display = 'none';
+  clearINRMessage();
   state.lastConvertedFareCalcString = null;
   state.unhalvedFareCalcString = null;
   state.lastVerifiedMisplacedString = null;
@@ -3240,12 +3309,6 @@ function calculateFare() {
   const diffCurrency = effectiveParsedDiff?.currency ?? baseCurrency;
   const currency = diffCurrency;
 
-  if (currency === 'INR') {
-    showINRMessage('INR currency detected, check if K3 needs to be calculated.');
-  } else {
-    clearINRMessage();
-  }
-
   // Control animated bulb tips visibility (displayed next to titles only after user enters old fare and new fare)
   const hasOld = (els.oldFare.value || '').trim() !== '';
   const hasNew = (els.newFare.value || '').trim() !== '';
@@ -3392,7 +3455,7 @@ const SUMMARY_ROW_DEFS = [
     get: d => {
       const feeCur = d.feeCurrency || d.currency;
       if (d.k3Fee > 0) {
-        return `${feeCur}${formatAmount(d.fee + d.k3Fee, feeCur)} (incl. of K3)`;
+        return `${feeCur}${formatAmount(d.fee + d.k3Fee, feeCur)} (Incl. of K3 ${feeCur}${formatAmount(d.k3Fee, feeCur)})`;
       }
       return `${feeCur}${formatAmount(d.fee, feeCur)}`;
     },
@@ -3548,7 +3611,10 @@ function clearFare() {
   if (els.convertedFareDiff) els.convertedFareDiff.value = '';
   els.applyK3OnFareDiff.checked = false;
   els.applyK3OnChangeFee.checked = false;
-  clearINRMessage();
+  if (state.activePtc === 'ADT' && state.ptcData['CHD']?.formSnapshot?.fields) {
+    state.ptcData['CHD'].formSnapshot.fields.changeFee = '';
+    state.ptcData['CHD'].formSnapshot.fields.applyK3OnChangeFee = false;
+  }
   els.taxAdj.value = '';
   els.perPax.value = '';
   els.subTotal.value = '';

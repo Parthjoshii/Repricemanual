@@ -214,7 +214,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
 
     const pass = changeFeeRowK3Off.includes('INR6488') && 
                  changeFeeRowK3On.includes('INR6813') &&
-                 changeFeeRowK3On.includes('(incl. of K3)') &&
+                 changeFeeRowK3On.includes('(Incl. of K3') &&
                  gdsStringK3On.includes('+ CHG FEE INR6813');
 
     recordResult(

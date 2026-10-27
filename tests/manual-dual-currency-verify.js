@@ -43,8 +43,8 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
   assert.strictEqual(inrPerPaxVal, 'INR4277', 'Downline settlement should switch to INR');
 
   let inrMsgVisible = await page.isVisible('#inrMessage:not(:empty)');
-  console.log('Is INR notice visible:', inrMsgVisible);
-  assert.strictEqual(inrMsgVisible, true, 'INR notice should be active');
+  console.log('Is INR notice visible without FCS:', inrMsgVisible);
+  assert.strictEqual(inrMsgVisible, false, 'INR notice should remain inactive without IN fare basis in FCS');
 
   console.log('--- TEST 3: Change Fee & K3 Tax in INR ---');
   await page.selectOption('#cabin', 'economy');
@@ -96,7 +96,7 @@ const fileUrl = 'file:///' + path.resolve(__dirname, '../index.html').replace(/\
   assert.strictEqual(oldFareRow?.val, 'USD100.00', 'Old Fare should remain in USD');
   assert.strictEqual(newFareRow?.val, 'USD135.00', 'New Fare should remain in USD');
   assert.strictEqual(diffRow?.val, 'INR4277', 'Fare Difference should display as INR4277');
-  assert(feeRow?.val.includes('INR3150') && feeRow?.val.includes('(incl. of K3)'), 'Change Fee should display INR3150 (incl. of K3)');
+  assert(feeRow?.val.includes('INR3150') && feeRow?.val.includes('(Incl. of K3 INR150)'), 'Change Fee should display INR3150 (Incl. of K3 INR150)');
   assert.strictEqual(totalRow?.val, 'INR7641', 'Sub Total should be in INR');
 
   let gdsStr = await page.inputValue('#gdsString');

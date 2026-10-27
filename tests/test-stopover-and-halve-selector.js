@@ -186,7 +186,7 @@ const assert = require('assert');
 
   const changeFeeSummaryText = await page.$eval('#summary table tr:nth-child(4) td:nth-child(2)', el => el.textContent.trim());
   console.log('Summary Change Fee row:', changeFeeSummaryText);
-  assert.strictEqual(changeFeeSummaryText, 'INR9450 (incl. of K3)');
+  assert.strictEqual(changeFeeSummaryText, 'INR9450 (Incl. of K3 INR450)');
 
   const gdsCommand = await page.inputValue('#gdsString');
   console.log('GDS Command String:', gdsCommand);

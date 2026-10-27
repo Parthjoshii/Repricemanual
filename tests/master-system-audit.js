@@ -420,6 +420,19 @@ class AuditReporter {
   ]));
   reporter.assert('Mixed currencies rejected with error object', !!mismatchResult.error, mismatchResult.error);
 
+  // 1.6 Change Fee K3 Breakdown in Final Summary Table
+  const changeFeeRowDefResult = await page.evaluate(() => {
+    const feeRowDef = SUMMARY_ROW_DEFS.find(r => r.label === 'Change Fee');
+    return {
+      withK3: feeRowDef.get({ currency: 'INR', fee: 3000, k3Fee: 150 }),
+      withoutK3: feeRowDef.get({ currency: 'INR', fee: 3000, k3Fee: 0 }),
+      usdWithK3: feeRowDef.get({ currency: 'USD', fee: 100, k3Fee: 5 }),
+    };
+  });
+  reporter.assert('Change Fee with K3 formatted as INR3150 (Incl. of K3 INR150)', changeFeeRowDefResult.withK3 === 'INR3150 (Incl. of K3 INR150)', changeFeeRowDefResult.withK3);
+  reporter.assert('Change Fee without K3 formatted as plain INR3000', changeFeeRowDefResult.withoutK3 === 'INR3000', changeFeeRowDefResult.withoutK3);
+  reporter.assert('Change Fee with K3 formatted in USD as USD105.00 (Incl. of K3 USD5.00)', changeFeeRowDefResult.usdWithK3 === 'USD105.00 (Incl. of K3 USD5.00)', changeFeeRowDefResult.usdWithK3);
+
   // ==========================================================================
   // MODULE 2: GDS LINEAR FARE CONSTRUCTION STRING PARSER AUDIT
   // ==========================================================================
@@ -533,6 +546,74 @@ class AuditReporter {
 
   const xssPwned = await page.evaluate(() => window.__xssPwned === true);
   reporter.assert('XSS payload harmlessly escaped; no script execution occurred', !xssPwned);
+
+  // 2.6 Real-Time IN Fare Alert Triggered on Input (Country Code 'IN')
+  const inFareStr = 'BOM AI LON 250.00H26APIN1 AI BOM 250.00H26APIN1 NUC500.00END ROE83.50';
+  await safeFill('#fareCalcString', inFareStr);
+  await page.waitForTimeout(60);
+
+  // Assert triggered IMMEDIATELY on input before clicking Convert (#parseButton)
+  const inrMsgOnInput = await page.evaluate(() => {
+    const el = document.getElementById('inrMessage');
+    const style = window.getComputedStyle(el);
+    return {
+      text: el ? el.textContent.trim() : '',
+      inHeader: el ? el.closest('h2#fareSectionHeading') !== null : false,
+      fontWeight: parseInt(style.fontWeight, 10) || 0,
+      fontSize: parseFloat(style.fontSize) || 0,
+    };
+  });
+  reporter.assert('FCS input immediately triggers IN fare alert before conversion', inrMsgOnInput.text === 'IN fare detected, check if K3 needs to be calculated.', inrMsgOnInput.text);
+  reporter.assert('IN fare alert positioned in Fare Calculator h2 header', inrMsgOnInput.inHeader);
+  reporter.assert('IN fare alert typography is extra bold (weight >= 800)', inrMsgOnInput.fontWeight >= 800, inrMsgOnInput.fontWeight);
+  reporter.assert('IN fare alert typography font size is prominent (>= 15px)', inrMsgOnInput.fontSize >= 15, `${inrMsgOnInput.fontSize}px`);
+
+  // Assert clicking Convert executes validator without any disruption and keeps alert visible
+  await safeClick('#parseButton');
+  await page.waitForTimeout(60);
+  const parserPassState = await page.evaluate(() => {
+    return {
+      nucVal: document.getElementById('nucValidation')?.textContent || '',
+      baseFare: document.getElementById('baseFare')?.textContent || '',
+      alertText: document.getElementById('inrMessage')?.textContent.trim() || '',
+    };
+  });
+  reporter.assert('Fare calculation validator passes cleanly with IN fare alert active', parserPassState.nucVal.includes('PASS'));
+  reporter.assert('IN fare alert persists post-conversion', parserPassState.alertText === 'IN fare detected, check if K3 needs to be calculated.', parserPassState.alertText);
+
+  // String with foreign fare basis (e.g. US country code)
+  const usFareStr = 'JFK AA LON 500.00TLEEPUS1 NUC500.00 END ROE1.0';
+  await safeFill('#fareCalcString', usFareStr);
+  await page.waitForTimeout(60);
+
+  const inrMsgInactiveOnUS = await page.evaluate(() => document.getElementById('inrMessage')?.textContent.trim() || '');
+  reporter.assert('FCS without country code IN clears IN fare alert', inrMsgInactiveOnUS === '', inrMsgInactiveOnUS);
+
+  // Clearing FCS input directly clears IN fare alert immediately
+  await safeFill('#fareCalcString', inFareStr);
+  await page.waitForTimeout(60);
+  await safeFill('#fareCalcString', '');
+  await page.waitForTimeout(60);
+  const inrMsgClearedOnEmptyInput = await page.evaluate(() => document.getElementById('inrMessage')?.textContent.trim() || '');
+  reporter.assert('Clearing FCS input immediately clears IN fare alert', inrMsgClearedOnEmptyInput === '', inrMsgClearedOnEmptyInput);
+
+  // Clearing parser button clears IN fare alert
+  await safeFill('#fareCalcString', inFareStr);
+  await safeClick('#parseButton');
+  await page.waitForTimeout(60);
+  await safeClick('#parserClearButton');
+  await page.waitForTimeout(60);
+  const inrMsgCleared = await page.evaluate(() => document.getElementById('inrMessage')?.textContent.trim() || '');
+  reporter.assert('Clearing parser clears IN fare alert', inrMsgCleared === '', inrMsgCleared);
+
+  // Selecting INR currency without FCS does NOT show IN fare alert
+  await safeSelect('#currency', 'INR');
+  await safeFill('#oldFare', '1000');
+  await safeFill('#newFare', '2000');
+  await safeClick('#fareCalcButton');
+  await page.waitForTimeout(60);
+  const inrMsgOnCurrencyOnly = await page.evaluate(() => document.getElementById('inrMessage')?.textContent.trim() || '');
+  reporter.assert('Selecting INR currency alone does NOT trigger IN fare alert', inrMsgOnCurrencyOnly === '', inrMsgOnCurrencyOnly);
 
   // ==========================================================================
   // MODULE 3: PASSENGER TAB STATE MANAGEMENT & ISOLATION AUDIT
@@ -735,6 +816,106 @@ class AuditReporter {
 
   await safeClick('#ptcTabADT');
   await page.waitForTimeout(60);
+
+  // 3.4 Adult-to-Child Change Fee & Checkbox Synchronization
+  await safeFill('#changeFee', '3000');
+  await safeCheck('#applyK3OnChangeFee');
+  await page.waitForTimeout(60);
+
+  // Switch to Child tab and verify fee & checkbox are populated
+  await safeClick('#ptcTabCHD');
+  await page.waitForTimeout(60);
+  const chdSyncedFee = await page.evaluate(() => ({
+    fee: els.changeFee.value,
+    k3Checked: els.applyK3OnChangeFee.checked,
+  }));
+  reporter.assert('Adult Change Fee (3000) auto-synced to Child tab', chdSyncedFee.fee === '3000', chdSyncedFee.fee);
+  reporter.assert('Adult Apply K3 on Change Fee checkbox auto-synced to Child tab', chdSyncedFee.k3Checked === true);
+
+  // Child tab fee remains independently editable
+  await safeFill('#changeFee', '2500');
+  await page.waitForTimeout(60);
+  await safeClick('#ptcTabADT');
+  await page.waitForTimeout(60);
+  const adtFeePreserved = await page.evaluate(() => els.changeFee.value);
+  reporter.assert('Child tab manual fee edit does not overwrite Adult tab', adtFeePreserved === '3000', adtFeePreserved);
+
+  // 3.5 Adult Cabin Auto-Sync to All Tabs & Independent Overrides
+  await safeSelect('#cabin', 'economy');
+  await page.waitForTimeout(60);
+
+  // Verify cabin auto-synced to Child and Infant tab snapshots
+  const snapshotsCabin = await page.evaluate(() => ({
+    chdCabin: state.ptcData['CHD']?.formSnapshot?.fields?.cabin,
+    infCabin: state.ptcData['INF']?.formSnapshot?.fields?.cabin,
+  }));
+  reporter.assert('Adult Cabin (economy) auto-synced to Child tab snapshot', snapshotsCabin.chdCabin === 'economy', snapshotsCabin.chdCabin);
+  reporter.assert('Adult Cabin (economy) auto-synced to Infant tab snapshot', snapshotsCabin.infCabin === 'economy', snapshotsCabin.infCabin);
+
+  // Switch to Child tab and verify cabin dropdown is populated with 'economy'
+  await safeClick('#ptcTabCHD');
+  await page.waitForTimeout(60);
+  const chdCabinVal = await page.evaluate(() => els.cabin.value);
+  reporter.assert('Child tab active cabin restored as economy from Adult', chdCabinVal === 'economy', chdCabinVal);
+
+  // Child tab cabin can be changed independently
+  await safeSelect('#cabin', 'business');
+  await page.waitForTimeout(60);
+  const chdCabinBusiness = await page.evaluate(() => els.cabin.value);
+  reporter.assert('Child tab cabin changed to business independently', chdCabinBusiness === 'business', chdCabinBusiness);
+
+  // Switch back to Adult tab and verify Adult cabin remains economy
+  await safeClick('#ptcTabADT');
+  await page.waitForTimeout(60);
+  const adtCabinStillEconomy = await page.evaluate(() => els.cabin.value);
+  reporter.assert('Child cabin change does not overwrite Adult cabin (still economy)', adtCabinStillEconomy === 'economy', adtCabinStillEconomy);
+
+  // Switch back to Child tab and verify Child cabin remains business
+  await safeClick('#ptcTabCHD');
+  await page.waitForTimeout(60);
+  const chdCabinStillBusiness = await page.evaluate(() => els.cabin.value);
+  reporter.assert('Child cabin retains business on return', chdCabinStillBusiness === 'business', chdCabinStillBusiness);
+
+  // 3.6 End-to-End Summarise Bug Verification (No missing cabin error)
+  await safeClick('#ptcTabADT');
+  await page.waitForTimeout(60);
+  await safeSelect('#currency', 'USD');
+  await safeSelect('#cabin', 'economy');
+  await safeFill('#oldTax', 'USD50YQ');
+  await safeFill('#newTax', 'USD80YQ');
+  await safeClick('#taxCalcButton');
+  await safeFill('#oldFare', '1000');
+  await safeFill('#newFare', '2000');
+  await safeFill('#changeFee', '3000');
+  await safeCheck('#applyK3OnChangeFee');
+  await safeClick('#fareCalcButton');
+  await page.waitForTimeout(60);
+
+  // Reset modal error tracker before clicking Summarise
+  let errorMessageEncountered = null;
+  const originalErrorHandler = await page.evaluate(() => {
+    window.__lastErrorMsg = null;
+    const orig = window.showError;
+    window.showError = function(msg) {
+      window.__lastErrorMsg = msg;
+      return orig.apply(this, arguments);
+    };
+    return true;
+  });
+
+  await safeClick('#summariseButton');
+  await page.waitForTimeout(100);
+
+  const summariseErrorCheck = await page.evaluate(() => {
+    return {
+      errorCaptured: window.__lastErrorMsg,
+      summaryVisible: els.summaryContent.style.display === 'block',
+      tableHtml: els.summary.innerHTML,
+    };
+  });
+
+  reporter.assert('Clicking Summarise with Adult K3 on change fee triggers NO cabin error', !summariseErrorCheck.errorCaptured || !summariseErrorCheck.errorCaptured.toLowerCase().includes('cabin'), summariseErrorCheck.errorCaptured);
+  reporter.assert('Summary table rendered successfully', summariseErrorCheck.summaryVisible && summariseErrorCheck.tableHtml.length > 0);
 
   // ==========================================================================
   // MODULE 4: UI/UX DESIGN GEOMETRY & CSS PAINT PIPELINE AUDIT
