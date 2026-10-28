@@ -244,14 +244,26 @@ function showPtcPrompt({ message, defaultValue = '', requireInput = true }) {
 // Matches direct Q (Q12.29, Q 12.29), coded Q (Q COKDUB58.47, QBOM5.00), or bare city-pair surcharges (COKDUB58.47).
 const TRAILING_Q_REGEX = /(\d+(?:\.\d+)?)([A-Z0-9]{8})(CH|IN)?(\/[A-Z0-9]{1,8}?)?\s*(Q\s*(?:[A-Z]{3}(?:\s*[A-Z]{3})?\s*)?\d+(?:\.\d+)?(?:\s*Q(?![A-Za-z]))?|[A-Z]{6}\d+(?:\.\d+)?(?:\s*Q(?![A-Za-z]))?)/g;
 
+function formatStandardQ(rawQ) {
+  const trimmed = rawQ.trim();
+  const match = trimmed.match(/^Q\s*([A-Z]{3}(?:\s*[A-Z]{3})?)\s*(\d+(?:\.\d+)?.*)$/);
+  if (match) {
+    const cityCode = match[1].replace(/\s+/g, '');
+    const rest = match[2];
+    return `Q ${cityCode}${rest}`;
+  }
+  return trimmed;
+}
+
 function normalizeTrailingQSurchargesInMemory(str) {
   if (!str) return '';
   const regex = new RegExp(TRAILING_Q_REGEX.source, 'g');
-  return str.replace(regex, (match, fare, basis, suffix, desig, fullQ) => {
+  return str.replace(regex, (match, fare, basis, suffix, desig, fullQ, offset, string) => {
     const sfx = suffix || '';
     const dsg = desig || '';
-    const cleanQ = fullQ.trim();
-    return `${cleanQ} ${fare}${basis}${sfx}${dsg} `;
+    const cleanQ = formatStandardQ(fullQ);
+    const prefixSpace = (offset > 0 && /[A-Za-z0-9]/.test(string[offset - 1])) ? ' ' : '';
+    return `${prefixSpace}${cleanQ} ${fare}${basis}${sfx}${dsg} `;
   });
 }
 
@@ -273,11 +285,12 @@ function detectTrailingQSurcharges(str) {
   }
   if (matches.length === 0) return null;
 
-  const standardized = str.replace(new RegExp(TRAILING_Q_REGEX.source, 'g'), (match, fare, basis, suffix, desig, fullQ) => {
+  const standardized = str.replace(new RegExp(TRAILING_Q_REGEX.source, 'g'), (match, fare, basis, suffix, desig, fullQ, offset, string) => {
     const sfx = suffix || '';
     const dsg = desig || '';
-    const cleanQ = fullQ.trim();
-    return `${cleanQ} ${fare}${basis}${sfx}${dsg} `;
+    const cleanQ = formatStandardQ(fullQ);
+    const prefixSpace = (offset > 0 && /[A-Za-z0-9]/.test(string[offset - 1])) ? ' ' : '';
+    return `${prefixSpace}${cleanQ} ${fare}${basis}${sfx}${dsg} `;
   }).replace(/\s+/g, ' ').trim();
 
   const inputtedHtml = escapeHtml(str).replace(new RegExp(TRAILING_Q_REGEX.source, 'g'), (match, fare, basis, suffix, desig, fullQ) => {
@@ -286,11 +299,12 @@ function detectTrailingQSurcharges(str) {
     return `${fare}${basis}${sfx}${dsg}<span class="q-hl-misplaced">${escapeHtml(fullQ)}</span>`;
   });
 
-  const standardizedHtml = escapeHtml(str).replace(new RegExp(TRAILING_Q_REGEX.source, 'g'), (match, fare, basis, suffix, desig, fullQ) => {
+  const standardizedHtml = escapeHtml(str).replace(new RegExp(TRAILING_Q_REGEX.source, 'g'), (match, fare, basis, suffix, desig, fullQ, offset, string) => {
     const sfx = suffix || '';
     const dsg = desig || '';
-    const cleanQ = fullQ.trim();
-    return `<span class="q-hl-standard">${escapeHtml(cleanQ)}</span> ${fare}${basis}${sfx}${dsg} `;
+    const cleanQ = formatStandardQ(fullQ);
+    const prefixSpace = (offset > 0 && /[A-Za-z0-9]/.test(string[offset - 1])) ? ' ' : '';
+    return `${prefixSpace}<span class="q-hl-standard">${escapeHtml(cleanQ)}</span> ${fare}${basis}${sfx}${dsg} `;
   });
 
   return {

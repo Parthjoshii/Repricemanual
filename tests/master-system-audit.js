@@ -521,6 +521,28 @@ class AuditReporter {
   reporter.assert('Trailing Q surcharge detected after fare basis code', trailingDetection !== null && trailingDetection.count > 0, trailingDetection?.count);
   reporter.assert('Trailing Q standardized before fare component', trailingDetection?.standardized.includes('Q12.29 600.00H26APDEL'), trailingDetection?.standardized);
 
+  const blrUserFcs = 'BLR EK DXB89.19LLXAPIN1/NDC2 EK BLR950.59YLWRFIN1/NDC2 QBLRBLR3.16 NUC203.01END ROE94.655727';
+  const blrResults = await page.evaluate((fcs) => {
+    const std = detectTrailingQSurcharges(fcs);
+    const inMem = normalizeTrailingQSurchargesInMemory(fcs);
+    const parsed = parseFareCalcStringInternal(std.standardized);
+    const qSurcharges = parsed.qSurcharges;
+    const calcNuc = parsed.fareComponents.reduce((acc, c) => acc + c.amount, 0) + qSurcharges.reduce((acc, q) => acc + q, 0);
+    return {
+      formattedQ: formatStandardQ('QBLRBLR3.16'),
+      standardized: std?.standardized,
+      inMem,
+      qSurcharges,
+      calcNuc: Math.round((calcNuc + Number.EPSILON) * 100) / 100,
+    };
+  }, blrUserFcs);
+
+  reporter.assert('formatStandardQ separates Q and city pair (Q BLRBLR3.16)', blrResults.formattedQ === 'Q BLRBLR3.16', blrResults.formattedQ);
+  reporter.assert('Trailing Q standardizes with space before Q and after Q (BLR Q BLRBLR3.16 950.59)', blrResults.standardized.includes('EK BLR Q BLRBLR3.16 950.59YLWRFIN1/NDC2'), blrResults.standardized);
+  reporter.assert('In-memory normalization produces standard spacing (BLR Q BLRBLR3.16 950.59)', blrResults.inMem.includes('EK BLR Q BLRBLR3.16 950.59YLWRFIN1/NDC2'), blrResults.inMem);
+  reporter.assert('Parser extracts Q surcharge 3.16 from standardized string', blrResults.qSurcharges.includes(3.16), blrResults.qSurcharges);
+  reporter.assert('Calculated NUC totals 1042.94 (89.19 + 950.59 + 3.16)', blrResults.calcNuc === 1042.94, blrResults.calcNuc);
+
   // 2.4 Selective Component Halving & Stopovers
   const stopoverStr = 'BOM AI LON 400.00H26APBOM AI PAR 1S50.00 300.00H26APBOM AI BOM 700.00H26APBOM NUC1450.00END ROE83.5';
   await safeFill('#fareCalcString', stopoverStr);

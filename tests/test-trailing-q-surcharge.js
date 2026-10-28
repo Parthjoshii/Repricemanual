@@ -241,6 +241,63 @@ const assert = require('assert');
 
   console.log('✓ TEST 5 passed: Modal activates, clean designator /VFN2, no phantom 2.00, calculated NUC = 1215.27.\n');
 
+  // -------------------------------------------------------------------------
+  // TEST 6: User Case with Airport Code touching Fare and Q glued to Airport Pair
+  // (BLR950.59YLWRFIN1/NDC2 QBLRBLR3.16 -> BLR Q BLRBLR3.16 950.59YLWRFIN1/NDC2)
+  // -------------------------------------------------------------------------
+  console.log('--- TEST 6: User Case (BLR950.59YLWRFIN1/NDC2 QBLRBLR3.16) ---');
+  await page.click('#ptcTabADT');
+  await page.waitForTimeout(150);
+  await page.click('#parserClearButton');
+  await page.waitForTimeout(100);
+
+  const userBlrString = 'BLR EK DXB89.19LLXAPIN1/NDC2 EK BLR950.59YLWRFIN1/NDC2 QBLRBLR3.16 NUC203.01END ROE94.655727';
+  await page.fill('#fareCalcString', userBlrString);
+  await page.click('#parseButton');
+  await page.waitForTimeout(200);
+
+  // Modal must be triggered
+  assert.strictEqual(await page.isVisible('#qCorrectionModal.show'), true, 'Modal MUST be triggered for QBLRBLR3.16');
+
+  // Verify modal standardized diff preview contains standard spaced format: Q BLRBLR3.16
+  const blrDiffStandardized = await page.innerHTML('#qDiffStandardized');
+  console.log('BLR Diff Standardized HTML:', blrDiffStandardized);
+  assert.strictEqual(blrDiffStandardized.includes('BLR <span class="q-hl-standard">Q BLRBLR3.16</span> 950.59'), true, 'Standardized diff must separate BLR, Q, and BLRBLR with spaces');
+
+  // Click Apply
+  await page.click('#qCorrectionApplyBtn');
+  await page.waitForTimeout(300);
+
+  // Textarea must contain properly spaced standard IATA format: BLR Q BLRBLR3.16 950.59
+  const blrUpdatedFcs = await page.inputValue('#fareCalcString');
+  console.log('BLR Standardized Textarea Value:', blrUpdatedFcs);
+  assert.strictEqual(blrUpdatedFcs.includes('EK BLR Q BLRBLR3.16 950.59YLWRFIN1/NDC2'), true, 'Textarea must contain standard "EK BLR Q BLRBLR3.16 950.59YLWRFIN1/NDC2"');
+
+  // Fare Components
+  const blrFcItems = await page.$$eval('#fareComponents li', lis => lis.map(li => li.innerText));
+  console.log('BLR Fare Components:', blrFcItems);
+  assert.strictEqual(blrFcItems.length, 2);
+  assert.strictEqual(blrFcItems[0].includes('89.19 (LLXAPIN1/NDC2)'), true);
+  assert.strictEqual(blrFcItems[1].includes('950.59 (YLWRFIN1/NDC2)'), true);
+
+  // Q Surcharges: 3.16 MUST be accounted!
+  const blrQItems = await page.$$eval('#qSurcharges li', lis => lis.map(li => li.innerText));
+  console.log('BLR Q Surcharges:', blrQItems);
+  assert.deepStrictEqual(blrQItems, ['3.16'], 'Q Surcharge 3.16 must be cleanly extracted');
+
+  // Calculated NUC: 89.19 + 950.59 + 3.16 = 1042.94
+  const blrCalcNuc = await page.textContent('#calculatedNuc');
+  console.log('BLR Calculated NUC:', blrCalcNuc);
+  assert.strictEqual(blrCalcNuc.includes('1042.94'), true, 'Calculated NUC must be 1042.94');
+
+  // Corrected fare string must have NUC1042.94END and retain standard spacing
+  const blrNucValidation = await page.textContent('#nucValidation');
+  console.log('BLR NUC Validation:', blrNucValidation);
+  assert.strictEqual(blrNucValidation.includes('NUC1042.94END'), true, 'Corrected fare string must reflect NUC1042.94END');
+  assert.strictEqual(blrNucValidation.includes('EK BLR Q BLRBLR3.16 950.59'), true, 'Corrected fare string must contain clean spacing');
+
+  console.log('✓ TEST 6 passed: BLR950.59... QBLRBLR3.16 standardizes to "BLR Q BLRBLR3.16 950.59", extracts 3.16 Q, NUC = 1042.94.\n');
+
   await browser.close();
 
   console.log('========================================================================');
