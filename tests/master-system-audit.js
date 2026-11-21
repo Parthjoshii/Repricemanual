@@ -637,6 +637,64 @@ class AuditReporter {
   const inrMsgOnCurrencyOnly = await page.evaluate(() => document.getElementById('inrMessage')?.textContent.trim() || '');
   reporter.assert('Selecting INR currency alone does NOT trigger IN fare alert', inrMsgOnCurrencyOnly === '', inrMsgOnCurrencyOnly);
 
+  // 2.7 Fare Rule Guidance HUD Verification (Immediate Trigger on Input, 6 Guidance Pills, Critical Surcharge & FZ Alert Banner, Zero Friction, Reset)
+  await safeClick('#parserClearButton');
+  await page.waitForTimeout(60);
+
+  const hudInitialDisplay = await page.evaluate(() => document.getElementById('fareRuleChecklistSection')?.style.display || 'none');
+  reporter.assert('Fare rule HUD initially hidden when textarea is empty', hudInitialDisplay === 'none');
+
+  // Input string triggers HUD immediately
+  const auditFcs = 'BOM EK DXB 300.00TLEEPIN1/NDC2 EK BOM 250.00TLEEPIN1/NDC2 NUC550.00 ROE1.0';
+  await safeFill('#fareCalcString', auditFcs);
+  await page.waitForTimeout(60);
+
+  const hudTriggered = await page.evaluate(() => {
+    const el = document.getElementById('fareRuleChecklistSection');
+    return el && window.getComputedStyle(el).display === 'block';
+  });
+  reporter.assert('Entering fare calculation string immediately triggers fare rule HUD', hudTriggered);
+
+  // Verify all 6 guidance pills exist with clean labels
+  const pillData = await page.evaluate(() => {
+    const pills = Array.from(document.querySelectorAll('.fare-rule-pill'));
+    return pills.map(p => ({
+      label: p.querySelector('.pill-label')?.textContent.trim() || '',
+      badge: p.querySelector('.pill-badge-critical')?.textContent.trim() || '',
+      warningIcon: p.querySelector('.pill-warning-icon')?.textContent.trim() || '',
+      isCritical: p.classList.contains('pill-critical'),
+    }));
+  });
+  reporter.assert('Exactly 6 fare rule guidance pills exist in HUD', pillData.length === 6, `Count: ${pillData.length}`);
+
+  const expectedLabels = ['Flight Application', 'Day/Time Application', 'Stopover', 'Combinability', 'Seasonality', 'Surcharges'];
+  const labelsMatch = expectedLabels.every((exp, idx) => pillData[idx]?.label === exp);
+  reporter.assert('All 6 guidance pills match clean label definitions', labelsMatch);
+
+  // Verify first 5 pills have no emojis and no category numbers
+  const standardPillsClean = pillData.slice(0, 5).every(p => !p.isCritical && p.warningIcon === '' && !p.label.includes('Cat'));
+  reporter.assert('Standard 5 guidance pills have clean typography without emojis or category codes', standardPillsClean);
+
+  // Verify Surcharges pill has critical styling, warning icon and CRITICAL badge
+  const surchargePill = pillData[5];
+  reporter.assert('Surcharges guidance pill has critical styling', surchargePill && surchargePill.isCritical);
+  reporter.assert('Surcharges guidance pill has CRITICAL badge', surchargePill && surchargePill.badge === 'CRITICAL', surchargePill?.badge);
+  reporter.assert('Surcharges guidance pill has warning icon', surchargePill && surchargePill.warningIcon === '⚠️', surchargePill?.warningIcon);
+
+  // Verify Surcharge banner contains required FZ text
+  const bannerText = await page.evaluate(() => document.getElementById('surchargeWarningNotice')?.textContent.trim() || '');
+  reporter.assert('Surcharge banner contains required FZ text', bannerText.includes('Important - Check all surcharges are calculated. Especially FZ surcharge') || (bannerText.includes('Important - Check all surcharges are calculated') && bannerText.includes('FZ surcharge')), bannerText);
+
+  // Zero checkboxes in HUD (zero interaction cost)
+  const hudCheckboxCount = await page.evaluate(() => document.querySelectorAll('#fareRuleChecklistSection input[type="checkbox"]').length);
+  reporter.assert('HUD requires 0 manual checkboxes for zero-click speed', hudCheckboxCount === 0, `Checkboxes: ${hudCheckboxCount}`);
+
+  // Clearing parser resets HUD
+  await safeClick('#parserClearButton');
+  await page.waitForTimeout(60);
+  const clearedDisp = await page.evaluate(() => document.getElementById('fareRuleChecklistSection')?.style.display);
+  reporter.assert('Parser Clear button hides fare rule HUD', clearedDisp === 'none');
+
   // ==========================================================================
   // MODULE 3: PASSENGER TAB STATE MANAGEMENT & ISOLATION AUDIT
   // ==========================================================================
@@ -1254,24 +1312,30 @@ class AuditReporter {
   const allPassed = reporter.summary();
 
   // Save audit artifact report
-  const auditReportPath = path.resolve('C:/Users/Parth Joshi/.gemini/antigravity-ide/brain/643cd18c-a97f-4475-80c9-0ad6e75f8e33/master_zero_defect_audit_report.json');
-  const auditReportDir = path.dirname(auditReportPath);
-  if (!fs.existsSync(auditReportDir)) {
-    fs.mkdirSync(auditReportDir, { recursive: true });
+  try {
+    const localArtifactDir = path.resolve(__dirname, 'artifacts');
+    if (!fs.existsSync(localArtifactDir)) {
+      fs.mkdirSync(localArtifactDir, { recursive: true });
+    }
+    const auditReportPath = path.join(localArtifactDir, 'master_zero_defect_audit_report.json');
+    fs.writeFileSync(auditReportPath, JSON.stringify({
+      timestamp: new Date().toISOString(),
+      totalTests: reporter.totalTests,
+      passed: reporter.passed,
+      failed: reporter.failed,
+      seed: SEED,
+      chaosSteps: CHAOS_STEPS,
+      moduleStats: reporter.moduleStats,
+      status: allPassed ? 'ZERO_DEFECT_VERIFIED' : 'FAILED',
+    }, null, 2));
+    console.log(`\nMaster audit report saved to: ${auditReportPath}`);
+  } catch (err) {
+    console.warn('Could not write audit artifact file:', err.message);
   }
-  fs.writeFileSync(auditReportPath, JSON.stringify({
-    timestamp: new Date().toISOString(),
-    totalTests: reporter.totalTests,
-    passed: reporter.passed,
-    failed: reporter.failed,
-    seed: SEED,
-    chaosSteps: CHAOS_STEPS,
-    moduleStats: reporter.moduleStats,
-    status: allPassed ? 'ZERO_DEFECT_VERIFIED' : 'FAILED',
-  }, null, 2));
-
-  console.log(`\nMaster audit report saved to: ${auditReportPath}`);
 
   await browser.close();
   process.exit(allPassed ? 0 : 1);
 })();
+
+module.exports = {};
+

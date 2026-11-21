@@ -193,6 +193,8 @@ const els = {
   qDiffStandardized: byId('qDiffStandardized'),
   qCorrectionAsIsBtn: byId('qCorrectionAsIsBtn'),
   qCorrectionApplyBtn: byId('qCorrectionApplyBtn'),
+  fareRuleChecklistSection: byId('fareRuleChecklistSection'),
+  surchargeWarningNotice: byId('surchargeWarningNotice'),
 };
 
 // In-app replacement for window.prompt()/confirm() — some embedded browser previews (e.g.
@@ -472,7 +474,7 @@ function defaultPtcSnapshot() {
   }
   const stateValues = {};
   PTC_STATE_KEYS.forEach(key => { stateValues[key] = key === 'lastFareK3Total' ? 0 : (key === 'lastK3AddTaxes' ? '' : null); });
-  return { fields, stateValues, parserVisible: false, qSurchargesVisible: false };
+  return { fields, stateValues, parserVisible: false, qSurchargesVisible: false, fareRuleChecklistVisible: false };
 }
 
 function snapshotPtc() {
@@ -492,6 +494,7 @@ function snapshotPtc() {
     parserVisible: els.parserResults.style.display === 'block',
     qSurchargesVisible: els.qSurchargesSection.style.display === 'block',
     stopoverChargesVisible: els.stopoverChargesSection ? els.stopoverChargesSection.style.display === 'block' : false,
+    fareRuleChecklistVisible: els.fareRuleChecklistSection ? els.fareRuleChecklistSection.style.display === 'block' : false,
     fareComponentsHtml: els.fareComponents.innerHTML,
     qSurchargesHtml: els.qSurcharges.innerHTML,
     stopoverChargesHtml: els.stopoverCharges ? els.stopoverCharges.innerHTML : '',
@@ -518,6 +521,10 @@ function restorePtc(snapshot) {
   els.qSurchargesSection.style.display = snapshot.qSurchargesVisible ? 'block' : 'none';
   if (els.stopoverChargesSection) {
     els.stopoverChargesSection.style.display = snapshot.stopoverChargesVisible ? 'block' : 'none';
+  }
+  if (els.fareRuleChecklistSection) {
+    const shouldShowChecklist = snapshot.fareRuleChecklistVisible || (els.fareCalcString.value || '').trim().length > 0;
+    els.fareRuleChecklistSection.style.display = shouldShowChecklist ? 'block' : 'none';
   }
   els.fareComponents.innerHTML = snapshot.fareComponentsHtml || '';
   els.qSurcharges.innerHTML = snapshot.qSurchargesHtml || '';
@@ -1265,6 +1272,12 @@ if (els.copyTaxFromAdult) {
   }
 });
 
+function syncFareRuleChecklistVisibility() {
+  if (!els.fareRuleChecklistSection) return;
+  const hasInput = (els.fareCalcString.value || '').trim().length > 0;
+  els.fareRuleChecklistSection.style.display = hasInput ? 'block' : 'none';
+}
+
 // Parser event listeners
 els.parseButton.addEventListener('click', parseFareCalcString);
 els.parserClearButton.addEventListener('click', clearParser);
@@ -1282,9 +1295,11 @@ els.fareCalcString.addEventListener('input', () => {
   }
   state.lastVerifiedMisplacedString = null;
   updateFareComponentDetector();
+  syncFareRuleChecklistVisibility();
 });
 els.fareCalcString.addEventListener('change', () => {
   updateFareComponentDetector();
+  syncFareRuleChecklistVisibility();
 });
 els.autoCalcFromAdult.addEventListener('change', () => {
   if (!isAutoCalcEligible(state.activePtc)) return;
@@ -1404,8 +1419,11 @@ async function parseFareCalcString(options = {}) {
   if (!rawInput) {
     showError('Please enter a fare calculation string.');
     els.parserResults.style.display = 'none';
+    syncFareRuleChecklistVisibility();
     return;
   }
+
+  syncFareRuleChecklistVisibility();
 
   // Fare calculation strings are conventionally all-uppercase (GDS/ticketing systems always
   // print them that way), so a lowercase-typed string isn't really "malformed" input — it's just
@@ -1966,6 +1984,9 @@ function clearParser() {
   if (els.stopoverChargesSection) {
     els.stopoverChargesSection.style.display = 'none';
   }
+  if (els.fareRuleChecklistSection) {
+    els.fareRuleChecklistSection.style.display = 'none';
+  }
   if (els.baseFareRoundPrompt) {
     els.baseFareRoundPrompt.classList.remove('active');
   }
@@ -2267,14 +2288,6 @@ function applyCopyTaxFromAdult({ silent = false } = {}) {
   els.newTax.value = adultTaxes.newTax;
   calculateTaxes();
   markTabDirty('CHD');
-}
-
-function toggleParserSection() {
-  els.parserCollapsible.classList.toggle('collapsed');
-  els.parserToggleBtn.classList.toggle('collapsed');
-  const isCollapsed = els.parserCollapsible.classList.contains('collapsed');
-  els.parserToggleBtn.textContent = isCollapsed ? 'Show' : 'Hide';
-  els.parserToggleBtn.setAttribute('aria-expanded', !isCollapsed);
 }
 
 // Builds the minimal tax-only summary shape used when a PTC has tax data but no fare data yet.
@@ -3895,6 +3908,7 @@ function copyGdsString() {
 loadTheme();
 initSessionRestore();
 updatePtcTabUI();
+syncFareRuleChecklistVisibility();
 updateGliderPosition(true);
 
 window.addEventListener('resize', () => updateGliderPosition(true));

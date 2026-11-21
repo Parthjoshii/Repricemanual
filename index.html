@@ -288,6 +288,53 @@ Changes in V4.6 (Bug Fix Release):
                   <div id="halveComponentOptions" class="halve-component-options"></div>
                 </div>
               </div>
+              <!-- Fare Rule Alert & Guidance HUD (Zero-Friction, Instant-Glance) -->
+              <div class="section-grid-full fare-rule-hud-cell" id="fareRuleChecklistSection" style="display: none;" role="group" aria-label="Fare Rule Guidance and Surcharge Alert">
+                <div class="fare-rule-hud-card">
+                  <!-- Primary Prominent Surcharge Alert Banner -->
+                  <div id="surchargeWarningNotice" class="surcharge-hud-banner warning-state" role="alert">
+                    <div class="surcharge-hud-icon-wrap">
+                      <svg class="surcharge-hud-icon" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.25" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">
+                        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+                        <line x1="12" y1="9" x2="12" y2="13"></line>
+                        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+                      </svg>
+                    </div>
+                    <div class="surcharge-hud-content">
+                      <span class="surcharge-hud-headline">Important - Check all surcharges are calculated. Especially <strong>FZ surcharge</strong></span>
+                    </div>
+                  </div>
+
+                  <!-- 6 Glanceable Rule Guidance Pills -->
+                  <div class="fare-rule-pills-row" role="list" aria-label="Essential Fare Rule Points">
+                    <div class="fare-rule-pill" role="listitem">
+                      <span class="pill-dot"></span>
+                      <span class="pill-label">Flight Application</span>
+                    </div>
+                    <div class="fare-rule-pill" role="listitem">
+                      <span class="pill-dot"></span>
+                      <span class="pill-label">Day/Time Application</span>
+                    </div>
+                    <div class="fare-rule-pill" role="listitem">
+                      <span class="pill-dot"></span>
+                      <span class="pill-label">Stopover</span>
+                    </div>
+                    <div class="fare-rule-pill" role="listitem">
+                      <span class="pill-dot"></span>
+                      <span class="pill-label">Combinability</span>
+                    </div>
+                    <div class="fare-rule-pill" role="listitem">
+                      <span class="pill-dot"></span>
+                      <span class="pill-label">Seasonality</span>
+                    </div>
+                    <div class="fare-rule-pill pill-critical" role="listitem">
+                      <span class="pill-warning-icon">⚠️</span>
+                      <span class="pill-label">Surcharges</span>
+                      <span class="pill-badge-critical">CRITICAL</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
               <div class="section-grid-full button-row">
                 <button id="parseButton" type="button" aria-label="Parse fare calculation string">Convert</button>
                 <button id="parserClearButton" type="button" class="secondary"

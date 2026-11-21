@@ -2564,3 +2564,180 @@ th {
   border-color: var(--text-secondary);
   background: var(--bg-app);
 }
+
+/* ==========================================================================
+   Fare Rule Alert & Guidance HUD (Zero-Friction, Instant-Glance)
+   ========================================================================== */
+.fare-rule-hud-cell {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  margin-bottom: 8px;
+  box-sizing: border-box;
+}
+
+.fare-rule-hud-card {
+  display: block;
+  width: 100%;
+  padding: 10px 14px 12px 14px;
+  border-radius: 8px;
+  background: rgba(16, 20, 38, 0.65);
+  border: 1px solid rgba(56, 189, 248, 0.28);
+  box-sizing: border-box;
+  animation: fadeInDown 0.22s ease-out;
+}
+
+[data-theme="light"] .fare-rule-hud-card {
+  background: rgba(241, 245, 249, 0.95);
+  border-color: #cbd5e1;
+}
+
+/* Primary Prominent Surcharge Alert Banner */
+.surcharge-hud-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 6px;
+  margin-bottom: 10px;
+  transition: all 0.2s ease;
+}
+
+.surcharge-hud-banner.warning-state {
+  background: rgba(245, 158, 11, 0.14);
+  border: 1px solid rgba(245, 158, 11, 0.45);
+  color: #fcd34d;
+}
+
+[data-theme="light"] .surcharge-hud-banner.warning-state {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+
+.surcharge-hud-icon-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.surcharge-hud-icon {
+  flex-shrink: 0;
+}
+
+.surcharge-hud-content {
+  flex: 1;
+}
+
+.surcharge-hud-headline {
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  line-height: 1.35;
+}
+
+.surcharge-hud-headline strong {
+  font-weight: 800;
+}
+
+/* 6 Glanceable Rule Guidance Pills */
+.fare-rule-pills-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.fare-rule-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border-radius: 6px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  background: rgba(26, 30, 54, 0.75);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  user-select: none;
+  transition: all 0.15s ease;
+  box-sizing: border-box;
+}
+
+[data-theme="light"] .fare-rule-pill {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: #cbd5e1;
+  color: #475569;
+}
+
+.pill-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(56, 189, 248, 0.6);
+  flex-shrink: 0;
+}
+
+[data-theme="light"] .pill-dot {
+  background: #6366f1;
+}
+
+.pill-label {
+  font-size: 0.78rem;
+}
+
+/* Surcharges Critical Pill */
+.fare-rule-pill.pill-critical {
+  background: rgba(245, 158, 11, 0.12);
+  border: 1.5px solid rgba(245, 158, 11, 0.75);
+  color: #fcd34d;
+  box-shadow: 0 0 8px rgba(245, 158, 11, 0.18);
+}
+
+[data-theme="light"] .fare-rule-pill.pill-critical {
+  background: #fffbeb;
+  border-color: #d97706;
+  color: #92400e;
+  box-shadow: 0 0 6px rgba(217, 119, 6, 0.15);
+}
+
+.pill-warning-icon {
+  font-size: 0.80rem;
+  flex-shrink: 0;
+}
+
+.pill-badge-critical {
+  font-size: 0.60rem;
+  font-weight: 800;
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: #ef4444;
+  color: #ffffff;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  flex-shrink: 0;
+  animation: pulseCritical 2s infinite ease-in-out;
+}
+
+@keyframes pulseCritical {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.82;
+    transform: scale(0.96);
+  }
+}
+
+@media (max-width: 600px) {
+  .fare-rule-pills-row {
+    gap: 6px;
+  }
+
+  .fare-rule-pill {
+    font-size: 0.74rem;
+    padding: 4px 8px;
+  }
+}
